@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useGetSoloAccess, useGetMe, useListSoloGroups, type SoloGroup } from "@workspace/api-client-react";
+import { useGetSoloAccess, useGetMe, useListSoloGroups, useListParties, type SoloGroup, type Party } from "@workspace/api-client-react";
 import { useSelectedCity } from "@/components/LocationContext";
 import { SEO } from "@/components/SEO";
 import { Spinner } from "@/components/ui/spinner";
 import { SoloVerificationFlow } from "@/components/solo-connect/SoloVerificationFlow";
 import { CreateGroupModal } from "@/components/solo-connect/CreateGroupModal";
+import { joinBadge } from "@/components/solo-connect/CreatePartyWizard";
 import { SoloGroupDetail } from "@/components/solo-connect/SoloGroupDetail";
 import {
   Crown,
@@ -23,18 +24,26 @@ import {
   CalendarDays,
   Gamepad2,
   Trophy,
+  PartyPopper,
   LogIn,
-  UserPlus,
   Smartphone,
   Camera,
   Flag,
   MessageCircle,
   CheckCircle2,
   ChevronRight,
+  Search,
+  Eye,
 } from "lucide-react";
 
 const GOLD = "#d4af37";
 const RED = "#b91c1c";
+const PARTY_ACCENT = "#f472b6";
+
+// What stands between a visitor and joining/booking a group. `null` means the
+// visitor is fully approved and can act; otherwise it names the next step they
+// must complete. Browsing groups & profiles is allowed in every case.
+type BookingGate = "login" | "premium" | "verify" | null;
 
 const ACTIVITY_FILTERS = [
   { value: "", label: "All" },
@@ -55,6 +64,7 @@ const ACTIVITY_ACCENT: Record<string, string> = {
   events: "#60a5fa",
   games: "#34d399",
   activities: "#fb923c",
+  party: "#f472b6",
 };
 const accentOf = (a: string) => ACTIVITY_ACCENT[a] ?? GOLD;
 const prettyActivity = (a: string) => a.replace(/_/g, " ");
@@ -86,6 +96,10 @@ export function SoloConnect() {
   // Lifted so the hero filter bar drives the group list below.
   const [activity, setActivity] = useState("");
 
+  // Admin and vendor (partner) roles bypass premium + verification gates entirely.
+  const userRole = me?.user?.role;
+  const isPrivileged = userRole === "admin" || userRole === "vendor";
+
   const loading = meLoading || (loggedIn && accessLoading);
 
   return (
@@ -107,21 +121,31 @@ export function SoloConnect() {
           {/* Hero section: left banner + filters · right misuse warning */}
           <HeroSection activity={activity} setActivity={setActivity} />
 
-          {/* Gated content */}
           <div className="mt-8">
             {loading ? (
               <div className="py-24 flex justify-center"><Spinner /></div>
             ) : !loggedIn ? (
               <LoggedOutShowcase />
-            ) : !access?.eligible ? (
-              <div className="space-y-10">
-                <PremiumGate />
-                <ShowcaseSections />
-              </div>
-            ) : access.verificationStatus !== "approved" ? (
+            ) : isPrivileged ? (
+              // Admin / partner: skip premium & verification — full access.
+              <BrowseExperience gate={null} gender={access?.gender ?? null} activity={activity} />
+            ) : access?.eligible && access.verificationStatus !== "approved" ? (
+              // Premium members mid-onboarding go straight to verification.
               <SoloVerificationFlow />
             ) : (
-              <ApprovedExperience gender={access.gender ?? null} activity={activity} />
+              <>
+                <BrowseExperience
+                  gate={!access?.eligible ? "premium" : null}
+                  gender={access?.gender ?? null}
+                  activity={activity}
+                />
+                {/* Marketing explainer below the browse for non-premium members. */}
+                {!access?.eligible && (
+                  <div className="mt-14">
+                    <ShowcaseSections />
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -294,7 +318,6 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
 // Where login should return the visitor once authenticated.
 const LOGIN_NEXT = `/login?next=${encodeURIComponent("/solo-connect")}`;
 const SIGNUP_NEXT = "/register";
-
 // Perks shown to logged-out visitors — the "what you get when you join" grid.
 const SHOWCASE_FEATURES = [
   {
@@ -344,23 +367,86 @@ const FLOW_STEPS = [
   { icon: Users, label: "Join groups", sub: "Get approved, then browse & meet up in your city" },
 ] as const;
 
+// Faux, representative plans used ONLY to build curiosity for logged-out
+// visitors. Deliberately not real data — guests must log in to see real groups.
+const TEASER_GROUPS = [
+  { activity: "nightlife", label: "Nightlife", name: "Friday Pub Crawl", count: "4/6", icon: Music },
+  { activity: "food_drinks", label: "Food & Drinks", name: "Sunday Brunch Club", count: "3/8", icon: Utensils },
+  { activity: "events", label: "Events", name: "Live Comedy Night", count: "6/10", icon: CalendarDays },
+  { activity: "games", label: "Games", name: "Bowling Night Out", count: "2/6", icon: Gamepad2 },
+  { activity: "happy_hours", label: "Happy Hours", name: "After-Work Drinks", count: "5/8", icon: Wine },
+  { activity: "activities", label: "Activities", name: "Sunday Match Screening", count: "7/12", icon: Trophy },
+] as const;
+
+// Logged-out experience: a curiosity-building teaser (no real groups revealed)
+// followed by the standard "what you get / how it works" explainer.
 function LoggedOutShowcase() {
   return (
-    <div className="space-y-10">
-      {/* ── Login-first call to action ───────────────────────────────── */}
-      <GlassCard className="!max-w-3xl p-8 md:p-10 text-center">
-        <span
-          className="inline-flex items-center justify-center h-16 w-16 rounded-2xl mb-5"
-          style={{ background: `linear-gradient(145deg, ${GOLD}26, ${RED}1a)`, border: `1px solid ${GOLD}55`, boxShadow: `0 0 30px ${GOLD}22` }}
-        >
-          <Lock className="h-7 w-7" style={{ color: GOLD }} />
+    <div className="space-y-14">
+      <CuriosityTeaser />
+      <ShowcaseSections />
+    </div>
+  );
+}
+
+// The eye-catching hook. A blurred wall of plans sits behind a lock + headline
+// so visitors can sense the activity but must log in to actually see it.
+function CuriosityTeaser() {
+  return (
+    <section
+      className="relative overflow-hidden rounded-3xl"
+      style={{ border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 24px 60px rgba(0,0,0,0.5)" }}
+    >
+      {/* Blurred faux-group wall — non-interactive, just for texture/curiosity */}
+      <div
+        aria-hidden
+        className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 p-5 md:p-6 select-none pointer-events-none"
+        style={{ filter: "blur(7px)", opacity: 0.6 }}
+      >
+        {TEASER_GROUPS.map((g) => {
+          const accent = accentOf(g.activity);
+          const Icon = g.icon;
+          return (
+            <div
+              key={g.name}
+              className="rounded-2xl p-5"
+              style={{ background: "linear-gradient(180deg, rgba(24,22,26,0.92), rgba(13,12,15,0.92))", border: "1px solid rgba(255,255,255,0.08)" }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold"
+                  style={{ background: `${accent}1f`, color: accent, border: `1px solid ${accent}40` }}>{g.label}</span>
+                <Icon className="h-4 w-4" style={{ color: accent }} />
+              </div>
+              <h4 className="font-serif text-lg mb-3" style={{ color: "#fff" }}>{g.name}</h4>
+              <span className="flex items-center gap-1 text-xs" style={{ color: GOLD }}><Users className="h-3.5 w-3.5" /> {g.count}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Warm/dark veil to push the wall back behind the message */}
+      <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(13,12,15,0.55), rgba(13,12,15,0.92))" }} />
+      <div className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 h-56 w-[80%] rounded-full blur-[120px] opacity-40" style={{ background: `${RED}55` }} />
+
+      {/* Curiosity overlay — the eye-catching hook + login CTA */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 py-10">
+        {/* Live pulse — makes it feel like plans are forming this very moment */}
+        <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em] mb-5"
+          style={{ background: `${RED}1f`, color: "#fca5a5", border: `1px solid ${RED}55` }}>
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full rounded-full animate-ping" style={{ background: "#f87171", opacity: 0.75 }} />
+            <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: "#ef4444" }} />
+          </span>
+          Plans forming near you now
         </span>
-        <h3 className="font-serif text-2xl md:text-3xl mb-2" style={{ color: "#fff" }}>
-          Please log in first to join Solo Connect
+        <h3 className="font-serif text-2xl md:text-[2.6rem] leading-[1.1] mb-3 max-w-2xl" style={{ color: "#fff", textShadow: "0 2px 20px rgba(0,0,0,0.6)" }}>
+          Your city is making plans tonight.<br className="hidden sm:block" />
+          <span style={{ color: GOLD }}>You're the only one missing.</span>
         </h3>
-        <p className="text-sm md:text-base mb-7 leading-relaxed max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.62)" }}>
-          Solo Connect is a verified, members-only space. Log in to your Royvento account to unlock it —
-          here's exactly what you get and how it works.
+        <p className="text-sm md:text-base mb-7 leading-relaxed max-w-xl" style={{ color: "rgba(255,255,255,0.82)" }}>
+          Verified people near you are filling up groups <span style={{ color: GOLD, fontWeight: 600 }}>right now</span> —
+          pub crawls, dinners, gigs, game nights. The seats are real and they go fast.
+          You just can't see who's in… <span style={{ color: "#fff", fontWeight: 600 }}>until you log in.</span>
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
@@ -368,20 +454,82 @@ function LoggedOutShowcase() {
             className="group inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
             style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 10px 30px ${RED}4d` }}
           >
-            <LogIn className="h-4 w-4" /> Log in to continue
+            <Eye className="h-4 w-4" /> Log in & see who's going out
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
           <Link
             href={SIGNUP_NEXT}
             className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
-            style={{ background: "rgba(255,255,255,0.06)", color: "#fff", border: `1px solid ${GOLD}55` }}
+            style={{ background: "rgba(255,255,255,0.08)", color: "#fff", border: `1px solid ${GOLD}55` }}
           >
-            <UserPlus className="h-4 w-4" style={{ color: GOLD }} /> Create an account
+            Create an account
           </Link>
         </div>
-      </GlassCard>
+        <p className="text-[11px] mt-4 inline-flex items-center gap-1.5" style={{ color: "rgba(255,255,255,0.5)" }}>
+          <Lock className="h-3 w-3" /> Members-only · verified people · your city
+        </p>
+      </div>
+    </section>
+  );
+}
 
-      <ShowcaseSections />
+// Slim "you can look, but joining needs a step" banner shown above the browse
+// list for logged-in non-premium members. Mirrors the gate copy used inside the
+// group-detail modal so the journey is consistent.
+function GuestBanner({ gate }: { gate: Exclude<BookingGate, null> }) {
+  const cfg = {
+    login: {
+      icon: Lock,
+      title: "You're browsing as a guest",
+      body: "Explore every group and profile in your city. Log in and get verified to join or book.",
+      cta: "Log in to continue",
+      href: LOGIN_NEXT,
+      ctaIcon: LogIn,
+    },
+    premium: {
+      icon: Crown,
+      title: "Browse freely — Premium to participate",
+      body: "You can see every group and profile. Upgrade to Premium to join groups, book party tickets, and access group chats.",
+      cta: "Upgrade to Premium",
+      href: "/subscription?plan=user_vip",
+      ctaIcon: Crown,
+    },
+    verify: {
+      icon: ShieldCheck,
+      title: "One step left to join",
+      body: "Complete phone + selfie verification to join groups and book parties.",
+      cta: "Complete verification",
+      href: "/solo-connect",
+      ctaIcon: ShieldCheck,
+    },
+  }[gate];
+  const Icon = cfg.icon;
+  const CtaIcon = cfg.ctaIcon;
+  return (
+    <div
+      className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 md:px-5 rounded-2xl mb-6"
+      style={{
+        background: "linear-gradient(180deg, rgba(24,22,26,0.9), rgba(14,13,16,0.9))",
+        border: `1px solid ${GOLD}33`,
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
+      }}
+    >
+      <span className="flex items-center justify-center h-11 w-11 rounded-2xl shrink-0"
+        style={{ background: `linear-gradient(145deg, ${GOLD}26, ${RED}1a)`, border: `1px solid ${GOLD}55`, boxShadow: `0 0 22px ${GOLD}1f` }}>
+        <Icon className="h-5 w-5" style={{ color: GOLD }} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="font-serif text-lg leading-tight" style={{ color: "#fff" }}>{cfg.title}</p>
+        <p className="text-[13px] leading-snug mt-0.5" style={{ color: "rgba(255,255,255,0.6)" }}>{cfg.body}</p>
+      </div>
+      <Link
+        href={cfg.href}
+        className="group inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold whitespace-nowrap transition-all hover:brightness-110 shrink-0"
+        style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 8px 22px ${RED}40` }}
+      >
+        <CtaIcon className="h-4 w-4" /> {cfg.cta}
+        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+      </Link>
     </div>
   );
 }
@@ -623,37 +771,18 @@ function VerificationPreview() {
   );
 }
 
-function PremiumGate() {
-  return (
-    <GlassCard className="p-8 text-center">
-      <span
-        className="inline-flex items-center justify-center h-16 w-16 rounded-2xl mb-5"
-        style={{ background: `linear-gradient(145deg, ${GOLD}26, ${RED}1a)`, border: `1px solid ${GOLD}55`, boxShadow: `0 0 30px ${GOLD}22` }}
-      >
-        <Crown className="h-7 w-7" style={{ color: GOLD }} />
-      </span>
-      <h3 className="font-serif text-2xl mb-2" style={{ color: "#fff" }}>A premium experience</h3>
-      <p className="text-sm mb-7 leading-relaxed" style={{ color: "rgba(255,255,255,0.6)" }}>
-        Upgrade to Royvento Premium to unlock Solo Connect and meet verified people for real plans.
-      </p>
-      <Link
-        href="/subscription?plan=user_vip"
-        className="group inline-flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
-        style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 10px 30px ${RED}4d` }}
-      >
-        Upgrade to Premium
-        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-      </Link>
-    </GlassCard>
-  );
-}
-
-function ApprovedExperience({ gender, activity }: { gender: string | null; activity: string }) {
+// The browse surface — used for guests, non-premium members AND fully approved
+// members. `gate` decides whether the join/create actions are live (`null`) or
+// replaced by a "log in / upgrade / verify" call to action.
+function BrowseExperience({ gate, gender, activity }: { gate: BookingGate; gender: string | null; activity: string }) {
+  void gender; // captured for parity with access payload; not shown on the browse banner
   const { selectedCity, detectLocation, detecting, locationError } = useSelectedCity();
   const [showCreate, setShowCreate] = useState(false);
   const [openGroupId, setOpenGroupId] = useState<number | null>(null);
+  const canAct = gate === null;
 
-  // Location gate — a verified city is required before any group is shown.
+  // Location gate — a city is required before any group is shown (applies to
+  // guests too: they pick/detect a city, then browse it).
   if (!selectedCity) {
     return (
       <GlassCard className="p-8 text-center">
@@ -681,60 +810,294 @@ function ApprovedExperience({ gender, activity }: { gender: string | null; activ
 
   return (
     <div className="w-full">
-      {/* Verified + location banner */}
-      <div
-        className="flex flex-wrap items-center justify-between gap-3 p-4 md:px-5 rounded-2xl mb-6"
-        style={{
-          background: "linear-gradient(180deg, rgba(24,22,26,0.9), rgba(14,13,16,0.9))",
-          border: "1px solid rgba(255,255,255,0.08)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
-        }}
-      >
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)" }}>
-            <ShieldCheck className="h-3.5 w-3.5" /> Verified
-          </span>
-          <span className="inline-flex items-center gap-1.5" style={{ color: "rgba(255,255,255,0.78)" }}>
-            <MapPin className="h-4 w-4" style={{ color: GOLD }} /> {selectedCity}
-          </span>
-          <span className="inline-flex items-center gap-1.5" style={{ color: "rgba(255,255,255,0.78)" }}>
-            <Users className="h-4 w-4" style={{ color: GOLD }} /> All groups
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
-          style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 8px 22px ${RED}40` }}
+      {gate === null ? (
+        /* Verified + location banner (approved members only) */
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 p-4 md:px-5 rounded-2xl mb-6"
+          style={{
+            background: "linear-gradient(180deg, rgba(24,22,26,0.9), rgba(14,13,16,0.9))",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
+          }}
         >
-          <Plus className="h-4 w-4" /> Create group
-        </button>
-      </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)" }}>
+              <ShieldCheck className="h-3.5 w-3.5" /> Verified
+            </span>
+            <span className="inline-flex items-center gap-1.5" style={{ color: "rgba(255,255,255,0.78)" }}>
+              <MapPin className="h-4 w-4" style={{ color: GOLD }} /> {selectedCity}
+            </span>
+            <span className="inline-flex items-center gap-1.5" style={{ color: "rgba(255,255,255,0.78)" }}>
+              <Users className="h-4 w-4" style={{ color: GOLD }} /> All groups
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
+            style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 8px 22px ${RED}40` }}
+          >
+            <Plus className="h-4 w-4" /> Create group
+          </button>
+        </div>
+      ) : (
+        <GuestBanner gate={gate} />
+      )}
 
-      <GroupList city={selectedCity} activity={activity} onOpen={setOpenGroupId} />
+      <PartyList city={selectedCity} />
 
-      {showCreate && (
+      <GroupList city={selectedCity} activity={activity} canCreate={canAct} onOpen={setOpenGroupId} />
+
+      {canAct && showCreate && (
         <CreateGroupModal city={selectedCity} onClose={() => setShowCreate(false)} />
       )}
       {openGroupId !== null && (
-        <SoloGroupDetail groupId={openGroupId} city={selectedCity} onClose={() => setOpenGroupId(null)} />
+        <SoloGroupDetail groupId={openGroupId} city={selectedCity} gate={gate} onClose={() => setOpenGroupId(null)} />
       )}
     </div>
+  );
+}
+
+// Discovery rail for standalone "Create Your Own Party" entities (their own
+// ticketed product — not solo groups). Cards link to the party profile page.
+function PartyList({ city }: { city: string }) {
+  const { data: parties = [], isLoading } = useListParties(
+    { city },
+    { query: { retry: false } as any },
+  );
+  const [q, setQ] = useState("");
+  const [tType, setTType] = useState<"all" | "free" | "paid">("all");
+  const [minP, setMinP] = useState("");
+  const [maxP, setMaxP] = useState("");
+
+  if (isLoading) return null;
+  const live = (parties as Party[]).filter((p) => p.status !== "cancelled");
+  if (live.length === 0) return null;
+
+  const filtered = live.filter((p) => {
+    if (tType !== "all" && p.ticketType !== tType) return false;
+    if (q.trim()) {
+      const hay = `${p.name} ${p.venueName} ${p.city}`.toLowerCase();
+      if (!hay.includes(q.trim().toLowerCase())) return false;
+    }
+    // Price range applies to paid parties; a min > 0 excludes free entries.
+    if (p.ticketType === "paid") {
+      const price = Number(p.ticketPrice);
+      if (minP && price < Number(minP)) return false;
+      if (maxP && price > Number(maxP)) return false;
+    } else if (minP && Number(minP) > 0) {
+      return false;
+    }
+    return true;
+  });
+
+  const seg = (v: "all" | "free" | "paid", label: string) => {
+    const active = tType === v;
+    return (
+      <button key={v} type="button" onClick={() => setTType(v)}
+        className="px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all duration-200"
+        style={{
+          background: active ? `linear-gradient(135deg, ${PARTY_ACCENT}33, ${RED}22)` : "transparent",
+          border: `1px solid ${active ? PARTY_ACCENT : "transparent"}`,
+          color: active ? "#fff" : "rgba(255,255,255,0.5)",
+          boxShadow: active ? `0 0 14px ${PARTY_ACCENT}30` : "none",
+        }}>
+        {label}
+      </button>
+    );
+  };
+
+  return (
+    <section className="mb-9">
+      {/* Premium header card */}
+      <div
+        className="relative mb-5 overflow-hidden rounded-2xl p-5 md:p-6"
+        style={{
+          background: `linear-gradient(135deg, rgba(8,6,0,0.99) 0%, rgba(26,20,3,0.97) 40%, rgba(18,13,1,0.98) 70%, rgba(8,6,0,0.99) 100%)`,
+          border: `1px solid ${GOLD}28`,
+          boxShadow: `0 0 80px ${GOLD}12, 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 ${GOLD}18`,
+        }}
+      >
+        {/* Ambient glows */}
+        <div className="pointer-events-none absolute -top-16 -right-16 h-52 w-52 rounded-full blur-3xl opacity-50"
+          style={{ background: `${PARTY_ACCENT}1a` }} />
+        <div className="pointer-events-none absolute -bottom-16 -left-16 h-52 w-52 rounded-full blur-3xl opacity-35"
+          style={{ background: `${RED}18` }} />
+
+        {/* Top shimmer line */}
+        <div className="absolute top-0 left-0 right-0 h-px"
+          style={{ background: `linear-gradient(90deg, transparent 5%, ${GOLD}cc 40%, ${GOLD}cc 60%, transparent 95%)` }} />
+
+        {/* Header row */}
+        <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 mb-5">
+          <span
+            className="flex items-center justify-center h-[52px] w-[52px] rounded-2xl shrink-0"
+            style={{
+              background: `linear-gradient(145deg, ${PARTY_ACCENT}28, ${RED}1e)`,
+              border: `1px solid ${PARTY_ACCENT}50`,
+              boxShadow: `0 0 32px ${PARTY_ACCENT}38, inset 0 1px 0 rgba(255,255,255,0.07)`,
+            }}
+          >
+            <PartyPopper className="h-6 w-6" style={{ color: PARTY_ACCENT }} />
+          </span>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-baseline gap-2.5 mb-1">
+              <h3
+                className="font-serif text-2xl md:text-[1.75rem] leading-none"
+                style={{
+                  background: `linear-gradient(135deg, #ffffff 0%, #fddcee 45%, ${PARTY_ACCENT} 100%)`,
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}
+              >
+                Parties near you
+              </h3>
+              <span
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold"
+                style={{
+                  background: `${PARTY_ACCENT}20`,
+                  color: PARTY_ACCENT,
+                  border: `1px solid ${PARTY_ACCENT}50`,
+                  boxShadow: `0 0 12px ${PARTY_ACCENT}28`,
+                }}
+              >
+                {filtered.length} live
+              </span>
+            </div>
+            <p className="text-[13px] leading-relaxed" style={{ color: "rgba(255,255,255,0.42)" }}>
+              Host-run parties you can book — free RSVP or paid tickets
+            </p>
+          </div>
+        </div>
+
+        {/* Premium filter panel */}
+        <div
+          className="relative flex flex-wrap items-center gap-2 rounded-xl p-1.5"
+          style={{
+            background: "rgba(0,0,0,0.4)",
+            border: "1px solid rgba(255,255,255,0.06)",
+          }}
+        >
+          {/* Search */}
+          <div className="relative flex-1 min-w-[160px]">
+            <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "rgba(255,255,255,0.28)" }} />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search parties…"
+              className="w-full pl-9 pr-3 py-2.5 rounded-lg text-sm outline-none"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.07)",
+                color: "#fff",
+              }}
+            />
+          </div>
+
+          {/* Segment: All / Free / Paid */}
+          <div
+            className="flex items-center gap-0.5 rounded-lg p-1"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            {seg("all", "All")}{seg("free", "Free")}{seg("paid", "Paid")}
+          </div>
+
+          {/* Price range */}
+          <div className="flex items-center gap-1.5">
+            <input
+              value={minP}
+              onChange={(e) => setMinP(e.target.value.replace(/[^0-9]/g, ""))}
+              inputMode="numeric"
+              placeholder="₹ min"
+              disabled={tType === "free"}
+              className="w-20 px-2.5 py-2.5 rounded-lg text-sm outline-none"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", color: "#fff", opacity: tType === "free" ? 0.3 : 1, transition: "opacity 0.2s" }}
+            />
+            <span className="text-xs" style={{ color: "rgba(255,255,255,0.22)" }}>—</span>
+            <input
+              value={maxP}
+              onChange={(e) => setMaxP(e.target.value.replace(/[^0-9]/g, ""))}
+              inputMode="numeric"
+              placeholder="₹ max"
+              disabled={tType === "free"}
+              className="w-20 px-2.5 py-2.5 rounded-lg text-sm outline-none"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", color: "#fff", opacity: tType === "free" ? 0.3 : 1, transition: "opacity 0.2s" }}
+            />
+          </div>
+        </div>
+
+        {/* Bottom fade line */}
+        <div className="absolute bottom-0 left-0 right-0 h-px"
+          style={{ background: `linear-gradient(90deg, transparent, ${GOLD}30, transparent)` }} />
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-sm text-center py-8 rounded-2xl" style={{ color: "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.1)" }}>No parties match your filters.</p>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filtered.map((p) => <PartyCard key={p.id} p={p} />)}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// Mirrors the homepage EventCard visual language so listings read consistently.
+function PartyCard({ p }: { p: Party }) {
+  const isPaid = p.ticketType === "paid";
+  const loc = [p.venueName, p.city].filter(Boolean).join(", ");
+  return (
+    <Link href={`/party/${p.id}`}>
+      <article className="group cursor-pointer overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111111] transition-all duration-300 hover:border-[#f472b6]/30 hover:shadow-[0_0_0_1px_rgba(244,114,182,0.18),0_8px_32px_rgba(0,0,0,0.6)]">
+        {/* Image */}
+        <div className="relative aspect-video overflow-hidden bg-black/40">
+          {p.coverImageUrl
+            ? <img src={p.coverImageUrl} alt={p.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.05]" />
+            : <div className="h-full w-full" style={{ background: `linear-gradient(135deg, ${PARTY_ACCENT}33, ${RED}22)` }} />}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30" />
+          <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/5" />
+        </div>
+        {/* Body */}
+        <div className="p-3.5">
+          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white" style={{ background: PARTY_ACCENT }}>Party</span>
+            {!isPaid && <span className="inline-flex items-center rounded-md bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Free Entry</span>}
+            <span className="inline-flex items-center rounded-md border border-white/20 bg-white/[0.08] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white/85">{joinBadge(p.joinType)}</span>
+          </div>
+          <h3 className="text-[15px] font-bold leading-tight text-white line-clamp-1 transition-colors duration-200 group-hover:text-[#f472b6]">{p.name}</h3>
+          <p className="mt-0.5 text-[12px] text-muted-foreground line-clamp-1">
+            {[loc, p.partyDate].filter(Boolean).join(" · ") || "Party"}
+          </p>
+          <div className="mt-2.5 flex items-center justify-between border-t border-white/[0.06] pt-2.5">
+            <span className="text-[11px] text-muted-foreground/70">Entry</span>
+            <span className="text-sm font-bold text-white">{isPaid ? `₹${Number(p.ticketPrice).toLocaleString("en-IN")}` : "Free"}</span>
+          </div>
+        </div>
+      </article>
+    </Link>
   );
 }
 
 function GroupList({
   city,
   activity,
+  canCreate,
   onOpen,
 }: {
   city: string;
   activity: string;
+  canCreate: boolean;
   onOpen: (id: number) => void;
 }) {
-  // Fetch all of the user's gender+city groups once, then split into per-activity
-  // sections client-side. The hero filter just narrows which sections show.
-  const { data: groups, isLoading } = useListSoloGroups({ city });
+  // Show every group across the user's current STATE when we know it (GPS detect);
+  // otherwise fall back to the same-city scope. Split into per-activity sections
+  // client-side — the hero filter just narrows which sections show.
+  const { selectedState } = useSelectedCity();
+  const { data: groups, isLoading } = useListSoloGroups(
+    selectedState ? { state: selectedState } : { city },
+  );
 
   if (isLoading) {
     return <div className="py-16 flex justify-center"><Spinner /></div>;
@@ -748,7 +1111,11 @@ function GroupList({
         </span>
         <p className="font-serif text-xl mb-1" style={{ color: "#fff" }}>No groups yet in {city}</p>
         <p className="text-sm" style={{ color: "rgba(255,255,255,0.5)" }}>
-          Be the first to start one — tap <span style={{ color: GOLD }}>Create group</span> above.
+          {canCreate ? (
+            <>Be the first to start one — tap <span style={{ color: GOLD }}>Create group</span> above.</>
+          ) : (
+            <>Check back soon, or join Solo Connect to start the first one.</>
+          )}
         </p>
       </GlassCard>
     );
@@ -790,10 +1157,10 @@ function GroupList({
             {list.length === 0 ? (
               <div className="rounded-2xl px-5 py-8 text-center text-sm"
                 style={{ background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.45)" }}>
-                No {s.label} groups yet in {city}. Be the first — tap <span style={{ color: GOLD }}>Create group</span>.
+                No {s.label} groups yet in {city}.{canCreate ? <> Be the first — tap <span style={{ color: GOLD }}>Create group</span>.</> : <> Check back soon.</>}
               </div>
             ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {list.map((g) => <GroupCard key={g.id} g={g} onOpen={onOpen} />)}
               </div>
             )}
@@ -807,60 +1174,76 @@ function GroupList({
 function GroupCard({ g, onOpen }: { g: SoloGroup; onOpen: (id: number) => void }) {
   const accent = accentOf(g.activityType);
   const full = g.memberCount >= g.maxMembers;
+  const isParty = g.activityType === "party";
+  const ticketLabel = isParty
+    ? g.ticketType === "paid"
+      ? `₹${Number(g.ticketPrice ?? 0).toLocaleString("en-IN")}`
+      : g.ticketType === "free"
+        ? "Free entry"
+        : null
+    : null;
   return (
     <button
       type="button"
       onClick={() => onOpen(g.id)}
-      className="group relative text-left p-5 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1"
-      style={{
-        background: "linear-gradient(180deg, rgba(24,22,26,0.92), rgba(13,12,15,0.92))",
-        border: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 10px 34px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)",
-      }}
+      className="group text-left rounded-2xl overflow-hidden transition-all duration-300 hover:border-white/[0.14] hover:shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
+      style={{ background: "#111111", border: "1px solid rgba(255,255,255,0.06)" }}
     >
-      <span className="absolute top-0 left-0 right-0 h-px opacity-60 group-hover:opacity-100 transition-opacity"
-        style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }} />
-      <span className="pointer-events-none absolute -top-16 -right-16 h-32 w-32 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-        style={{ background: `${accent}33` }} />
-
-      <div className="flex items-center justify-between mb-2.5">
-        <span
-          className="px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold"
-          style={{ background: `${accent}1f`, color: accent, border: `1px solid ${accent}40` }}
-        >
-          {prettyActivity(g.activityType)}
-        </span>
-        {g.status !== "open" && (
-          <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide" style={{ color: "rgba(255,255,255,0.4)" }}>
-            <Lock className="h-3 w-3" /> {g.status}
-          </span>
-        )}
-      </div>
-
-      <h4 className="font-serif text-lg leading-snug mb-1.5" style={{ color: "#fff" }}>{g.name}</h4>
-      {g.venueName && (
-        <p className="text-xs mb-3 flex items-center gap-1.5" style={{ color: "rgba(255,255,255,0.5)" }}>
-          <MapPin className="h-3 w-3" /> {g.venueName}
-        </p>
+      {/* Cover image — only for party-type cards that have a photo */}
+      {isParty && g.coverImageUrl && (
+        <div className="relative aspect-video overflow-hidden bg-black/40">
+          <img src={g.coverImageUrl} alt="" loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.05]" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30" />
+          <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/5" />
+          {ticketLabel && (
+            <span className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded-full font-semibold backdrop-blur-sm"
+              style={{ background: "rgba(0,0,0,0.65)", color: accent, border: `1px solid ${accent}55` }}>
+              {ticketLabel}
+            </span>
+          )}
+        </div>
       )}
 
-      <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <span className="flex items-center gap-2 text-xs" style={{ color: full ? "#fca5a5" : "rgba(255,255,255,0.75)" }}>
-          <span className="inline-flex items-center gap-1" title="Men">👨 {g.menCount}</span>
-          <span className="inline-flex items-center gap-1" title="Women">👩 {g.womenCount}</span>
-          <span className="inline-flex items-center gap-1 ml-0.5" style={{ color: full ? "#fca5a5" : GOLD }} title="Total members">
-            <Users className="h-3.5 w-3.5" /> {g.memberCount}/{g.maxMembers}
+      <div className="p-3.5">
+        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white"
+            style={{ background: accent }}>
+            {prettyActivity(g.activityType)}
           </span>
-        </span>
-        {g.myMembershipStatus === "approved" ? (
-          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(74,222,128,0.14)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.3)" }}>Joined</span>
-        ) : g.myMembershipStatus === "requested" ? (
-          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: `${GOLD}1a`, color: GOLD, border: `1px solid ${GOLD}40` }}>Pending</span>
-        ) : (
-          <span className="inline-flex items-center gap-1 text-xs font-medium transition-transform group-hover:translate-x-0.5" style={{ color: accent }}>
+          {g.status !== "open" && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-white/20 bg-white/[0.08] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white/85">
+              <Lock className="h-2.5 w-2.5" /> {g.status}
+            </span>
+          )}
+          {g.myMembershipStatus === "approved" && (
+            <span className="inline-flex items-center rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Joined</span>
+          )}
+          {g.myMembershipStatus === "requested" && (
+            <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+              style={{ background: `${GOLD}33`, color: GOLD }}>Pending</span>
+          )}
+        </div>
+
+        <h4 className="text-[15px] font-bold leading-tight text-white line-clamp-1">{g.name}</h4>
+        <p className="mt-0.5 text-[12px] text-muted-foreground line-clamp-1">
+          {g.venueName || g.city}
+        </p>
+
+        <div className="mt-2.5 flex items-center justify-between border-t border-white/[0.06] pt-2.5">
+          <span className="flex items-center gap-1.5 text-[11px]"
+            style={{ color: full ? "#fca5a5" : "rgba(255,255,255,0.65)" }}>
+            <span title="Men">👨 {g.menCount}</span>
+            <span title="Women">👩 {g.womenCount}</span>
+            <span className="ml-0.5 flex items-center gap-0.5" style={{ color: full ? "#fca5a5" : GOLD }}>
+              <Users className="h-3 w-3" /> {g.memberCount}/{g.maxMembers}
+            </span>
+          </span>
+          <span className="inline-flex items-center gap-1 text-xs font-medium transition-transform group-hover:translate-x-0.5"
+            style={{ color: accent }}>
             View <ArrowRight className="h-3.5 w-3.5" />
           </span>
-        )}
+        </div>
       </div>
     </button>
   );

@@ -1894,6 +1894,21 @@ export const soloGroupsTable = pgTable(
     expiryWarnedAt: timestamp("expiry_warned_at", { withTimezone: true }),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     deletedReason: varchar("deleted_reason", { length: 30 }).notNull().default(""),
+    // ── "Create Your Own Party" fields (activity_type = 'party') ──────────
+    // A user-hosted party carries its own cover photo, full address + pin,
+    // a Google-Maps link, organizer name, an end time and a ticket model.
+    // All empty/null for non-party groups.
+    coverImageUrl: text("cover_image_url").notNull().default(""),
+    address: text("address").notNull().default(""),
+    pinCode: varchar("pin_code", { length: 12 }).notNull().default(""),
+    mapLocation: text("map_location").notNull().default(""),
+    organizerName: varchar("organizer_name", { length: 120 }).notNull().default(""),
+    endTime: varchar("end_time", { length: 8 }).notNull().default(""),
+    // "" (n/a) | free | paid
+    ticketType: varchar("ticket_type", { length: 10 }).notNull().default(""),
+    ticketPrice: numeric("ticket_price", { precision: 10, scale: 2 }).notNull().default("0"),
+    // Total party capacity (paid parties); null = not applicable / unlimited.
+    capacity: integer("capacity"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -2025,3 +2040,216 @@ export const soloDeletedGroupsLogTable = pgTable(
   }),
 );
 export type SoloDeletedGroupLog = typeof soloDeletedGroupsLogTable.$inferSelect;
+
+// ─── "Create Your Own Party" vertical ────────────────────────────────────────
+//
+// A standalone, user-hosted ticketed party product. Deliberately ISOLATED from
+// the pub/club/event/vendor tables (its own entity, tickets, bookings, payments,
+// commission config and attendee list) so its money flows never touch the
+// heavily-used partner financial tables. Mirrors the Event Organizer vertical's
+// shape, minus manager/QR/check-in/table-booking. Online payment only.
+
+// The party entity. organizerUserId/createdBy are a normal user (the host).
+// joinType GATES who may book (enforced server-side against users.gender).
+export const createYourPartyTable = pgTable(
+  "create_your_party",
+  {
+    id: serial("id").primaryKey(),
+    organizerUserId: integer("organizer_user_id").notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    slug: varchar("slug", { length: 200 }).notNull().default(""),
+    coverImageUrl: text("cover_image_url").notNull().default(""),
+    // Optional host-uploaded photo gallery, shown to viewers below the hero.
+    galleryImages: text("gallery_images").array().notNull().default([]),
+    description: text("description").notNull().default(""),
+    rules: text("rules").notNull().default(""),
+    category: varchar("category", { length: 80 }).notNull().default(""),
+    // public | private
+    visibility: varchar("visibility", { length: 10 }).notNull().default("public"),
+    venueName: varchar("venue_name", { length: 255 }).notNull().default(""),
+    address: text("address").notNull().default(""),
+    city: varchar("city", { length: 100 }).notNull().default(""),
+    state: varchar("state", { length: 100 }).notNull().default(""),
+    pinCode: varchar("pin_code", { length: 12 }).notNull().default(""),
+    mapLocation: text("map_location").notNull().default(""),
+    partyDate: date("party_date"),
+    startTime: varchar("start_time", { length: 8 }).notNull().default(""),
+    endTime: varchar("end_time", { length: 8 }).notNull().default(""),
+    // male_only | female_only | mixed — GATES booking by gender (mandatory).
+    joinType: varchar("join_type", { length: 12 }).notNull().default("mixed"),
+    organizerName: varchar("organizer_name", { length: 120 }).notNull().default(""),
+    capacity: integer("capacity").notNull().default(0),
+    // ── Optional vibe metadata ───────────────────────────────────────────
+    // age_group: '' | 18-25 | 25-35 | 35+   dress_code: '' | casual | smart_casual | black_theme | white_theme
+    ageGroup: varchar("age_group", { length: 12 }).notNull().default(""),
+    dressCode: varchar("dress_code", { length: 20 }).notNull().default(""),
+    // Party preferences — '' (unspecified) | yes | no
+    drinking: varchar("drinking", { length: 4 }).notNull().default(""),
+    smoking: varchar("smoking", { length: 4 }).notNull().default(""),
+    coupleFriendly: varchar("couple_friendly", { length: 4 }).notNull().default(""),
+    lgbtqFriendly: varchar("lgbtq_friendly", { length: 4 }).notNull().default(""),
+    // published | sales_stopped | cancelled | completed
+    status: varchar("status", { length: 16 }).notNull().default("published"),
+    createdBy: integer("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("cyp_organizer_idx").on(t.organizerUserId),
+    cityStatusIdx: index("cyp_city_status_idx").on(t.city, t.status),
+    slugIdx: index("cyp_slug_idx").on(t.slug),
+  }),
+);
+export type CreateYourParty = typeof createYourPartyTable.$inferSelect;
+
+// Ticket model for a party (free | paid). Usually one row per party, but kept as
+// a table (mirrors event_tickets) for future multi-tier support.
+export const createYourPartyTicketsTable = pgTable(
+  "create_your_party_tickets",
+  {
+    id: serial("id").primaryKey(),
+    partyId: integer("party_id")
+      .notNull()
+      .references(() => createYourPartyTable.id, { onDelete: "cascade" }),
+    // free | paid
+    type: varchar("type", { length: 10 }).notNull().default("free"),
+    name: varchar("name", { length: 120 }).notNull().default("Entry"),
+    price: numeric("price", { precision: 10, scale: 2 }).notNull().default("0"),
+    quantity: integer("quantity").notNull().default(0),
+    soldCount: integer("sold_count").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    partyIdx: index("cyp_tickets_party_idx").on(t.partyId),
+  }),
+);
+export type CreateYourPartyTicket = typeof createYourPartyTicketsTable.$inferSelect;
+
+// A booking/order. commissionAmount + netAmount are LOCKED at confirmation so
+// later commission-config changes never re-price history.
+export const createYourPartyBookingsTable = pgTable(
+  "create_your_party_bookings",
+  {
+    id: serial("id").primaryKey(),
+    partyId: integer("party_id")
+      .notNull()
+      .references(() => createYourPartyTable.id, { onDelete: "cascade" }),
+    ticketId: integer("ticket_id")
+      .notNull()
+      .references(() => createYourPartyTicketsTable.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull(),
+    bookingCode: varchar("booking_code", { length: 16 }).notNull(),
+    name: varchar("name", { length: 255 }).notNull().default(""),
+    email: varchar("email", { length: 255 }).notNull().default(""),
+    phone: varchar("phone", { length: 50 }).notNull().default(""),
+    quantity: integer("quantity").notNull().default(1),
+    totalPrice: numeric("total_price", { precision: 10, scale: 2 }).notNull().default("0"),
+    commissionAmount: numeric("commission_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+    netAmount: numeric("net_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+    // payment_pending | confirmed | cancelled | completed
+    status: varchar("status", { length: 20 }).notNull().default("confirmed"),
+    // none | initiated | success | failed
+    paymentStatus: varchar("payment_status", { length: 12 }).notNull().default("none"),
+    // Door check-in — set when the host scans this booking's QR/ticket code.
+    checkedIn: boolean("checked_in").notNull().default(false),
+    checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  },
+  (t) => ({
+    partyIdx: index("cyp_bookings_party_idx").on(t.partyId),
+    userIdx: index("cyp_bookings_user_idx").on(t.userId),
+    codeUniq: uniqueIndex("cyp_bookings_code_uniq").on(t.bookingCode),
+  }),
+);
+export type CreateYourPartyBooking = typeof createYourPartyBookingsTable.$inferSelect;
+
+// Razorpay payment record for a paid party booking (online only). Mirrors the
+// relevant subset of the shared payments table but isolated.
+export const createYourPartyPaymentsTable = pgTable(
+  "create_your_party_payments",
+  {
+    id: serial("id").primaryKey(),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => createYourPartyBookingsTable.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull(),
+    amount: numeric("amount", { precision: 10, scale: 2 }).notNull().default("0"),
+    razorpayOrderId: varchar("razorpay_order_id", { length: 64 }).notNull().default(""),
+    razorpayPaymentId: varchar("razorpay_payment_id", { length: 64 }).notNull().default(""),
+    // initiated | success | failed
+    status: varchar("status", { length: 12 }).notNull().default("initiated"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    bookingIdx: index("cyp_payments_booking_idx").on(t.bookingId),
+    orderIdx: index("cyp_payments_order_idx").on(t.razorpayOrderId),
+  }),
+);
+export type CreateYourPartyPayment = typeof createYourPartyPaymentsTable.$inferSelect;
+
+// Platform commission CONFIG for parties — a single active row, admin-set.
+// Independent of pub/club/event commission. Per-booking realised amounts are
+// locked onto create_your_party_bookings.
+export const createYourPartyCommissionsTable = pgTable(
+  "create_your_party_commissions",
+  {
+    id: serial("id").primaryKey(),
+    // fixed | percentage
+    commissionType: varchar("commission_type", { length: 12 }).notNull().default("percentage"),
+    value: numeric("value", { precision: 10, scale: 2 }).notNull().default("10"),
+    active: boolean("active").notNull().default(true),
+    updatedBy: integer("updated_by"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+);
+export type CreateYourPartyCommission = typeof createYourPartyCommissionsTable.$inferSelect;
+
+// Attendee list — one row per confirmed booking, used by the organizer's
+// "View Attendees" / "Upcoming Guests" views.
+export const createYourPartyAttendeesTable = pgTable(
+  "create_your_party_attendees",
+  {
+    id: serial("id").primaryKey(),
+    partyId: integer("party_id")
+      .notNull()
+      .references(() => createYourPartyTable.id, { onDelete: "cascade" }),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => createYourPartyBookingsTable.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull(),
+    name: varchar("name", { length: 255 }).notNull().default(""),
+    gender: varchar("gender", { length: 20 }).notNull().default(""),
+    quantity: integer("quantity").notNull().default(1),
+    // going | cancelled
+    status: varchar("status", { length: 12 }).notNull().default("going"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    partyIdx: index("cyp_attendees_party_idx").on(t.partyId),
+    bookingIdx: index("cyp_attendees_booking_idx").on(t.bookingId),
+  }),
+);
+export type CreateYourPartyAttendee = typeof createYourPartyAttendeesTable.$inferSelect;
+
+// Party group chat — host + confirmed attendees only. Mirrors solo_group_messages.
+// Viewers can see the chat panel on the profile but the API gates read/write to
+// people who've joined (booked) the party (or the host).
+export const createYourPartyMessagesTable = pgTable(
+  "create_your_party_messages",
+  {
+    id: serial("id").primaryKey(),
+    partyId: integer("party_id")
+      .notNull()
+      .references(() => createYourPartyTable.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    partyIdx: index("cyp_messages_party_idx").on(t.partyId),
+  }),
+);
+export type CreateYourPartyMessage = typeof createYourPartyMessagesTable.$inferSelect;

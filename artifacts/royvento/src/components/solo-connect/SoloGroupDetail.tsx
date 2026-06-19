@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetSoloGroup,
@@ -14,13 +15,19 @@ import {
   getListSoloMessagesQueryKey,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { useRequireGender } from "@/components/useRequireGender";
 import { apiPost } from "@/lib/api";
 import { uploadImage } from "@/lib/uploadImage";
-import { X, MapPin, Calendar, Users, Phone, Lock, ShieldAlert, Check, UserX, MessageCircle, Send, Flag } from "lucide-react";
+import { X, MapPin, Calendar, Users, Phone, Lock, ShieldAlert, Check, UserX, MessageCircle, Send, Flag, Ticket, Clock, User, ExternalLink, LogIn, Crown, ShieldCheck, ArrowRight } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 
 const GOLD = "#d4af37";
 const RED = "#b91c1c";
+
+// Mirrors the page-level gate: when set, the visitor can view the profile but
+// must complete this step before joining/booking.
+type BookingGate = "login" | "premium" | "verify" | null;
+const LOGIN_NEXT = `/login?next=${encodeURIComponent("/solo-connect")}`;
 
 const ACTIVITY_ACCENT: Record<string, string> = {
   nightlife: "#a78bfa",
@@ -29,9 +36,23 @@ const ACTIVITY_ACCENT: Record<string, string> = {
   events: "#60a5fa",
   games: "#34d399",
   activities: "#fb923c",
+  party: "#f472b6",
 };
 const accentOf = (a: string) => ACTIVITY_ACCENT[a] ?? GOLD;
 const prettyActivity = (a: string) => a.replace(/_/g, " ");
+
+// Compact labelled fact tile used in the party details grid.
+function PartyFact({ icon: Icon, label, value }: { icon: typeof MapPin; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-2.5 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+      <Icon className="h-4 w-4 mt-0.5 shrink-0" style={{ color: "#f472b6" }} />
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.45)" }}>{label}</p>
+        <p className="text-sm break-words" style={{ color: "rgba(255,255,255,0.85)" }}>{value}</p>
+      </div>
+    </div>
+  );
+}
 
 const EMERGENCY = [
   { label: "Police", number: "100" },
@@ -43,10 +64,12 @@ const EMERGENCY = [
 export function SoloGroupDetail({
   groupId,
   city,
+  gate = null,
   onClose,
 }: {
   groupId: number;
   city: string;
+  gate?: BookingGate;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
@@ -60,6 +83,18 @@ export function SoloGroupDetail({
   const remove = useRemoveSoloMember();
   const lock = useLockSoloGroup();
   const close = useCloseSoloGroup();
+  const { ensureGender, modal: genderModal } = useRequireGender();
+
+  // Send the join request — guarded so the caller always has a binary gender
+  // (reused silently if already set, otherwise collected first).
+  function requestJoin() {
+    ensureGender(() =>
+      join.mutate({ id: groupId, data: { city } }, {
+        onSuccess: () => { toast({ title: "Join request sent!" }); refresh(); },
+        onError: (e) => toast({ title: e instanceof Error ? e.message : "Could not join", variant: "destructive" }),
+      }),
+    );
+  }
 
   function refresh() {
     qc.invalidateQueries({ queryKey: ["/api/solo-connect/groups"] });
@@ -107,6 +142,13 @@ export function SoloGroupDetail({
         {isLoading || !group ? (
           <div className="py-24 flex justify-center"><Spinner /></div>
         ) : (
+          <>
+          {group.activityType === "party" && group.coverImageUrl && (
+            <div className="relative h-44 w-full overflow-hidden">
+              <img src={group.coverImageUrl} alt="" className="h-full w-full object-cover" />
+              <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, transparent 50%, rgba(13,12,15,0.98))" }} />
+            </div>
+          )}
           <div className="p-6 md:p-7">
             <span
               className="inline-block px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold mb-3"
@@ -123,12 +165,69 @@ export function SoloGroupDetail({
               <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{group.memberCount}/{group.maxMembers}</span>
             </div>
 
+            {/* Party details — organizer, ticket, full address, map link, end time. */}
+            {group.activityType === "party" && (
+              <div className="grid sm:grid-cols-2 gap-2.5 mb-5">
+                {group.organizerName && (
+                  <PartyFact icon={User} label="Hosted by" value={group.organizerName} />
+                )}
+                <PartyFact
+                  icon={Ticket}
+                  label="Ticket"
+                  value={group.ticketType === "paid"
+                    ? `₹${Number(group.ticketPrice ?? 0).toLocaleString("en-IN")}${group.capacity ? ` · ${group.capacity} seats` : ""}`
+                    : "Free entry"}
+                />
+                {(group.startTime || group.endTime) && (
+                  <PartyFact icon={Clock} label="Time" value={`${group.startTime || "—"}${group.endTime ? ` – ${group.endTime}` : ""}`} />
+                )}
+                {group.address && (
+                  <PartyFact icon={MapPin} label="Address" value={`${group.address}${group.pinCode ? ` · ${group.pinCode}` : ""}`} />
+                )}
+                {group.mapLocation && (
+                  <a
+                    href={group.mapLocation}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 p-3 rounded-xl transition-all hover:brightness-110 sm:col-span-2"
+                    style={{ background: "rgba(244,114,182,0.1)", border: "1px solid rgba(244,114,182,0.3)" }}
+                  >
+                    <ExternalLink className="h-4 w-4 shrink-0" style={{ color: "#f472b6" }} />
+                    <span className="text-sm font-medium" style={{ color: "#f472b6" }}>Open in Google Maps</span>
+                  </a>
+                )}
+              </div>
+            )}
+
             {group.description && (
               <p className="text-sm mb-5" style={{ color: "rgba(255,255,255,0.7)" }}>{group.description}</p>
             )}
 
             {/* Membership actions */}
             <div className="mb-5">
+              {gate ? (
+                <>
+                  <GateJoinCTA gate={gate} isParty={group.activityType === "party"} />
+                  {/* Locked chat preview — non-premium users can see the group but not the chat */}
+                  <div className="mt-4 relative overflow-hidden rounded-2xl" style={{ background: "rgba(0,0,0,0.3)", border: `1px solid ${GOLD}22` }}>
+                    <div className="p-3 space-y-2 blur-[5px] select-none pointer-events-none" aria-hidden>
+                      {["Planning on grabbing a spot near the bar 🎶", "Same, I'll be there around 9!", "Just confirmed with the venue 👍"].map((msg, i) => (
+                        <div key={i} className={`flex ${i % 2 === 1 ? "justify-end" : "justify-start"}`}>
+                          <div className="max-w-[70%] px-3 py-1.5 rounded-2xl text-[13px]"
+                            style={{ background: i % 2 === 1 ? RED : "rgba(255,255,255,0.07)", color: "#fff" }}>{msg}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4"
+                      style={{ background: "rgba(13,12,15,0.65)" }}>
+                      <Lock className="h-4.5 w-4.5 mb-1.5" style={{ color: GOLD }} />
+                      <p className="text-[13px] font-medium" style={{ color: "#fff" }}>Group chat — Premium only</p>
+                      <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>Join after upgrading to read & send messages</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+              <>
               {myStatus === "approved" && !isAdmin && (
                 <button type="button" onClick={() => leave.mutate({ id: groupId }, { onSuccess: () => { toast({ title: "You left the group." }); refresh(); onClose(); } })}
                   className="w-full py-3 rounded-xl text-sm font-semibold" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)" }}>
@@ -140,14 +239,13 @@ export function SoloGroupDetail({
               )}
               {(!myStatus || ["left", "rejected", "removed"].includes(myStatus)) && group.status === "open" && (
                 <button type="button"
-                  onClick={() => join.mutate({ id: groupId, data: { city } }, {
-                    onSuccess: () => { toast({ title: "Join request sent!" }); refresh(); },
-                    onError: (e) => toast({ title: e instanceof Error ? e.message : "Could not join", variant: "destructive" }),
-                  })}
+                  onClick={requestJoin}
                   disabled={join.isPending}
                   className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110" style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 10px 28px ${RED}4d` }}>
                   {join.isPending ? "Requesting…" : "Request to join"}
                 </button>
+              )}
+              </>
               )}
             </div>
 
@@ -246,6 +344,7 @@ export function SoloGroupDetail({
               Cancel
             </button>
           </div>
+          </>
         )}
       </div>
 
@@ -256,6 +355,32 @@ export function SoloGroupDetail({
           onClose={() => setReportTarget(null)}
         />
       )}
+      {genderModal}
+    </div>
+  );
+}
+
+// Replaces the join/leave action for visitors who can view the profile but must
+// complete a step (login / premium / verification) before joining or booking.
+function GateJoinCTA({ gate, isParty }: { gate: Exclude<BookingGate, null>; isParty: boolean }) {
+  const verb = isParty ? "book" : "join";
+  const cfg = {
+    login: { icon: LogIn, label: `Log in to ${verb}`, href: LOGIN_NEXT, note: "Log in and get verified to continue." },
+    premium: { icon: Crown, label: `Upgrade to ${verb}`, href: "/subscription?plan=user_vip", note: `Joining groups, booking tickets, and group chats are Royvento Premium features.` },
+    verify: { icon: ShieldCheck, label: `Verify to ${verb}`, href: "/solo-connect", note: "Complete phone + selfie verification to continue." },
+  }[gate];
+  const Icon = cfg.icon;
+  return (
+    <div>
+      <Link
+        href={cfg.href}
+        className="group flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
+        style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 10px 28px ${RED}4d` }}
+      >
+        <Icon className="h-4 w-4" /> {cfg.label}
+        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+      </Link>
+      <p className="text-[11px] text-center mt-2" style={{ color: "rgba(255,255,255,0.45)" }}>{cfg.note}</p>
     </div>
   );
 }

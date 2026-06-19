@@ -2,11 +2,15 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 
 const STORAGE_KEY = "royvento_city";
 const LOCALITY_KEY = "royvento_locality";
+const STATE_KEY = "royvento_state";
 const MANUAL_KEY = "royvento_loc_manual";
 
 interface LocationContextValue {
   selectedCity: string;
   selectedLocality: string;
+  /** The user's detected administrative state/region (e.g. "West Bengal").
+   *  Empty when unknown (manual city pick or no GPS). */
+  selectedState: string;
   /** `manual` = true when the user explicitly picked a city from the list, so
    *  GPS auto-detect won't override it on the next load. */
   setSelectedCity: (city: string, locality?: string, manual?: boolean) => void;
@@ -20,6 +24,7 @@ interface LocationContextValue {
 const LocationContext = createContext<LocationContextValue>({
   selectedCity: "",
   selectedLocality: "",
+  selectedState: "",
   setSelectedCity: () => {},
   detectLocation: async () => false,
   detecting: false,
@@ -30,13 +35,13 @@ export function useSelectedCity() {
   return useContext(LocationContext);
 }
 
-interface GeoResult { city: string; locality: string; }
+interface GeoResult { city: string; locality: string; state: string; }
 
 const dedupe = (city: string, locality: string): GeoResult => {
   let c = (city ?? "").trim();
   let l = (locality ?? "").trim();
   if (l && c && l.toLowerCase() === c.toLowerCase()) l = "";
-  return { city: c, locality: l };
+  return { city: c, locality: l, state: "" };
 };
 
 /** Google reverse-geocode via our server proxy. Google has far finer Indian
@@ -49,9 +54,9 @@ async function reverseGeocodeGoogle(lat: number, lon: number): Promise<GeoResult
       headers: { Accept: "application/json" },
     });
     if (!r.ok) return null;
-    const d = (await r.json()) as { city?: string | null; locality?: string | null };
+    const d = (await r.json()) as { city?: string | null; locality?: string | null; state?: string | null };
     const res = dedupe(d.city ?? "", d.locality ?? "");
-    return res.city || res.locality ? res : null;
+    return res.city || res.locality ? { ...res, state: (d.state ?? "").trim() } : null;
   } catch {
     return null;
   }
@@ -71,9 +76,9 @@ async function reverseGeocodeOSM(lat: number, lon: number): Promise<GeoResult> {
       a.neighbourhood || a.suburb || a.quarter || a.hamlet || a.village ||
       a.city_district || a.residential || a.road || "";
     const clean = (s: string) => (s ? String(s).split(",")[0].trim() : "");
-    return dedupe(clean(cityRaw), clean(localityRaw));
+    return { ...dedupe(clean(cityRaw), clean(localityRaw)), state: clean(a.state || "") };
   } catch {
-    return { city: "", locality: "" };
+    return { city: "", locality: "", state: "" };
   }
 }
 
@@ -130,6 +135,13 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [selectedLocality, setSelectedLocalityState] = useState<string>(() => {
     try { return localStorage.getItem(LOCALITY_KEY) ?? ""; } catch { return ""; }
   });
+  const [selectedState, setSelectedStateRaw] = useState<string>(() => {
+    try { return localStorage.getItem(STATE_KEY) ?? ""; } catch { return ""; }
+  });
+  const setSelectedState = useCallback((s: string) => {
+    setSelectedStateRaw(s);
+    try { if (s) localStorage.setItem(STATE_KEY, s); else localStorage.removeItem(STATE_KEY); } catch {}
+  }, []);
   const [detecting, setDetecting] = useState(false);
   const [locationError, setLocationError] = useState("");
 
@@ -157,10 +169,11 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     setLocationError("");
     try {
       const pos = await getBestPosition();
-      const { city, locality } = await reverseGeocodeDetailed(
+      const { city, locality, state } = await reverseGeocodeDetailed(
         pos.coords.latitude,
         pos.coords.longitude,
       );
+      if (state) setSelectedState(state);
       // GPS detection is the source of truth → manual flag cleared (manual=false).
       if (city) { setSelectedCity(city, locality, false); return true; }
       if (locality) { setSelectedCity(locality, "", false); return true; }
@@ -177,7 +190,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setDetecting(false);
     }
-  }, [setSelectedCity]);
+  }, [setSelectedCity, setSelectedState]);
 
   // Auto-detect ONLY when the browser already granted geolocation permission —
   // a first-time visitor is never hit with an unprompted permission popup
@@ -204,7 +217,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <LocationContext.Provider
-      value={{ selectedCity, selectedLocality, setSelectedCity, detectLocation, detecting, locationError }}
+      value={{ selectedCity, selectedLocality, selectedState, setSelectedCity, detectLocation, detecting, locationError }}
     >
       {children}
     </LocationContext.Provider>

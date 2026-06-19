@@ -406,6 +406,7 @@ function Analytics() {
     dailyRevenue?: { date: string; revenue: number }[];
     monthlyRevenue?: { month: string; revenue: number }[];
     perVendor?: { vendorId: number; vendorName: string; bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number }[];
+    commissionBreakdown?: { pubClub: number; party: number; events: number; games: number };
   };
 
   const hasTickets = ((adminData.totalWomen ?? 0) + (adminData.totalMen ?? 0) + (adminData.totalCouple ?? 0)) > 0;
@@ -500,8 +501,19 @@ function Analytics() {
         <AdminKpi label="Revenue" value={formatINR(data.totalRevenue)} hint="Total bookings revenue" Icon={IndianRupee} accent="primary" />
         <AdminKpi label="COD collected (actual)" value={formatINR(data.actualCodRevenue ?? 0)} hint={`${data.actualCodRecordedCount ?? 0} bookings scanned`} Icon={Banknote} accent="amber" warning={pendingActuals > 0 ? `${pendingActuals} bookings awaiting QR scan` : null} />
         <AdminKpi label="Online payments" value={formatINR(data.onlineRevenue)} hint="Paid via gateway" Icon={CreditCard} accent="emerald" />
-        <AdminKpi label="Total commission" value={formatINR(totalCommission)} hint="Platform commission charged" Icon={Percent} accent="violet" />
+        <AdminKpi label="Total commission" value={formatINR(totalCommission)} hint="All verticals (incl. parties)" Icon={Percent} accent="violet" />
         <AdminKpi label="Total base fee" value={formatINR(totalBaseFee)} hint="Base fee (Incl. GST) collected" Icon={Banknote} accent="amber" />
+      </div>
+
+      {/* Commission breakdown by vertical */}
+      <div className="space-y-3">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold">Commission by vertical</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <AdminKpi label="Pubs & Clubs commission" value={formatINR(adminData.commissionBreakdown?.pubClub ?? 0)} hint="Pub / club / venue bookings" Icon={Percent} accent="primary" />
+          <AdminKpi label="Create Your Own Party commission" value={formatINR(adminData.commissionBreakdown?.party ?? 0)} hint="User-hosted party tickets" Icon={Percent} accent="emerald" />
+          <AdminKpi label="Events commission" value={formatINR(adminData.commissionBreakdown?.events ?? 0)} hint="Event Organizer ticket sales" Icon={Percent} accent="amber" />
+          <AdminKpi label="Games commission" value={formatINR(adminData.commissionBreakdown?.games ?? 0)} hint="Game Organizer bookings" Icon={Percent} accent="violet" />
+        </div>
       </div>
 
       {/* Secondary count tiles */}
@@ -5350,6 +5362,100 @@ interface CommissionReport {
   totals: { totalBookings: number; totalRevenue: number; totalCommission: number; totalBaseFee: number; collectedCommission: number; pendingCommission: number };
 }
 
+// Platform commission config for the "Create Your Own Party" vertical — a
+// single fixed-₹ or percentage rate, fully independent of pub/club/event
+// commission. Backed by GET/PUT /api/admin/create-your-party/commission.
+function PartyCommissionCard() {
+  const { toast } = useToast();
+  const [type, setType] = useState<"fixed" | "percentage">("percentage");
+  const [value, setValue] = useState<string>("10");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    apiGet<{ commissionType: "fixed" | "percentage"; value: number }>("/api/admin/create-your-party/commission")
+      .then((c) => { setType(c.commissionType); setValue(String(c.value)); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async () => {
+    const v = Number(value);
+    if (!(v >= 0)) { toast({ title: "Enter a valid value", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      await apiPut("/api/admin/create-your-party/commission", { commissionType: type, value: v });
+      toast({ title: "Party commission updated" });
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl glass-card p-6">
+      <div className="flex items-start gap-3 mb-5">
+        <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 red-ring">
+          <Percent className="h-4 w-4 text-primary" />
+        </div>
+        <div>
+          <h2 className="font-serif text-xl">Create Your Own Party — Commission</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Platform cut on every paid party booking. Independent of pub, club & event commission.</p>
+        </div>
+      </div>
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : (
+        <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+          <div className="flex-1">
+            <label className="text-xs text-muted-foreground">Commission type</label>
+            <div className="grid grid-cols-2 gap-2 mt-1.5">
+              {(["percentage", "fixed"] as const).map((t) => (
+                <button key={t} type="button" onClick={() => setType(t)}
+                  className={`py-2.5 rounded-lg text-sm font-medium capitalize border transition-all ${type === t ? "border-primary bg-primary/15 text-white" : "border-white/10 bg-white/5 text-muted-foreground"}`}>
+                  {t === "fixed" ? "Fixed ₹" : "Percentage %"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex-1">
+            <label className="text-xs text-muted-foreground">{type === "fixed" ? "Amount (₹ per booking)" : "Rate (% of total)"}</label>
+            <Input type="number" min={0} value={value} onChange={(e) => setValue(e.target.value)} className="mt-1.5" />
+          </div>
+          <Button onClick={save} disabled={saving} className="shrink-0">{saving ? "Saving…" : "Save"}</Button>
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground mt-3">
+        Example: {type === "fixed" ? `₹${value || 0} deducted per booking` : `${value || 0}% of the ticket total`} → remainder goes to the party organizer.
+      </p>
+    </div>
+  );
+}
+
+// Per-game / per-package commission for the Game Organizer vertical, surfaced in
+// the Commissions tab so every platform commission control lives in one place.
+// The editor itself is GameCommissionAdmin (defined with the game-organizer admin
+// section); each organizer sees the rate set here in their dashboard's
+// Banking & Settlements tab. Backed by PATCH /api/admin/games/:id/commission and
+// PATCH /api/admin/game-packages/:id/commission.
+function GameCommissionCard() {
+  return (
+    <div className="rounded-2xl glass-card p-6">
+      <div className="flex items-start gap-3 mb-5">
+        <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 red-ring">
+          <Gamepad2 className="h-4 w-4 text-primary" />
+        </div>
+        <div>
+          <h2 className="font-serif text-xl">Game Organizer — Commission</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Platform cut per game &amp; package booking, realised at player check-in. Each organizer sees this rate in their dashboard.</p>
+        </div>
+      </div>
+      <GameCommissionAdmin />
+    </div>
+  );
+}
+
 function CommissionsAdmin() {
   const { toast } = useToast();
 
@@ -5491,6 +5597,12 @@ function CommissionsAdmin() {
 
   return (
     <div className="space-y-8">
+
+      {/* -- Create Your Own Party commission ------------------------------ */}
+      <PartyCommissionCard />
+
+      {/* -- Game Organizer commission (per game / package) ---------------- */}
+      <GameCommissionCard />
 
       {/* -- Partner subscription plan visibility -------------------------- */}
       <div className="rounded-2xl glass-card p-6">
@@ -9382,8 +9494,10 @@ function GameOrganizersAdmin() {
         <GameApprovalsAdmin />
       </div>
       <div>
-        <h2 className="font-serif text-xl mb-4">Per-Game / Package Commission</h2>
-        <GameCommissionAdmin />
+        <h2 className="font-serif text-xl mb-2">Per-Game / Package Commission</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Manage commission rates from the <span className="text-white/80">Commissions</span> tab.
+        </p>
       </div>
       <div>
         <h2 className="font-serif text-xl mb-4">Game Organizer Settlements</h2>

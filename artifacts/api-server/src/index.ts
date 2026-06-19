@@ -347,6 +347,16 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "expiry_warned_at" timestamp with time zone`);
     await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "deleted_at" timestamp with time zone`);
     await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "deleted_reason" varchar(30) NOT NULL DEFAULT ''`);
+    // "Create Your Own Party" fields (activity_type = 'party').
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "cover_image_url" text NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "address" text NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "pin_code" varchar(12) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "map_location" text NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "organizer_name" varchar(120) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "end_time" varchar(8) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "ticket_type" varchar(10) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "ticket_price" numeric(10,2) NOT NULL DEFAULT '0'`);
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "capacity" integer`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_groups_city_status_idx" ON "solo_groups" ("city", "status")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_groups_activity_idx" ON "solo_groups" ("last_activity_at")`);
     await db.execute(sql`
@@ -395,6 +405,163 @@ async function applyPendingSchemaChanges() {
         "purged_at" timestamp with time zone
       )`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_deleted_groups_log_group_idx" ON "solo_deleted_groups_log" ("group_id")`);
+
+    // ── "Create Your Own Party" vertical — isolated ticketing tables ──────────
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "create_your_party" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organizer_user_id" integer NOT NULL,
+        "name" varchar(160) NOT NULL,
+        "slug" varchar(200) NOT NULL DEFAULT '',
+        "cover_image_url" text NOT NULL DEFAULT '',
+        "gallery_images" text[] NOT NULL DEFAULT '{}',
+        "description" text NOT NULL DEFAULT '',
+        "rules" text NOT NULL DEFAULT '',
+        "category" varchar(80) NOT NULL DEFAULT '',
+        "visibility" varchar(10) NOT NULL DEFAULT 'public',
+        "venue_name" varchar(255) NOT NULL DEFAULT '',
+        "address" text NOT NULL DEFAULT '',
+        "city" varchar(100) NOT NULL DEFAULT '',
+        "state" varchar(100) NOT NULL DEFAULT '',
+        "pin_code" varchar(12) NOT NULL DEFAULT '',
+        "map_location" text NOT NULL DEFAULT '',
+        "party_date" date,
+        "start_time" varchar(8) NOT NULL DEFAULT '',
+        "end_time" varchar(8) NOT NULL DEFAULT '',
+        "join_type" varchar(12) NOT NULL DEFAULT 'mixed',
+        "organizer_name" varchar(120) NOT NULL DEFAULT '',
+        "capacity" integer NOT NULL DEFAULT 0,
+        "status" varchar(16) NOT NULL DEFAULT 'published',
+        "created_by" integer NOT NULL,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+        "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    // Added after initial release — backfill for existing party tables.
+    await db.execute(sql`ALTER TABLE "create_your_party" ADD COLUMN IF NOT EXISTS "gallery_images" text[] NOT NULL DEFAULT '{}'`);
+    await db.execute(sql`ALTER TABLE "create_your_party" ADD COLUMN IF NOT EXISTS "age_group" varchar(12) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "create_your_party" ADD COLUMN IF NOT EXISTS "dress_code" varchar(20) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "create_your_party" ADD COLUMN IF NOT EXISTS "drinking" varchar(4) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "create_your_party" ADD COLUMN IF NOT EXISTS "smoking" varchar(4) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "create_your_party" ADD COLUMN IF NOT EXISTS "couple_friendly" varchar(4) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "create_your_party" ADD COLUMN IF NOT EXISTS "lgbtq_friendly" varchar(4) NOT NULL DEFAULT ''`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_organizer_idx" ON "create_your_party" ("organizer_user_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_city_status_idx" ON "create_your_party" ("city", "status")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_slug_idx" ON "create_your_party" ("slug")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "create_your_party_tickets" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "party_id" integer NOT NULL REFERENCES "create_your_party"("id") ON DELETE CASCADE,
+        "type" varchar(10) NOT NULL DEFAULT 'free',
+        "name" varchar(120) NOT NULL DEFAULT 'Entry',
+        "price" numeric(10,2) NOT NULL DEFAULT '0',
+        "quantity" integer NOT NULL DEFAULT 0,
+        "sold_count" integer NOT NULL DEFAULT 0,
+        "active" boolean NOT NULL DEFAULT true,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_tickets_party_idx" ON "create_your_party_tickets" ("party_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "create_your_party_bookings" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "party_id" integer NOT NULL REFERENCES "create_your_party"("id") ON DELETE CASCADE,
+        "ticket_id" integer NOT NULL REFERENCES "create_your_party_tickets"("id") ON DELETE CASCADE,
+        "user_id" integer NOT NULL,
+        "booking_code" varchar(16) NOT NULL,
+        "name" varchar(255) NOT NULL DEFAULT '',
+        "email" varchar(255) NOT NULL DEFAULT '',
+        "phone" varchar(50) NOT NULL DEFAULT '',
+        "quantity" integer NOT NULL DEFAULT 1,
+        "total_price" numeric(10,2) NOT NULL DEFAULT '0',
+        "commission_amount" numeric(10,2) NOT NULL DEFAULT '0',
+        "net_amount" numeric(10,2) NOT NULL DEFAULT '0',
+        "status" varchar(20) NOT NULL DEFAULT 'confirmed',
+        "payment_status" varchar(12) NOT NULL DEFAULT 'none',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+        "cancelled_at" timestamp with time zone
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_bookings_party_idx" ON "create_your_party_bookings" ("party_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_bookings_user_idx" ON "create_your_party_bookings" ("user_id")`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "cyp_bookings_code_uniq" ON "create_your_party_bookings" ("booking_code")`);
+    await db.execute(sql`ALTER TABLE "create_your_party_bookings" ADD COLUMN IF NOT EXISTS "checked_in" boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE "create_your_party_bookings" ADD COLUMN IF NOT EXISTS "checked_in_at" timestamp with time zone`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "create_your_party_payments" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "booking_id" integer NOT NULL REFERENCES "create_your_party_bookings"("id") ON DELETE CASCADE,
+        "user_id" integer NOT NULL,
+        "amount" numeric(10,2) NOT NULL DEFAULT '0',
+        "razorpay_order_id" varchar(64) NOT NULL DEFAULT '',
+        "razorpay_payment_id" varchar(64) NOT NULL DEFAULT '',
+        "status" varchar(12) NOT NULL DEFAULT 'initiated',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+        "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_payments_booking_idx" ON "create_your_party_payments" ("booking_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_payments_order_idx" ON "create_your_party_payments" ("razorpay_order_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "create_your_party_commissions" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "commission_type" varchar(12) NOT NULL DEFAULT 'percentage',
+        "value" numeric(10,2) NOT NULL DEFAULT '10',
+        "active" boolean NOT NULL DEFAULT true,
+        "updated_by" integer,
+        "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "create_your_party_attendees" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "party_id" integer NOT NULL REFERENCES "create_your_party"("id") ON DELETE CASCADE,
+        "booking_id" integer NOT NULL REFERENCES "create_your_party_bookings"("id") ON DELETE CASCADE,
+        "user_id" integer NOT NULL,
+        "name" varchar(255) NOT NULL DEFAULT '',
+        "gender" varchar(20) NOT NULL DEFAULT '',
+        "quantity" integer NOT NULL DEFAULT 1,
+        "status" varchar(12) NOT NULL DEFAULT 'going',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_attendees_party_idx" ON "create_your_party_attendees" ("party_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_attendees_booking_idx" ON "create_your_party_attendees" ("booking_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "create_your_party_messages" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "party_id" integer NOT NULL REFERENCES "create_your_party"("id") ON DELETE CASCADE,
+        "user_id" integer NOT NULL,
+        "body" text NOT NULL,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_messages_party_idx" ON "create_your_party_messages" ("party_id")`);
+    // Seed the single platform commission config row (10% default) if absent.
+    await db.execute(sql`INSERT INTO "create_your_party_commissions" ("commission_type", "value", "active") SELECT 'percentage', 10, true WHERE NOT EXISTS (SELECT 1 FROM "create_your_party_commissions")`);
+    // One-time idempotent migration: lift existing solo_groups 'party' rows into
+    // the new standalone tables. The guard (slug marker 'sg-<id>') makes reboots
+    // safe — already-migrated rows are skipped.
+    await db.execute(sql`
+      INSERT INTO "create_your_party"
+        ("organizer_user_id", "name", "slug", "cover_image_url", "description", "category",
+         "visibility", "venue_name", "address", "city", "state", "pin_code", "map_location",
+         "party_date", "start_time", "end_time", "join_type", "organizer_name", "capacity",
+         "status", "created_by", "created_at")
+      SELECT sg."admin_user_id", sg."name", 'sg-' || sg."id", sg."cover_image_url", sg."description", 'party',
+             sg."visibility", sg."venue_name", sg."address", sg."city", sg."state", sg."pin_code", sg."map_location",
+             sg."group_date", sg."start_time", sg."end_time",
+             CASE sg."gender_type" WHEN 'male' THEN 'male_only' WHEN 'female' THEN 'female_only' ELSE 'mixed' END,
+             sg."organizer_name", COALESCE(sg."capacity", 0),
+             'published', sg."admin_user_id", sg."created_at"
+      FROM "solo_groups" sg
+      WHERE sg."activity_type" = 'party'
+        AND sg."deleted_at" IS NULL
+        AND NOT EXISTS (SELECT 1 FROM "create_your_party" cyp WHERE cyp."slug" = 'sg-' || sg."id")`);
+    // Create the matching ticket row for each freshly-migrated party.
+    await db.execute(sql`
+      INSERT INTO "create_your_party_tickets" ("party_id", "type", "name", "price", "quantity")
+      SELECT cyp."id",
+             CASE WHEN sg."ticket_type" = 'paid' THEN 'paid' ELSE 'free' END,
+             'Entry', COALESCE(sg."ticket_price", 0), COALESCE(sg."capacity", 0)
+      FROM "create_your_party" cyp
+      JOIN "solo_groups" sg ON cyp."slug" = 'sg-' || sg."id"
+      WHERE cyp."category" = 'party'
+        AND NOT EXISTS (SELECT 1 FROM "create_your_party_tickets" t WHERE t."party_id" = cyp."id")`);
+
     await db.execute(sql`ALTER TABLE "drink_plans" ADD COLUMN IF NOT EXISTS "global_priority" integer`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "drink_plans_global_priority_idx" ON "drink_plans" ("global_priority")`);
     await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "base_fee_percent" numeric(5,2) DEFAULT 3.50`);

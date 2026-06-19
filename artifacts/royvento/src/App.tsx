@@ -56,6 +56,9 @@ const OrganizerProfile = lazy(() => import("@/pages/organizer-profile").then((m)
 const OrganizerEventDetail = lazy(() => import("@/pages/organizer-profile").then((m) => ({ default: m.OrganizerEventDetail })));
 const GameOrganizerDashboard = lazy(() => import("@/pages/game-organizer-dashboard").then((m) => ({ default: m.GameOrganizerDashboard })));
 const GameOrganizerProfile = lazy(() => import("@/pages/game-organizer-profile").then((m) => ({ default: m.GameOrganizerProfile })));
+const PartyDetail = lazy(() => import("@/pages/party-detail").then((m) => ({ default: m.PartyDetail })));
+const PartyDashboardPage = lazy(() => import("@/pages/party-dashboard").then((m) => ({ default: m.PartyDashboardPage })));
+const PartyScanner = lazy(() => import("@/pages/party-scanner").then((m) => ({ default: m.PartyScanner })));
 const Subscription = lazy(() => import("@/pages/subscription").then((m) => ({ default: m.Subscription })));
 const TonightPlans = lazy(() => import("@/pages/tonight-plans").then((m) => ({ default: m.TonightPlans })));
 const Blogs = lazy(() => import("@/pages/blogs").then((m) => ({ default: m.Blogs })));
@@ -176,6 +179,7 @@ function Router() {
           <Route path="/pub-offers" component={PubOffers} />
           <Route path="/events" component={Events} />
           <Route path="/games" component={GamesAndSports} />
+          <Route path="/party/:id" component={PartyDetail} />
           <Route path="/vendors" component={Vendors} />
           <Route path="/partners" component={Vendors} />
           {/* Legacy ID URLs auto-redirect to the slugged canonical URL.
@@ -229,6 +233,12 @@ function Router() {
           </Route>
           <Route path="/dashboard/bookings">
             {() => <RequireAuth><Bookings /></RequireAuth>}
+          </Route>
+          <Route path="/dashboard/parties">
+            {() => <RequireAuth><PartyDashboardPage /></RequireAuth>}
+          </Route>
+          <Route path="/dashboard/parties/:id/scan">
+            {() => <RequireAuth><PartyScanner /></RequireAuth>}
           </Route>
           <Route path="/solo-connect">
             {() => <SoloConnect />}

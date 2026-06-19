@@ -35,6 +35,7 @@ import gameOrganizersRouter from "./gameOrganizers";
 import happeningTonightRouter from "./happeningTonight";
 import goingOutRouter from "./goingOut";
 import soloConnectRouter from "./soloConnect";
+import createYourPartyRouter from "./createYourParty";
 
 const router: IRouter = Router();
 
@@ -74,5 +75,6 @@ router.use(gameOrganizersRouter);
 router.use(happeningTonightRouter);
 router.use(goingOutRouter);
 router.use(soloConnectRouter);
+router.use(createYourPartyRouter);
 
 export default router;

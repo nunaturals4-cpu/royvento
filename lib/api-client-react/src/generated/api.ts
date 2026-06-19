@@ -74,6 +74,7 @@ import type {
   ListEventsParams,
   ListMyVendorEvents200,
   ListMyVendorEventsParams,
+  ListPartiesParams,
   ListReviewsAdminParams,
   ListReviewsPartnerParams,
   ListSoloGroupsParams,
@@ -93,6 +94,19 @@ import type {
   PartnerAnalyticsResult,
   PartnerCommissionRates,
   PartnerLeadsResponse,
+  Party,
+  PartyBookBody,
+  PartyBookResult,
+  PartyCommission,
+  PartyCreateBody,
+  PartyDashboard,
+  PartyMessage,
+  PartyMessageBody,
+  PartyMyBooking,
+  PartyScanBody,
+  PartyScanResult,
+  PartyUpdateBody,
+  PartyVerifyBody,
   PatchAdminEventBody,
   PreviewGooglePubBody,
   PreviewGooglePubResponse,
@@ -1195,7 +1209,1194 @@ export const useReviewSoloVerification = <TError = ErrorType<unknown>,
       return useMutation(getReviewSoloVerificationMutationOptions(options));
     }
 
-export const getListSoloGroupsUrl = (params: ListSoloGroupsParams,) => {
+export const getListPartiesUrl = (params?: ListPartiesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/create-your-party?${stringifiedParams}` : `/api/create-your-party`
+}
+
+/**
+ * @summary List published parties (optionally by city)
+ */
+export const listParties = async (params?: ListPartiesParams, options?: RequestInit): Promise<Party[]> => {
+
+  return customFetch<Party[]>(getListPartiesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPartiesQueryKey = (params?: ListPartiesParams,) => {
+    return [
+    `/api/create-your-party`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListPartiesQueryOptions = <TData = Awaited<ReturnType<typeof listParties>>, TError = ErrorType<unknown>>(params?: ListPartiesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listParties>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPartiesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listParties>>> = ({ signal }) => listParties(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listParties>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPartiesQueryResult = NonNullable<Awaited<ReturnType<typeof listParties>>>
+export type ListPartiesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List published parties (optionally by city)
+ */
+
+export function useListParties<TData = Awaited<ReturnType<typeof listParties>>, TError = ErrorType<unknown>>(
+ params?: ListPartiesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listParties>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPartiesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreatePartyUrl = () => {
+
+
+
+
+  return `/api/create-your-party`
+}
+
+/**
+ * @summary Create a party
+ */
+export const createParty = async (partyCreateBody: PartyCreateBody, options?: RequestInit): Promise<Party> => {
+
+  return customFetch<Party>(getCreatePartyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      partyCreateBody,)
+  }
+);}
+
+
+
+
+export const getCreatePartyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createParty>>, TError,{data: BodyType<PartyCreateBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createParty>>, TError,{data: BodyType<PartyCreateBody>}, TContext> => {
+
+const mutationKey = ['createParty'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createParty>>, {data: BodyType<PartyCreateBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createParty(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePartyMutationResult = NonNullable<Awaited<ReturnType<typeof createParty>>>
+    export type CreatePartyMutationBody = BodyType<PartyCreateBody>
+    export type CreatePartyMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a party
+ */
+export const useCreateParty = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createParty>>, TError,{data: BodyType<PartyCreateBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createParty>>,
+        TError,
+        {data: BodyType<PartyCreateBody>},
+        TContext
+      > => {
+      return useMutation(getCreatePartyMutationOptions(options));
+    }
+
+export const getListMyPartiesUrl = () => {
+
+
+
+
+  return `/api/create-your-party/mine`
+}
+
+/**
+ * @summary The caller's own parties (organizer dashboard)
+ */
+export const listMyParties = async ( options?: RequestInit): Promise<Party[]> => {
+
+  return customFetch<Party[]>(getListMyPartiesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMyPartiesQueryKey = () => {
+    return [
+    `/api/create-your-party/mine`
+    ] as const;
+    }
+
+
+export const getListMyPartiesQueryOptions = <TData = Awaited<ReturnType<typeof listMyParties>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyParties>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMyPartiesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyParties>>> = ({ signal }) => listMyParties({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMyParties>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMyPartiesQueryResult = NonNullable<Awaited<ReturnType<typeof listMyParties>>>
+export type ListMyPartiesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary The caller's own parties (organizer dashboard)
+ */
+
+export function useListMyParties<TData = Awaited<ReturnType<typeof listMyParties>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyParties>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMyPartiesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPartyUrl = (id: number,) => {
+
+
+
+
+  return `/api/create-your-party/${id}`
+}
+
+/**
+ * @summary Party detail
+ */
+export const getParty = async (id: number, options?: RequestInit): Promise<Party> => {
+
+  return customFetch<Party>(getGetPartyUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPartyQueryKey = (id: number,) => {
+    return [
+    `/api/create-your-party/${id}`
+    ] as const;
+    }
+
+
+export const getGetPartyQueryOptions = <TData = Awaited<ReturnType<typeof getParty>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getParty>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPartyQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getParty>>> = ({ signal }) => getParty(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getParty>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPartyQueryResult = NonNullable<Awaited<ReturnType<typeof getParty>>>
+export type GetPartyQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Party detail
+ */
+
+export function useGetParty<TData = Awaited<ReturnType<typeof getParty>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getParty>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPartyQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdatePartyUrl = (id: number,) => {
+
+
+
+
+  return `/api/create-your-party/${id}`
+}
+
+/**
+ * @summary Edit a party (host only)
+ */
+export const updateParty = async (id: number,
+    partyUpdateBody: PartyUpdateBody, options?: RequestInit): Promise<Party> => {
+
+  return customFetch<Party>(getUpdatePartyUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      partyUpdateBody,)
+  }
+);}
+
+
+
+
+export const getUpdatePartyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateParty>>, TError,{id: number;data: BodyType<PartyUpdateBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateParty>>, TError,{id: number;data: BodyType<PartyUpdateBody>}, TContext> => {
+
+const mutationKey = ['updateParty'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateParty>>, {id: number;data: BodyType<PartyUpdateBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateParty(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePartyMutationResult = NonNullable<Awaited<ReturnType<typeof updateParty>>>
+    export type UpdatePartyMutationBody = BodyType<PartyUpdateBody>
+    export type UpdatePartyMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Edit a party (host only)
+ */
+export const useUpdateParty = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateParty>>, TError,{id: number;data: BodyType<PartyUpdateBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateParty>>,
+        TError,
+        {id: number;data: BodyType<PartyUpdateBody>},
+        TContext
+      > => {
+      return useMutation(getUpdatePartyMutationOptions(options));
+    }
+
+export const getCancelPartyUrl = (id: number,) => {
+
+
+
+
+  return `/api/create-your-party/${id}`
+}
+
+/**
+ * @summary Cancel a party (host only)
+ */
+export const cancelParty = async (id: number, options?: RequestInit): Promise<Ok> => {
+
+  return customFetch<Ok>(getCancelPartyUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getCancelPartyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelParty>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelParty>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['cancelParty'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelParty>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  cancelParty(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelPartyMutationResult = NonNullable<Awaited<ReturnType<typeof cancelParty>>>
+
+    export type CancelPartyMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Cancel a party (host only)
+ */
+export const useCancelParty = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelParty>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelParty>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getCancelPartyMutationOptions(options));
+    }
+
+export const getBookPartyUrl = (id: number,) => {
+
+
+
+
+  return `/api/create-your-party/${id}/book`
+}
+
+/**
+ * @summary Book a party (free → confirmed; paid → Razorpay)
+ */
+export const bookParty = async (id: number,
+    partyBookBody?: PartyBookBody, options?: RequestInit): Promise<PartyBookResult> => {
+
+  return customFetch<PartyBookResult>(getBookPartyUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      partyBookBody,)
+  }
+);}
+
+
+
+
+export const getBookPartyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookParty>>, TError,{id: number;data?: BodyType<PartyBookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bookParty>>, TError,{id: number;data?: BodyType<PartyBookBody>}, TContext> => {
+
+const mutationKey = ['bookParty'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bookParty>>, {id: number;data?: BodyType<PartyBookBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  bookParty(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BookPartyMutationResult = NonNullable<Awaited<ReturnType<typeof bookParty>>>
+    export type BookPartyMutationBody = BodyType<PartyBookBody> | undefined
+    export type BookPartyMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Book a party (free → confirmed; paid → Razorpay)
+ */
+export const useBookParty = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookParty>>, TError,{id: number;data?: BodyType<PartyBookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bookParty>>,
+        TError,
+        {id: number;data?: BodyType<PartyBookBody>},
+        TContext
+      > => {
+      return useMutation(getBookPartyMutationOptions(options));
+    }
+
+export const getListPartyMessagesUrl = (id: number,) => {
+
+
+
+
+  return `/api/create-your-party/${id}/messages`
+}
+
+/**
+ * @summary Group chat messages (host + confirmed attendees only)
+ */
+export const listPartyMessages = async (id: number, options?: RequestInit): Promise<PartyMessage[]> => {
+
+  return customFetch<PartyMessage[]>(getListPartyMessagesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPartyMessagesQueryKey = (id: number,) => {
+    return [
+    `/api/create-your-party/${id}/messages`
+    ] as const;
+    }
+
+
+export const getListPartyMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listPartyMessages>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPartyMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPartyMessagesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPartyMessages>>> = ({ signal }) => listPartyMessages(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPartyMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPartyMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof listPartyMessages>>>
+export type ListPartyMessagesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Group chat messages (host + confirmed attendees only)
+ */
+
+export function useListPartyMessages<TData = Awaited<ReturnType<typeof listPartyMessages>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPartyMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPartyMessagesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSendPartyMessageUrl = (id: number,) => {
+
+
+
+
+  return `/api/create-your-party/${id}/messages`
+}
+
+/**
+ * @summary Send a group chat message (host + confirmed attendees only)
+ */
+export const sendPartyMessage = async (id: number,
+    partyMessageBody: PartyMessageBody, options?: RequestInit): Promise<PartyMessage> => {
+
+  return customFetch<PartyMessage>(getSendPartyMessageUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      partyMessageBody,)
+  }
+);}
+
+
+
+
+export const getSendPartyMessageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendPartyMessage>>, TError,{id: number;data: BodyType<PartyMessageBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendPartyMessage>>, TError,{id: number;data: BodyType<PartyMessageBody>}, TContext> => {
+
+const mutationKey = ['sendPartyMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendPartyMessage>>, {id: number;data: BodyType<PartyMessageBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  sendPartyMessage(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendPartyMessageMutationResult = NonNullable<Awaited<ReturnType<typeof sendPartyMessage>>>
+    export type SendPartyMessageMutationBody = BodyType<PartyMessageBody>
+    export type SendPartyMessageMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Send a group chat message (host + confirmed attendees only)
+ */
+export const useSendPartyMessage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendPartyMessage>>, TError,{id: number;data: BodyType<PartyMessageBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendPartyMessage>>,
+        TError,
+        {id: number;data: BodyType<PartyMessageBody>},
+        TContext
+      > => {
+      return useMutation(getSendPartyMessageMutationOptions(options));
+    }
+
+export const getVerifyPartyPaymentUrl = () => {
+
+
+
+
+  return `/api/create-your-party/payments/verify`
+}
+
+/**
+ * @summary Verify a Razorpay payment for a party booking
+ */
+export const verifyPartyPayment = async (partyVerifyBody: PartyVerifyBody, options?: RequestInit): Promise<Ok> => {
+
+  return customFetch<Ok>(getVerifyPartyPaymentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      partyVerifyBody,)
+  }
+);}
+
+
+
+
+export const getVerifyPartyPaymentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyPartyPayment>>, TError,{data: BodyType<PartyVerifyBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyPartyPayment>>, TError,{data: BodyType<PartyVerifyBody>}, TContext> => {
+
+const mutationKey = ['verifyPartyPayment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyPartyPayment>>, {data: BodyType<PartyVerifyBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  verifyPartyPayment(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyPartyPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof verifyPartyPayment>>>
+    export type VerifyPartyPaymentMutationBody = BodyType<PartyVerifyBody>
+    export type VerifyPartyPaymentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Verify a Razorpay payment for a party booking
+ */
+export const useVerifyPartyPayment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyPartyPayment>>, TError,{data: BodyType<PartyVerifyBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyPartyPayment>>,
+        TError,
+        {data: BodyType<PartyVerifyBody>},
+        TContext
+      > => {
+      return useMutation(getVerifyPartyPaymentMutationOptions(options));
+    }
+
+export const getGetPartyCommissionUrl = () => {
+
+
+
+
+  return `/api/admin/create-your-party/commission`
+}
+
+/**
+ * @summary Get the platform party-commission config (admin)
+ */
+export const getPartyCommission = async ( options?: RequestInit): Promise<PartyCommission> => {
+
+  return customFetch<PartyCommission>(getGetPartyCommissionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPartyCommissionQueryKey = () => {
+    return [
+    `/api/admin/create-your-party/commission`
+    ] as const;
+    }
+
+
+export const getGetPartyCommissionQueryOptions = <TData = Awaited<ReturnType<typeof getPartyCommission>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPartyCommission>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPartyCommissionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPartyCommission>>> = ({ signal }) => getPartyCommission({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPartyCommission>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPartyCommissionQueryResult = NonNullable<Awaited<ReturnType<typeof getPartyCommission>>>
+export type GetPartyCommissionQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the platform party-commission config (admin)
+ */
+
+export function useGetPartyCommission<TData = Awaited<ReturnType<typeof getPartyCommission>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPartyCommission>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPartyCommissionQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSetPartyCommissionUrl = () => {
+
+
+
+
+  return `/api/admin/create-your-party/commission`
+}
+
+/**
+ * @summary Update the platform party-commission config (admin)
+ */
+export const setPartyCommission = async (partyCommission: PartyCommission, options?: RequestInit): Promise<PartyCommission> => {
+
+  return customFetch<PartyCommission>(getSetPartyCommissionUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      partyCommission,)
+  }
+);}
+
+
+
+
+export const getSetPartyCommissionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setPartyCommission>>, TError,{data: BodyType<PartyCommission>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setPartyCommission>>, TError,{data: BodyType<PartyCommission>}, TContext> => {
+
+const mutationKey = ['setPartyCommission'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setPartyCommission>>, {data: BodyType<PartyCommission>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  setPartyCommission(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetPartyCommissionMutationResult = NonNullable<Awaited<ReturnType<typeof setPartyCommission>>>
+    export type SetPartyCommissionMutationBody = BodyType<PartyCommission>
+    export type SetPartyCommissionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update the platform party-commission config (admin)
+ */
+export const useSetPartyCommission = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setPartyCommission>>, TError,{data: BodyType<PartyCommission>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setPartyCommission>>,
+        TError,
+        {data: BodyType<PartyCommission>},
+        TContext
+      > => {
+      return useMutation(getSetPartyCommissionMutationOptions(options));
+    }
+
+export const getGetPartyDashboardUrl = (id: number,) => {
+
+
+
+
+  return `/api/create-your-party/${id}/dashboard`
+}
+
+/**
+ * @summary Organizer dashboard aggregates for one party (host only)
+ */
+export const getPartyDashboard = async (id: number, options?: RequestInit): Promise<PartyDashboard> => {
+
+  return customFetch<PartyDashboard>(getGetPartyDashboardUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPartyDashboardQueryKey = (id: number,) => {
+    return [
+    `/api/create-your-party/${id}/dashboard`
+    ] as const;
+    }
+
+
+export const getGetPartyDashboardQueryOptions = <TData = Awaited<ReturnType<typeof getPartyDashboard>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPartyDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPartyDashboardQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPartyDashboard>>> = ({ signal }) => getPartyDashboard(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPartyDashboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPartyDashboardQueryResult = NonNullable<Awaited<ReturnType<typeof getPartyDashboard>>>
+export type GetPartyDashboardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Organizer dashboard aggregates for one party (host only)
+ */
+
+export function useGetPartyDashboard<TData = Awaited<ReturnType<typeof getPartyDashboard>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPartyDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPartyDashboardQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getScanPartyTicketUrl = (id: number,) => {
+
+
+
+
+  return `/api/create-your-party/${id}/scan`
+}
+
+/**
+ * @summary Scan/check-in a ticket for this party (host only)
+ */
+export const scanPartyTicket = async (id: number,
+    partyScanBody: PartyScanBody, options?: RequestInit): Promise<PartyScanResult> => {
+
+  return customFetch<PartyScanResult>(getScanPartyTicketUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      partyScanBody,)
+  }
+);}
+
+
+
+
+export const getScanPartyTicketMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof scanPartyTicket>>, TError,{id: number;data: BodyType<PartyScanBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof scanPartyTicket>>, TError,{id: number;data: BodyType<PartyScanBody>}, TContext> => {
+
+const mutationKey = ['scanPartyTicket'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof scanPartyTicket>>, {id: number;data: BodyType<PartyScanBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  scanPartyTicket(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ScanPartyTicketMutationResult = NonNullable<Awaited<ReturnType<typeof scanPartyTicket>>>
+    export type ScanPartyTicketMutationBody = BodyType<PartyScanBody>
+    export type ScanPartyTicketMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Scan/check-in a ticket for this party (host only)
+ */
+export const useScanPartyTicket = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof scanPartyTicket>>, TError,{id: number;data: BodyType<PartyScanBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof scanPartyTicket>>,
+        TError,
+        {id: number;data: BodyType<PartyScanBody>},
+        TContext
+      > => {
+      return useMutation(getScanPartyTicketMutationOptions(options));
+    }
+
+export const getListMyPartyBookingsUrl = () => {
+
+
+
+
+  return `/api/create-your-party/mine/bookings`
+}
+
+/**
+ * @summary The caller's own party bookings (history)
+ */
+export const listMyPartyBookings = async ( options?: RequestInit): Promise<PartyMyBooking[]> => {
+
+  return customFetch<PartyMyBooking[]>(getListMyPartyBookingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMyPartyBookingsQueryKey = () => {
+    return [
+    `/api/create-your-party/mine/bookings`
+    ] as const;
+    }
+
+
+export const getListMyPartyBookingsQueryOptions = <TData = Awaited<ReturnType<typeof listMyPartyBookings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyPartyBookings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMyPartyBookingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyPartyBookings>>> = ({ signal }) => listMyPartyBookings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMyPartyBookings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMyPartyBookingsQueryResult = NonNullable<Awaited<ReturnType<typeof listMyPartyBookings>>>
+export type ListMyPartyBookingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary The caller's own party bookings (history)
+ */
+
+export function useListMyPartyBookings<TData = Awaited<ReturnType<typeof listMyPartyBookings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyPartyBookings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMyPartyBookingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCancelPartyBookingUrl = (bookingId: number,) => {
+
+
+
+
+  return `/api/create-your-party/bookings/${bookingId}/cancel`
+}
+
+/**
+ * @summary Cancel your own party booking
+ */
+export const cancelPartyBooking = async (bookingId: number, options?: RequestInit): Promise<Ok> => {
+
+  return customFetch<Ok>(getCancelPartyBookingUrl(bookingId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCancelPartyBookingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelPartyBooking>>, TError,{bookingId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelPartyBooking>>, TError,{bookingId: number}, TContext> => {
+
+const mutationKey = ['cancelPartyBooking'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelPartyBooking>>, {bookingId: number}> = (props) => {
+          const {bookingId} = props ?? {};
+
+          return  cancelPartyBooking(bookingId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelPartyBookingMutationResult = NonNullable<Awaited<ReturnType<typeof cancelPartyBooking>>>
+
+    export type CancelPartyBookingMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Cancel your own party booking
+ */
+export const useCancelPartyBooking = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelPartyBooking>>, TError,{bookingId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelPartyBooking>>,
+        TError,
+        {bookingId: number},
+        TContext
+      > => {
+      return useMutation(getCancelPartyBookingMutationOptions(options));
+    }
+
+export const getListSoloGroupsUrl = (params?: ListSoloGroupsParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -1213,7 +2414,7 @@ export const getListSoloGroupsUrl = (params: ListSoloGroupsParams,) => {
 /**
  * @summary List groups in the caller's gender + current city
  */
-export const listSoloGroups = async (params: ListSoloGroupsParams, options?: RequestInit): Promise<SoloGroup[]> => {
+export const listSoloGroups = async (params?: ListSoloGroupsParams, options?: RequestInit): Promise<SoloGroup[]> => {
 
   return customFetch<SoloGroup[]>(getListSoloGroupsUrl(params),
   {
@@ -1235,7 +2436,7 @@ export const getListSoloGroupsQueryKey = (params?: ListSoloGroupsParams,) => {
     }
 
 
-export const getListSoloGroupsQueryOptions = <TData = Awaited<ReturnType<typeof listSoloGroups>>, TError = ErrorType<unknown>>(params: ListSoloGroupsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSoloGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListSoloGroupsQueryOptions = <TData = Awaited<ReturnType<typeof listSoloGroups>>, TError = ErrorType<unknown>>(params?: ListSoloGroupsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSoloGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -1262,7 +2463,7 @@ export type ListSoloGroupsQueryError = ErrorType<unknown>
  */
 
 export function useListSoloGroups<TData = Awaited<ReturnType<typeof listSoloGroups>>, TError = ErrorType<unknown>>(
- params: ListSoloGroupsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSoloGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListSoloGroupsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSoloGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 

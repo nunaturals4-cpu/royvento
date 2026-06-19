@@ -63,7 +63,7 @@ router.get("/places/autocomplete", async (req, res) => {
   }
 });
 
-type ReverseResult = { city: string | null; locality: string | null; area: string | null; formatted: string | null };
+type ReverseResult = { city: string | null; locality: string | null; area: string | null; state: string | null; formatted: string | null };
 const reverseCache = new TtlCache<ReverseResult>();
 const REVERSE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -122,6 +122,7 @@ router.get("/places/reverse", async (req, res) => {
       // Finest → broadest neighbourhood-level naming (matches what Zomato shows).
       locality: pick("neighborhood", "sublocality_level_2", "sublocality_level_1", "sublocality", "route"),
       area: pick("sublocality_level_1", "sublocality", "administrative_area_level_2"),
+      state: pick("administrative_area_level_1"),
       formatted: data.results[0]?.formatted_address ?? null,
     };
     reverseCache.set(cacheKey, result, REVERSE_TTL_MS);

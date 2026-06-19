@@ -350,6 +350,428 @@ export interface SoloReviewBody {
   rejectionReason?: string;
 }
 
+export type PartyVisibility = typeof PartyVisibility[keyof typeof PartyVisibility];
+
+
+export const PartyVisibility = {
+  public: 'public',
+  private: 'private',
+} as const;
+
+export type PartyJoinType = typeof PartyJoinType[keyof typeof PartyJoinType];
+
+
+export const PartyJoinType = {
+  male_only: 'male_only',
+  female_only: 'female_only',
+  mixed: 'mixed',
+} as const;
+
+export type PartyStatus = typeof PartyStatus[keyof typeof PartyStatus];
+
+
+export const PartyStatus = {
+  published: 'published',
+  sales_stopped: 'sales_stopped',
+  cancelled: 'cancelled',
+  completed: 'completed',
+} as const;
+
+export type PartyTicketType = typeof PartyTicketType[keyof typeof PartyTicketType];
+
+
+export const PartyTicketType = {
+  free: 'free',
+  paid: 'paid',
+} as const;
+
+export interface Party {
+  id: number;
+  organizerUserId: number;
+  name: string;
+  slug: string;
+  coverImageUrl: string;
+  galleryImages: string[];
+  description: string;
+  rules: string;
+  category: string;
+  visibility: PartyVisibility;
+  venueName: string;
+  address: string;
+  city: string;
+  state: string;
+  pinCode: string;
+  mapLocation: string;
+  partyDate?: string | null;
+  startTime: string;
+  endTime: string;
+  joinType: PartyJoinType;
+  organizerName: string;
+  capacity: number;
+  ageGroup: string;
+  dressCode: string;
+  drinking: string;
+  smoking: string;
+  coupleFriendly: string;
+  lgbtqFriendly: string;
+  status: PartyStatus;
+  createdAt: string;
+  updatedAt: string;
+  ticketType: PartyTicketType;
+  ticketPrice: string;
+  soldCount: number;
+  seatsLeft?: number | null;
+  isOrganizer: boolean;
+  canChat?: boolean;
+}
+
+export type PartyCreateBodyVisibility = typeof PartyCreateBodyVisibility[keyof typeof PartyCreateBodyVisibility];
+
+
+export const PartyCreateBodyVisibility = {
+  public: 'public',
+  private: 'private',
+} as const;
+
+export type PartyCreateBodyJoinType = typeof PartyCreateBodyJoinType[keyof typeof PartyCreateBodyJoinType];
+
+
+export const PartyCreateBodyJoinType = {
+  male_only: 'male_only',
+  female_only: 'female_only',
+  mixed: 'mixed',
+} as const;
+
+export type PartyCreateBodyTicketType = typeof PartyCreateBodyTicketType[keyof typeof PartyCreateBodyTicketType];
+
+
+export const PartyCreateBodyTicketType = {
+  free: 'free',
+  paid: 'paid',
+} as const;
+
+export type PartyCreateBodyAgeGroup = typeof PartyCreateBodyAgeGroup[keyof typeof PartyCreateBodyAgeGroup];
+
+
+export const PartyCreateBodyAgeGroup = {
+  '': '',
+  '18-25': '18-25',
+  '25-35': '25-35',
+  '35+': '35+',
+} as const;
+
+export type PartyCreateBodyDressCode = typeof PartyCreateBodyDressCode[keyof typeof PartyCreateBodyDressCode];
+
+
+export const PartyCreateBodyDressCode = {
+  '': '',
+  casual: 'casual',
+  smart_casual: 'smart_casual',
+  black_theme: 'black_theme',
+  white_theme: 'white_theme',
+} as const;
+
+export type PartyCreateBodyDrinking = typeof PartyCreateBodyDrinking[keyof typeof PartyCreateBodyDrinking];
+
+
+export const PartyCreateBodyDrinking = {
+  '': '',
+  yes: 'yes',
+  no: 'no',
+} as const;
+
+export type PartyCreateBodySmoking = typeof PartyCreateBodySmoking[keyof typeof PartyCreateBodySmoking];
+
+
+export const PartyCreateBodySmoking = {
+  '': '',
+  yes: 'yes',
+  no: 'no',
+} as const;
+
+export type PartyCreateBodyCoupleFriendly = typeof PartyCreateBodyCoupleFriendly[keyof typeof PartyCreateBodyCoupleFriendly];
+
+
+export const PartyCreateBodyCoupleFriendly = {
+  '': '',
+  yes: 'yes',
+  no: 'no',
+} as const;
+
+export type PartyCreateBodyLgbtqFriendly = typeof PartyCreateBodyLgbtqFriendly[keyof typeof PartyCreateBodyLgbtqFriendly];
+
+
+export const PartyCreateBodyLgbtqFriendly = {
+  '': '',
+  yes: 'yes',
+  no: 'no',
+} as const;
+
+export interface PartyCreateBody {
+  name: string;
+  coverImageUrl?: string;
+  galleryImages?: string[];
+  description?: string;
+  rules?: string;
+  category?: string;
+  visibility?: PartyCreateBodyVisibility;
+  venueName?: string;
+  address?: string;
+  city: string;
+  state?: string;
+  pinCode?: string;
+  mapLocation?: string;
+  partyDate?: string;
+  startTime?: string;
+  endTime?: string;
+  joinType: PartyCreateBodyJoinType;
+  organizerName: string;
+  ticketType: PartyCreateBodyTicketType;
+  ticketPrice?: number;
+  capacity?: number;
+  ageGroup?: PartyCreateBodyAgeGroup;
+  dressCode?: PartyCreateBodyDressCode;
+  drinking?: PartyCreateBodyDrinking;
+  smoking?: PartyCreateBodySmoking;
+  coupleFriendly?: PartyCreateBodyCoupleFriendly;
+  lgbtqFriendly?: PartyCreateBodyLgbtqFriendly;
+}
+
+export type PartyUpdateBodyVisibility = typeof PartyUpdateBodyVisibility[keyof typeof PartyUpdateBodyVisibility];
+
+
+export const PartyUpdateBodyVisibility = {
+  public: 'public',
+  private: 'private',
+} as const;
+
+export type PartyUpdateBodyJoinType = typeof PartyUpdateBodyJoinType[keyof typeof PartyUpdateBodyJoinType];
+
+
+export const PartyUpdateBodyJoinType = {
+  male_only: 'male_only',
+  female_only: 'female_only',
+  mixed: 'mixed',
+} as const;
+
+export type PartyUpdateBodyStatus = typeof PartyUpdateBodyStatus[keyof typeof PartyUpdateBodyStatus];
+
+
+export const PartyUpdateBodyStatus = {
+  published: 'published',
+  sales_stopped: 'sales_stopped',
+  cancelled: 'cancelled',
+} as const;
+
+export type PartyUpdateBodyAgeGroup = typeof PartyUpdateBodyAgeGroup[keyof typeof PartyUpdateBodyAgeGroup];
+
+
+export const PartyUpdateBodyAgeGroup = {
+  '': '',
+  '18-25': '18-25',
+  '25-35': '25-35',
+  '35+': '35+',
+} as const;
+
+export type PartyUpdateBodyDressCode = typeof PartyUpdateBodyDressCode[keyof typeof PartyUpdateBodyDressCode];
+
+
+export const PartyUpdateBodyDressCode = {
+  '': '',
+  casual: 'casual',
+  smart_casual: 'smart_casual',
+  black_theme: 'black_theme',
+  white_theme: 'white_theme',
+} as const;
+
+export type PartyUpdateBodyDrinking = typeof PartyUpdateBodyDrinking[keyof typeof PartyUpdateBodyDrinking];
+
+
+export const PartyUpdateBodyDrinking = {
+  '': '',
+  yes: 'yes',
+  no: 'no',
+} as const;
+
+export type PartyUpdateBodySmoking = typeof PartyUpdateBodySmoking[keyof typeof PartyUpdateBodySmoking];
+
+
+export const PartyUpdateBodySmoking = {
+  '': '',
+  yes: 'yes',
+  no: 'no',
+} as const;
+
+export type PartyUpdateBodyCoupleFriendly = typeof PartyUpdateBodyCoupleFriendly[keyof typeof PartyUpdateBodyCoupleFriendly];
+
+
+export const PartyUpdateBodyCoupleFriendly = {
+  '': '',
+  yes: 'yes',
+  no: 'no',
+} as const;
+
+export type PartyUpdateBodyLgbtqFriendly = typeof PartyUpdateBodyLgbtqFriendly[keyof typeof PartyUpdateBodyLgbtqFriendly];
+
+
+export const PartyUpdateBodyLgbtqFriendly = {
+  '': '',
+  yes: 'yes',
+  no: 'no',
+} as const;
+
+export interface PartyUpdateBody {
+  name?: string;
+  coverImageUrl?: string;
+  galleryImages?: string[];
+  description?: string;
+  rules?: string;
+  category?: string;
+  visibility?: PartyUpdateBodyVisibility;
+  venueName?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pinCode?: string;
+  mapLocation?: string;
+  partyDate?: string;
+  startTime?: string;
+  endTime?: string;
+  joinType?: PartyUpdateBodyJoinType;
+  organizerName?: string;
+  status?: PartyUpdateBodyStatus;
+  ageGroup?: PartyUpdateBodyAgeGroup;
+  dressCode?: PartyUpdateBodyDressCode;
+  drinking?: PartyUpdateBodyDrinking;
+  smoking?: PartyUpdateBodySmoking;
+  coupleFriendly?: PartyUpdateBodyCoupleFriendly;
+  lgbtqFriendly?: PartyUpdateBodyLgbtqFriendly;
+}
+
+export interface PartyMessage {
+  id: number;
+  partyId: number;
+  userId: number;
+  userName: string;
+  isHost: boolean;
+  body: string;
+  createdAt: string;
+  isMine: boolean;
+}
+
+export interface PartyMessageBody {
+  body: string;
+}
+
+export interface PartyBookBody {
+  quantity?: number;
+  name?: string;
+  phone?: string;
+}
+
+export interface PartyBookResult {
+  ok: boolean;
+  bookingId?: number;
+  bookingCode?: string;
+  paymentPending?: boolean;
+  razorpayOrderId?: string;
+  razorpayKeyId?: string;
+  amountPaise?: number;
+}
+
+export interface PartyVerifyBody {
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+}
+
+export type PartyCommissionCommissionType = typeof PartyCommissionCommissionType[keyof typeof PartyCommissionCommissionType];
+
+
+export const PartyCommissionCommissionType = {
+  fixed: 'fixed',
+  percentage: 'percentage',
+} as const;
+
+export interface PartyCommission {
+  commissionType: PartyCommissionCommissionType;
+  value: number;
+}
+
+export interface PartyBookingRow {
+  id: number;
+  bookingCode: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  quantity: number;
+  totalPrice: string;
+  netAmount: string;
+  status: string;
+  paymentStatus: string;
+  checkedIn?: boolean;
+  checkedInAt?: string | null;
+  createdAt: string;
+}
+
+export type PartyDashboardStatsCommissionType = typeof PartyDashboardStatsCommissionType[keyof typeof PartyDashboardStatsCommissionType];
+
+
+export const PartyDashboardStatsCommissionType = {
+  fixed: 'fixed',
+  percentage: 'percentage',
+} as const;
+
+export interface PartyDashboardStats {
+  totalBookings: number;
+  cancelledBookings: number;
+  guestsGoing: number;
+  checkedInCount?: number;
+  revenue: string;
+  commission: string;
+  netEarnings: string;
+  seatsLeft?: number | null;
+  capacity: number;
+  commissionType: PartyDashboardStatsCommissionType;
+  commissionValue: number;
+}
+
+export interface PartyDashboard {
+  party: Party;
+  stats: PartyDashboardStats;
+  bookings: PartyBookingRow[];
+  cancelled: PartyBookingRow[];
+}
+
+export interface PartyMyBooking {
+  id: number;
+  partyId: number;
+  partyName: string;
+  coverImageUrl: string;
+  partyDate?: string | null;
+  bookingCode: string;
+  quantity: number;
+  totalPrice: string;
+  status: string;
+  paymentStatus: string;
+  checkedIn?: boolean;
+  createdAt: string;
+}
+
+export interface PartyScanBody {
+  code: string;
+}
+
+export interface PartyScanResult {
+  ok: boolean;
+  bookingId?: number;
+  bookingCode?: string;
+  name?: string;
+  quantity?: number;
+  partyName?: string;
+  checkedInAt?: string;
+}
+
 export type SoloGroupActivityType = typeof SoloGroupActivityType[keyof typeof SoloGroupActivityType];
 
 
@@ -360,6 +782,7 @@ export const SoloGroupActivityType = {
   activities: 'activities',
   happy_hours: 'happy_hours',
   food_drinks: 'food_drinks',
+  party: 'party',
 } as const;
 
 export type SoloGroupGenderType = typeof SoloGroupGenderType[keyof typeof SoloGroupGenderType];
@@ -412,6 +835,15 @@ export interface SoloGroup {
   ratingCount: number;
   createdAt: string;
   lastActivityAt?: string | null;
+  coverImageUrl: string;
+  address: string;
+  pinCode: string;
+  mapLocation: string;
+  organizerName: string;
+  endTime: string;
+  ticketType: string;
+  ticketPrice: string;
+  capacity?: number | null;
   memberCount: number;
   menCount: number;
   womenCount: number;
@@ -466,6 +898,7 @@ export const SoloGroupBodyActivityType = {
   activities: 'activities',
   happy_hours: 'happy_hours',
   food_drinks: 'food_drinks',
+  party: 'party',
 } as const;
 
 export type SoloGroupBodyVisibility = typeof SoloGroupBodyVisibility[keyof typeof SoloGroupBodyVisibility];
@@ -485,6 +918,14 @@ export const SoloGroupBodyGenderType = {
   mixed: 'mixed',
 } as const;
 
+export type SoloGroupBodyTicketType = typeof SoloGroupBodyTicketType[keyof typeof SoloGroupBodyTicketType];
+
+
+export const SoloGroupBodyTicketType = {
+  free: 'free',
+  paid: 'paid',
+} as const;
+
 export interface SoloGroupBody {
   name: string;
   activityType: SoloGroupBodyActivityType;
@@ -495,12 +936,21 @@ export interface SoloGroupBody {
   groupDate?: string;
   startTime?: string;
   description?: string;
-  maxMembers: number;
+  maxMembers?: number;
   visibility?: SoloGroupBodyVisibility;
   genderType?: SoloGroupBodyGenderType;
   country?: string;
   state?: string;
   city: string;
+  coverImageUrl?: string;
+  address?: string;
+  pinCode?: string;
+  mapLocation?: string;
+  organizerName?: string;
+  endTime?: string;
+  ticketType?: SoloGroupBodyTicketType;
+  ticketPrice?: number;
+  capacity?: number;
 }
 
 export interface SoloJoinBody {
@@ -2112,8 +2562,13 @@ export type ListSoloVenuesParams = {
 activityType?: string;
 };
 
+export type ListPartiesParams = {
+city?: string;
+};
+
 export type ListSoloGroupsParams = {
-city: string;
+city?: string;
+state?: string;
 activityType?: string;
 };
 

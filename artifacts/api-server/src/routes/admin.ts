@@ -10,6 +10,11 @@ import {
   couponsTable,
   vendorCommissionsTable,
   commissionLedgerTable,
+  organizerCommissionLedgerTable,
+  gameCommissionLedgerTable,
+  createYourPartyTable,
+  createYourPartyTicketsTable,
+  createYourPartyBookingsTable,
   vendorRequestsTable,
   vendorManagersTable,
   wishlistsTable,
@@ -391,6 +396,51 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   }
   totalCommission = Math.round(totalCommission * 100) / 100;
 
+  // ── Per-vertical commission breakdown (realised ledgers, range-filtered) ────
+  // Four disjoint sources so the boxes add up to the grand total below:
+  //   Pubs & Clubs   → commission_ledger (vendor)
+  //   Events         → organizer_commission_ledger (Event Organizer vertical)
+  //   Games          → game_commission_ledger (Game Organizer vertical)
+  //   Create a Party → create_your_party_bookings.commission_amount (confirmed)
+  // Party is online-only, so its revenue == its online revenue.
+  const round2c = (n: number) => Math.round(n * 100) / 100;
+  const [pubClubCommRows, eventsCommRows, gamesCommRows, partyAggRows] = await Promise.all([
+    db
+      .select({ s: sql<string>`coalesce(sum(${commissionLedgerTable.amount}), 0)::text` })
+      .from(commissionLedgerTable)
+      .where(sql`${commissionLedgerTable.createdAt} >= ${rangeStart} AND ${commissionLedgerTable.createdAt} <= ${rangeEnd}`),
+    db
+      .select({ s: sql<string>`coalesce(sum(${organizerCommissionLedgerTable.commission}), 0)::text` })
+      .from(organizerCommissionLedgerTable)
+      .where(sql`${organizerCommissionLedgerTable.createdAt} >= ${rangeStart} AND ${organizerCommissionLedgerTable.createdAt} <= ${rangeEnd}`),
+    db
+      .select({ s: sql<string>`coalesce(sum(${gameCommissionLedgerTable.commission}), 0)::text` })
+      .from(gameCommissionLedgerTable)
+      .where(sql`${gameCommissionLedgerTable.createdAt} >= ${rangeStart} AND ${gameCommissionLedgerTable.createdAt} <= ${rangeEnd}`),
+    db
+      .select({
+        comm: sql<string>`coalesce(sum(${createYourPartyBookingsTable.commissionAmount}), 0)::text`,
+        rev: sql<string>`coalesce(sum(${createYourPartyBookingsTable.totalPrice}), 0)::text`,
+      })
+      .from(createYourPartyBookingsTable)
+      .where(sql`${createYourPartyBookingsTable.status} IN ('confirmed', 'completed') AND ${createYourPartyBookingsTable.createdAt} >= ${rangeStart} AND ${createYourPartyBookingsTable.createdAt} <= ${rangeEnd}`),
+  ]);
+  const pubClubCommission = round2c(Number(pubClubCommRows[0]?.s ?? 0));
+  const eventsCommission = round2c(Number(eventsCommRows[0]?.s ?? 0));
+  const gamesCommission = round2c(Number(gamesCommRows[0]?.s ?? 0));
+  const partyCommission = round2c(Number(partyAggRows[0]?.comm ?? 0));
+  const partyRevenue = round2c(Number(partyAggRows[0]?.rev ?? 0));
+
+  // Grand total now spans every vertical (incl. party) and equals the sum of
+  // the four breakdown boxes shown on the dashboard.
+  totalCommission = round2c(pubClubCommission + partyCommission + eventsCommission + gamesCommission);
+  const commissionBreakdown = {
+    pubClub: pubClubCommission,
+    party: partyCommission,
+    events: eventsCommission,
+    games: gamesCommission,
+  };
+
   const perVendor = Array.from(perVendorMap.values())
     .map((pv) => ({ ...pv, vendorName: allVMap.get(pv.vendorId)?.businessName ?? `Partner #${pv.vendorId}` }))
     .sort((a, b) => b.revenue - a.revenue);
@@ -486,17 +536,19 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     pendingVendors: pendingCount[0]?.c ?? 0,
     totalEvents: eventsCount[0]?.c ?? 0,
     totalBookings: bookingsCount[0]?.c ?? 0,
-    totalRevenue: Math.round(totalRevenue),
+    // Revenue + online payments now span every vertical, incl. the
+    // online-only "Create Your Own Party" bookings.
+    totalRevenue: Math.round(totalRevenue + partyRevenue),
     totalBaseFee: Math.round(totalBaseFee),
-    // Not Math.round'd: commission-report sums per-booking round2'd amounts
-    // without additional integer rounding. We mirror that policy so the
-    // two endpoints agree to the rupee.
+    // Grand total across pubs/clubs, events, games and parties (= sum of the
+    // commissionBreakdown boxes).
     totalCommission,
+    commissionBreakdown,
     codRevenue,
     actualCodRevenue: Math.round(actualCodRevenue),
     actualCodRecordedCount,
     pendingActualsCount,
-    onlineRevenue,
+    onlineRevenue: round2c(onlineRevenue + partyRevenue),
     bookingsByStatus: statusCounts.map((s) => ({
       status: s.status,
       count: s.count,
@@ -3494,6 +3546,86 @@ router.post("/admin/seed-prod-showcase", requireAuth(["admin"]), async (req, res
     res.json(report);
   } catch (err) {
     req.log.error({ err }, "prod-showcase seed failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
+/**
+ * Demo: attach 5 gallery photos to a "HouseParty" Create-Your-Own-Party. If no
+ * such party exists yet it's created (free entry, public) owned by the admin so
+ * the gallery is immediately viewable on /party/:id. Idempotent — re-running
+ * just refreshes the gallery on the same party.
+ */
+router.post("/admin/seed-houseparty-demo", requireAuth(["admin"]), async (req, res) => {
+  const adminId = (req as AuthedRequest).user?.id;
+  if (!adminId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  // Five party photos (house-party vibe). External demo URLs are fine here since
+  // this seed writes directly to the DB and bypasses the upload-path guard.
+  const GALLERY = [
+    "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=1200&q=80",
+    "https://images.unsplash.com/photo-1496024840928-4c417adf211d?w=1200&q=80",
+    "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80",
+    "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1200&q=80",
+    "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1200&q=80",
+  ];
+  const COVER = "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=1600&q=80";
+  try {
+    const existing = await db
+      .select()
+      .from(createYourPartyTable)
+      .where(eq(createYourPartyTable.name, "HouseParty"))
+      .limit(1);
+    if (existing[0]) {
+      await db
+        .update(createYourPartyTable)
+        .set({
+          galleryImages: GALLERY,
+          coverImageUrl: existing[0].coverImageUrl || COVER,
+          updatedAt: new Date(),
+        })
+        .where(eq(createYourPartyTable.id, existing[0].id));
+      res.json({ ok: true, action: "updated", partyId: existing[0].id, galleryCount: GALLERY.length });
+      return;
+    }
+    const now = new Date();
+    const [party] = await db
+      .insert(createYourPartyTable)
+      .values({
+        organizerUserId: adminId,
+        name: "HouseParty",
+        slug: `houseparty-${Math.random().toString(36).slice(2, 8)}`,
+        coverImageUrl: COVER,
+        galleryImages: GALLERY,
+        description: "A cozy house party with great music, drinks and good company. Swipe through the gallery to get the vibe!",
+        category: "party",
+        visibility: "public",
+        venueName: "Private Residence",
+        address: "Sector V, Salt Lake",
+        city: "Kolkata",
+        state: "West Bengal",
+        pinCode: "700091",
+        joinType: "mixed",
+        organizerName: "Royvento Demo",
+        capacity: 0,
+        status: "published",
+        createdBy: adminId,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    await db.insert(createYourPartyTicketsTable).values({
+      partyId: party!.id,
+      type: "free",
+      name: "Entry",
+      price: "0",
+      quantity: 0,
+    });
+    res.json({ ok: true, action: "created", partyId: party!.id, galleryCount: GALLERY.length });
+  } catch (err) {
+    req.log.error({ err }, "houseparty demo seed failed");
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
   }
 });

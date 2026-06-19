@@ -302,10 +302,566 @@ export const ReviewSoloVerificationResponse = zod.object({
 
 
 /**
+ * @summary List published parties (optionally by city)
+ */
+export const ListPartiesQueryParams = zod.object({
+  "city": zod.coerce.string().optional()
+}).strict()
+
+export const ListPartiesResponseItem = zod.object({
+  "id": zod.number(),
+  "organizerUserId": zod.number(),
+  "name": zod.string(),
+  "slug": zod.string(),
+  "coverImageUrl": zod.string(),
+  "galleryImages": zod.array(zod.string()),
+  "description": zod.string(),
+  "rules": zod.string(),
+  "category": zod.string(),
+  "visibility": zod.enum(['public', 'private']),
+  "venueName": zod.string(),
+  "address": zod.string(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "pinCode": zod.string(),
+  "mapLocation": zod.string(),
+  "partyDate": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string(),
+  "joinType": zod.enum(['male_only', 'female_only', 'mixed']),
+  "organizerName": zod.string(),
+  "capacity": zod.number(),
+  "ageGroup": zod.string(),
+  "dressCode": zod.string(),
+  "drinking": zod.string(),
+  "smoking": zod.string(),
+  "coupleFriendly": zod.string(),
+  "lgbtqFriendly": zod.string(),
+  "status": zod.enum(['published', 'sales_stopped', 'cancelled', 'completed']),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "ticketType": zod.enum(['free', 'paid']),
+  "ticketPrice": zod.string(),
+  "soldCount": zod.number(),
+  "seatsLeft": zod.number().nullish(),
+  "isOrganizer": zod.boolean(),
+  "canChat": zod.boolean().optional()
+})
+export const ListPartiesResponse = zod.array(ListPartiesResponseItem)
+
+
+/**
+ * @summary Create a party
+ */
+export const CreatePartyBody = zod.object({
+  "name": zod.string(),
+  "coverImageUrl": zod.string().optional(),
+  "galleryImages": zod.array(zod.string()).optional(),
+  "description": zod.string().optional(),
+  "rules": zod.string().optional(),
+  "category": zod.string().optional(),
+  "visibility": zod.enum(['public', 'private']).optional(),
+  "venueName": zod.string().optional(),
+  "address": zod.string().optional(),
+  "city": zod.string(),
+  "state": zod.string().optional(),
+  "pinCode": zod.string().optional(),
+  "mapLocation": zod.string().optional(),
+  "partyDate": zod.string().optional(),
+  "startTime": zod.string().optional(),
+  "endTime": zod.string().optional(),
+  "joinType": zod.enum(['male_only', 'female_only', 'mixed']),
+  "organizerName": zod.string(),
+  "ticketType": zod.enum(['free', 'paid']),
+  "ticketPrice": zod.number().optional(),
+  "capacity": zod.number().optional(),
+  "ageGroup": zod.enum(['', '18-25', '25-35', '35+']).optional(),
+  "dressCode": zod.enum(['', 'casual', 'smart_casual', 'black_theme', 'white_theme']).optional(),
+  "drinking": zod.enum(['', 'yes', 'no']).optional(),
+  "smoking": zod.enum(['', 'yes', 'no']).optional(),
+  "coupleFriendly": zod.enum(['', 'yes', 'no']).optional(),
+  "lgbtqFriendly": zod.enum(['', 'yes', 'no']).optional()
+}).strict()
+
+export const CreatePartyResponse = zod.object({
+  "id": zod.number(),
+  "organizerUserId": zod.number(),
+  "name": zod.string(),
+  "slug": zod.string(),
+  "coverImageUrl": zod.string(),
+  "galleryImages": zod.array(zod.string()),
+  "description": zod.string(),
+  "rules": zod.string(),
+  "category": zod.string(),
+  "visibility": zod.enum(['public', 'private']),
+  "venueName": zod.string(),
+  "address": zod.string(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "pinCode": zod.string(),
+  "mapLocation": zod.string(),
+  "partyDate": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string(),
+  "joinType": zod.enum(['male_only', 'female_only', 'mixed']),
+  "organizerName": zod.string(),
+  "capacity": zod.number(),
+  "ageGroup": zod.string(),
+  "dressCode": zod.string(),
+  "drinking": zod.string(),
+  "smoking": zod.string(),
+  "coupleFriendly": zod.string(),
+  "lgbtqFriendly": zod.string(),
+  "status": zod.enum(['published', 'sales_stopped', 'cancelled', 'completed']),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "ticketType": zod.enum(['free', 'paid']),
+  "ticketPrice": zod.string(),
+  "soldCount": zod.number(),
+  "seatsLeft": zod.number().nullish(),
+  "isOrganizer": zod.boolean(),
+  "canChat": zod.boolean().optional()
+})
+
+
+/**
+ * @summary The caller's own parties (organizer dashboard)
+ */
+export const ListMyPartiesResponseItem = zod.object({
+  "id": zod.number(),
+  "organizerUserId": zod.number(),
+  "name": zod.string(),
+  "slug": zod.string(),
+  "coverImageUrl": zod.string(),
+  "galleryImages": zod.array(zod.string()),
+  "description": zod.string(),
+  "rules": zod.string(),
+  "category": zod.string(),
+  "visibility": zod.enum(['public', 'private']),
+  "venueName": zod.string(),
+  "address": zod.string(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "pinCode": zod.string(),
+  "mapLocation": zod.string(),
+  "partyDate": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string(),
+  "joinType": zod.enum(['male_only', 'female_only', 'mixed']),
+  "organizerName": zod.string(),
+  "capacity": zod.number(),
+  "ageGroup": zod.string(),
+  "dressCode": zod.string(),
+  "drinking": zod.string(),
+  "smoking": zod.string(),
+  "coupleFriendly": zod.string(),
+  "lgbtqFriendly": zod.string(),
+  "status": zod.enum(['published', 'sales_stopped', 'cancelled', 'completed']),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "ticketType": zod.enum(['free', 'paid']),
+  "ticketPrice": zod.string(),
+  "soldCount": zod.number(),
+  "seatsLeft": zod.number().nullish(),
+  "isOrganizer": zod.boolean(),
+  "canChat": zod.boolean().optional()
+})
+export const ListMyPartiesResponse = zod.array(ListMyPartiesResponseItem)
+
+
+/**
+ * @summary Party detail
+ */
+export const GetPartyParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const GetPartyResponse = zod.object({
+  "id": zod.number(),
+  "organizerUserId": zod.number(),
+  "name": zod.string(),
+  "slug": zod.string(),
+  "coverImageUrl": zod.string(),
+  "galleryImages": zod.array(zod.string()),
+  "description": zod.string(),
+  "rules": zod.string(),
+  "category": zod.string(),
+  "visibility": zod.enum(['public', 'private']),
+  "venueName": zod.string(),
+  "address": zod.string(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "pinCode": zod.string(),
+  "mapLocation": zod.string(),
+  "partyDate": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string(),
+  "joinType": zod.enum(['male_only', 'female_only', 'mixed']),
+  "organizerName": zod.string(),
+  "capacity": zod.number(),
+  "ageGroup": zod.string(),
+  "dressCode": zod.string(),
+  "drinking": zod.string(),
+  "smoking": zod.string(),
+  "coupleFriendly": zod.string(),
+  "lgbtqFriendly": zod.string(),
+  "status": zod.enum(['published', 'sales_stopped', 'cancelled', 'completed']),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "ticketType": zod.enum(['free', 'paid']),
+  "ticketPrice": zod.string(),
+  "soldCount": zod.number(),
+  "seatsLeft": zod.number().nullish(),
+  "isOrganizer": zod.boolean(),
+  "canChat": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Edit a party (host only)
+ */
+export const UpdatePartyParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const UpdatePartyBody = zod.object({
+  "name": zod.string().optional(),
+  "coverImageUrl": zod.string().optional(),
+  "galleryImages": zod.array(zod.string()).optional(),
+  "description": zod.string().optional(),
+  "rules": zod.string().optional(),
+  "category": zod.string().optional(),
+  "visibility": zod.enum(['public', 'private']).optional(),
+  "venueName": zod.string().optional(),
+  "address": zod.string().optional(),
+  "city": zod.string().optional(),
+  "state": zod.string().optional(),
+  "pinCode": zod.string().optional(),
+  "mapLocation": zod.string().optional(),
+  "partyDate": zod.string().optional(),
+  "startTime": zod.string().optional(),
+  "endTime": zod.string().optional(),
+  "joinType": zod.enum(['male_only', 'female_only', 'mixed']).optional(),
+  "organizerName": zod.string().optional(),
+  "status": zod.enum(['published', 'sales_stopped', 'cancelled']).optional(),
+  "ageGroup": zod.enum(['', '18-25', '25-35', '35+']).optional(),
+  "dressCode": zod.enum(['', 'casual', 'smart_casual', 'black_theme', 'white_theme']).optional(),
+  "drinking": zod.enum(['', 'yes', 'no']).optional(),
+  "smoking": zod.enum(['', 'yes', 'no']).optional(),
+  "coupleFriendly": zod.enum(['', 'yes', 'no']).optional(),
+  "lgbtqFriendly": zod.enum(['', 'yes', 'no']).optional()
+}).strict()
+
+export const UpdatePartyResponse = zod.object({
+  "id": zod.number(),
+  "organizerUserId": zod.number(),
+  "name": zod.string(),
+  "slug": zod.string(),
+  "coverImageUrl": zod.string(),
+  "galleryImages": zod.array(zod.string()),
+  "description": zod.string(),
+  "rules": zod.string(),
+  "category": zod.string(),
+  "visibility": zod.enum(['public', 'private']),
+  "venueName": zod.string(),
+  "address": zod.string(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "pinCode": zod.string(),
+  "mapLocation": zod.string(),
+  "partyDate": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string(),
+  "joinType": zod.enum(['male_only', 'female_only', 'mixed']),
+  "organizerName": zod.string(),
+  "capacity": zod.number(),
+  "ageGroup": zod.string(),
+  "dressCode": zod.string(),
+  "drinking": zod.string(),
+  "smoking": zod.string(),
+  "coupleFriendly": zod.string(),
+  "lgbtqFriendly": zod.string(),
+  "status": zod.enum(['published', 'sales_stopped', 'cancelled', 'completed']),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "ticketType": zod.enum(['free', 'paid']),
+  "ticketPrice": zod.string(),
+  "soldCount": zod.number(),
+  "seatsLeft": zod.number().nullish(),
+  "isOrganizer": zod.boolean(),
+  "canChat": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Cancel a party (host only)
+ */
+export const CancelPartyParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const CancelPartyResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Book a party (free → confirmed; paid → Razorpay)
+ */
+export const BookPartyParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const BookPartyBody = zod.object({
+  "quantity": zod.number().optional(),
+  "name": zod.string().optional(),
+  "phone": zod.string().optional()
+}).strict()
+
+export const BookPartyResponse = zod.object({
+  "ok": zod.boolean(),
+  "bookingId": zod.number().optional(),
+  "bookingCode": zod.string().optional(),
+  "paymentPending": zod.boolean().optional(),
+  "razorpayOrderId": zod.string().optional(),
+  "razorpayKeyId": zod.string().optional(),
+  "amountPaise": zod.number().optional()
+})
+
+
+/**
+ * @summary Group chat messages (host + confirmed attendees only)
+ */
+export const ListPartyMessagesParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const ListPartyMessagesResponseItem = zod.object({
+  "id": zod.number(),
+  "partyId": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "isHost": zod.boolean(),
+  "body": zod.string(),
+  "createdAt": zod.string(),
+  "isMine": zod.boolean()
+})
+export const ListPartyMessagesResponse = zod.array(ListPartyMessagesResponseItem)
+
+
+/**
+ * @summary Send a group chat message (host + confirmed attendees only)
+ */
+export const SendPartyMessageParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const SendPartyMessageBody = zod.object({
+  "body": zod.string()
+}).strict()
+
+export const SendPartyMessageResponse = zod.object({
+  "id": zod.number(),
+  "partyId": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "isHost": zod.boolean(),
+  "body": zod.string(),
+  "createdAt": zod.string(),
+  "isMine": zod.boolean()
+})
+
+
+/**
+ * @summary Verify a Razorpay payment for a party booking
+ */
+export const VerifyPartyPaymentBody = zod.object({
+  "razorpayOrderId": zod.string(),
+  "razorpayPaymentId": zod.string(),
+  "razorpaySignature": zod.string()
+}).strict()
+
+export const VerifyPartyPaymentResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Get the platform party-commission config (admin)
+ */
+export const GetPartyCommissionResponse = zod.object({
+  "commissionType": zod.enum(['fixed', 'percentage']),
+  "value": zod.number()
+})
+
+
+/**
+ * @summary Update the platform party-commission config (admin)
+ */
+export const SetPartyCommissionBody = zod.object({
+  "commissionType": zod.enum(['fixed', 'percentage']),
+  "value": zod.number()
+}).strict()
+
+export const SetPartyCommissionResponse = zod.object({
+  "commissionType": zod.enum(['fixed', 'percentage']),
+  "value": zod.number()
+})
+
+
+/**
+ * @summary Organizer dashboard aggregates for one party (host only)
+ */
+export const GetPartyDashboardParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const GetPartyDashboardResponse = zod.object({
+  "party": zod.object({
+  "id": zod.number(),
+  "organizerUserId": zod.number(),
+  "name": zod.string(),
+  "slug": zod.string(),
+  "coverImageUrl": zod.string(),
+  "galleryImages": zod.array(zod.string()),
+  "description": zod.string(),
+  "rules": zod.string(),
+  "category": zod.string(),
+  "visibility": zod.enum(['public', 'private']),
+  "venueName": zod.string(),
+  "address": zod.string(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "pinCode": zod.string(),
+  "mapLocation": zod.string(),
+  "partyDate": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string(),
+  "joinType": zod.enum(['male_only', 'female_only', 'mixed']),
+  "organizerName": zod.string(),
+  "capacity": zod.number(),
+  "ageGroup": zod.string(),
+  "dressCode": zod.string(),
+  "drinking": zod.string(),
+  "smoking": zod.string(),
+  "coupleFriendly": zod.string(),
+  "lgbtqFriendly": zod.string(),
+  "status": zod.enum(['published', 'sales_stopped', 'cancelled', 'completed']),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "ticketType": zod.enum(['free', 'paid']),
+  "ticketPrice": zod.string(),
+  "soldCount": zod.number(),
+  "seatsLeft": zod.number().nullish(),
+  "isOrganizer": zod.boolean(),
+  "canChat": zod.boolean().optional()
+}),
+  "stats": zod.object({
+  "totalBookings": zod.number(),
+  "cancelledBookings": zod.number(),
+  "guestsGoing": zod.number(),
+  "checkedInCount": zod.number().optional(),
+  "revenue": zod.string(),
+  "commission": zod.string(),
+  "netEarnings": zod.string(),
+  "seatsLeft": zod.number().nullish(),
+  "capacity": zod.number(),
+  "commissionType": zod.enum(['fixed', 'percentage']),
+  "commissionValue": zod.number()
+}),
+  "bookings": zod.array(zod.object({
+  "id": zod.number(),
+  "bookingCode": zod.string(),
+  "name": zod.string(),
+  "email": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "quantity": zod.number(),
+  "totalPrice": zod.string(),
+  "netAmount": zod.string(),
+  "status": zod.string(),
+  "paymentStatus": zod.string(),
+  "checkedIn": zod.boolean().optional(),
+  "checkedInAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})),
+  "cancelled": zod.array(zod.object({
+  "id": zod.number(),
+  "bookingCode": zod.string(),
+  "name": zod.string(),
+  "email": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "quantity": zod.number(),
+  "totalPrice": zod.string(),
+  "netAmount": zod.string(),
+  "status": zod.string(),
+  "paymentStatus": zod.string(),
+  "checkedIn": zod.boolean().optional(),
+  "checkedInAt": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Scan/check-in a ticket for this party (host only)
+ */
+export const ScanPartyTicketParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const ScanPartyTicketBody = zod.object({
+  "code": zod.string()
+}).strict()
+
+export const ScanPartyTicketResponse = zod.object({
+  "ok": zod.boolean(),
+  "bookingId": zod.number().optional(),
+  "bookingCode": zod.string().optional(),
+  "name": zod.string().optional(),
+  "quantity": zod.number().optional(),
+  "partyName": zod.string().optional(),
+  "checkedInAt": zod.string().optional()
+})
+
+
+/**
+ * @summary The caller's own party bookings (history)
+ */
+export const ListMyPartyBookingsResponseItem = zod.object({
+  "id": zod.number(),
+  "partyId": zod.number(),
+  "partyName": zod.string(),
+  "coverImageUrl": zod.string(),
+  "partyDate": zod.string().nullish(),
+  "bookingCode": zod.string(),
+  "quantity": zod.number(),
+  "totalPrice": zod.string(),
+  "status": zod.string(),
+  "paymentStatus": zod.string(),
+  "checkedIn": zod.boolean().optional(),
+  "createdAt": zod.string()
+})
+export const ListMyPartyBookingsResponse = zod.array(ListMyPartyBookingsResponseItem)
+
+
+/**
+ * @summary Cancel your own party booking
+ */
+export const CancelPartyBookingParams = zod.object({
+  "bookingId": zod.coerce.number()
+}).strict()
+
+export const CancelPartyBookingResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
  * @summary List groups in the caller's gender + current city
  */
 export const ListSoloGroupsQueryParams = zod.object({
-  "city": zod.coerce.string(),
+  "city": zod.coerce.string().optional(),
+  "state": zod.coerce.string().optional(),
   "activityType": zod.coerce.string().optional()
 }).strict()
 
@@ -313,7 +869,7 @@ export const ListSoloGroupsResponseItem = zod.object({
   "id": zod.number(),
   "adminUserId": zod.number(),
   "name": zod.string(),
-  "activityType": zod.enum(['nightlife', 'events', 'games', 'activities', 'happy_hours', 'food_drinks']),
+  "activityType": zod.enum(['nightlife', 'events', 'games', 'activities', 'happy_hours', 'food_drinks', 'party']),
   "activityLabel": zod.string(),
   "venueName": zod.string(),
   "vendorId": zod.number().nullish(),
@@ -333,6 +889,15 @@ export const ListSoloGroupsResponseItem = zod.object({
   "ratingCount": zod.number(),
   "createdAt": zod.string(),
   "lastActivityAt": zod.string().nullish(),
+  "coverImageUrl": zod.string(),
+  "address": zod.string(),
+  "pinCode": zod.string(),
+  "mapLocation": zod.string(),
+  "organizerName": zod.string(),
+  "endTime": zod.string(),
+  "ticketType": zod.string(),
+  "ticketPrice": zod.string(),
+  "capacity": zod.number().nullish(),
   "memberCount": zod.number(),
   "menCount": zod.number(),
   "womenCount": zod.number(),
@@ -348,7 +913,7 @@ export const ListSoloGroupsResponse = zod.array(ListSoloGroupsResponseItem)
  */
 export const CreateSoloGroupBody = zod.object({
   "name": zod.string(),
-  "activityType": zod.enum(['nightlife', 'events', 'games', 'activities', 'happy_hours', 'food_drinks']),
+  "activityType": zod.enum(['nightlife', 'events', 'games', 'activities', 'happy_hours', 'food_drinks', 'party']),
   "activityLabel": zod.string().optional(),
   "venueName": zod.string().optional(),
   "vendorId": zod.number().optional(),
@@ -356,19 +921,28 @@ export const CreateSoloGroupBody = zod.object({
   "groupDate": zod.string().optional(),
   "startTime": zod.string().optional(),
   "description": zod.string().optional(),
-  "maxMembers": zod.number(),
+  "maxMembers": zod.number().optional(),
   "visibility": zod.enum(['public', 'private']).optional(),
   "genderType": zod.enum(['male', 'female', 'mixed']).optional(),
   "country": zod.string().optional(),
   "state": zod.string().optional(),
-  "city": zod.string()
+  "city": zod.string(),
+  "coverImageUrl": zod.string().optional(),
+  "address": zod.string().optional(),
+  "pinCode": zod.string().optional(),
+  "mapLocation": zod.string().optional(),
+  "organizerName": zod.string().optional(),
+  "endTime": zod.string().optional(),
+  "ticketType": zod.enum(['free', 'paid']).optional(),
+  "ticketPrice": zod.number().optional(),
+  "capacity": zod.number().optional()
 }).strict()
 
 export const CreateSoloGroupResponse = zod.object({
   "id": zod.number(),
   "adminUserId": zod.number(),
   "name": zod.string(),
-  "activityType": zod.enum(['nightlife', 'events', 'games', 'activities', 'happy_hours', 'food_drinks']),
+  "activityType": zod.enum(['nightlife', 'events', 'games', 'activities', 'happy_hours', 'food_drinks', 'party']),
   "activityLabel": zod.string(),
   "venueName": zod.string(),
   "vendorId": zod.number().nullish(),
@@ -388,6 +962,15 @@ export const CreateSoloGroupResponse = zod.object({
   "ratingCount": zod.number(),
   "createdAt": zod.string(),
   "lastActivityAt": zod.string().nullish(),
+  "coverImageUrl": zod.string(),
+  "address": zod.string(),
+  "pinCode": zod.string(),
+  "mapLocation": zod.string(),
+  "organizerName": zod.string(),
+  "endTime": zod.string(),
+  "ticketType": zod.string(),
+  "ticketPrice": zod.string(),
+  "capacity": zod.number().nullish(),
   "memberCount": zod.number(),
   "menCount": zod.number(),
   "womenCount": zod.number(),
@@ -413,7 +996,7 @@ export const GetSoloGroupResponse = zod.object({
   "id": zod.number(),
   "adminUserId": zod.number(),
   "name": zod.string(),
-  "activityType": zod.enum(['nightlife', 'events', 'games', 'activities', 'happy_hours', 'food_drinks']),
+  "activityType": zod.enum(['nightlife', 'events', 'games', 'activities', 'happy_hours', 'food_drinks', 'party']),
   "activityLabel": zod.string(),
   "venueName": zod.string(),
   "vendorId": zod.number().nullish(),
@@ -433,6 +1016,15 @@ export const GetSoloGroupResponse = zod.object({
   "ratingCount": zod.number(),
   "createdAt": zod.string(),
   "lastActivityAt": zod.string().nullish(),
+  "coverImageUrl": zod.string(),
+  "address": zod.string(),
+  "pinCode": zod.string(),
+  "mapLocation": zod.string(),
+  "organizerName": zod.string(),
+  "endTime": zod.string(),
+  "ticketType": zod.string(),
+  "ticketPrice": zod.string(),
+  "capacity": zod.number().nullish(),
   "memberCount": zod.number(),
   "menCount": zod.number(),
   "womenCount": zod.number(),

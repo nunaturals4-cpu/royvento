@@ -2,6 +2,9 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateSoloGroup, useListSoloVenues } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { useSelectedCity } from "@/components/LocationContext";
+import { LocationSelect } from "@/components/LocationSelect";
+import { CreatePartyWizard } from "./CreatePartyWizard";
 import { X, Search, ChevronDown, Check, Plus } from "lucide-react";
 
 const GOLD = "#d4af37";
@@ -14,6 +17,7 @@ const ACTIVITY_TYPES = [
   { value: "events", label: "Events", hint: "Concert · Comedy · Live" },
   { value: "games", label: "Games", hint: "Bowling · VR · Arcade" },
   { value: "activities", label: "Activities", hint: "Sports Screening · Trivia" },
+  { value: "party", label: "Create Your Own Party", hint: "Host it your way, anywhere" },
 ] as const;
 
 type ActivityType = (typeof ACTIVITY_TYPES)[number]["value"];
@@ -25,6 +29,7 @@ const ACTIVITY_ACCENT: Record<string, string> = {
   events: "#60a5fa",
   games: "#34d399",
   activities: "#fb923c",
+  party: "#f472b6",
 };
 
 interface VenueOption {
@@ -195,6 +200,15 @@ export function CreateGroupModal({
   // Non-gating vibe label — anyone can join any group regardless.
   const [genderType, setGenderType] = useState<GenderType>("mixed");
 
+  // Country / state / city — prefilled from the detected location, editable so
+  // the group's location is explicit. State drives state-based discovery.
+  const { selectedState } = useSelectedCity();
+  const [groupCountry, setGroupCountry] = useState("India");
+  const [groupState, setGroupState] = useState(selectedState || "");
+  const [groupCity, setGroupCity] = useState(city || "");
+
+  const isParty = activityType === "party";
+
   function pickActivity(value: ActivityType) {
     setActivityType(value);
     // Venue options differ per activity type — clear any prior selection.
@@ -206,6 +220,10 @@ export function CreateGroupModal({
   function submit() {
     if (name.trim().length < 3) {
       toast({ title: "Group name must be at least 3 characters.", variant: "destructive" });
+      return;
+    }
+    if (!groupCity.trim()) {
+      toast({ title: "Please enter the group's city.", variant: "destructive" });
       return;
     }
     create.mutate(
@@ -223,14 +241,17 @@ export function CreateGroupModal({
           maxMembers,
           visibility: "public",
           genderType,
-          city,
-          country: "India",
+          city: groupCity.trim(),
+          state: groupState.trim() || undefined,
+          country: groupCountry.trim() || "India",
         },
       },
       {
         onSuccess: () => {
           toast({ title: "Group created!" });
-          qc.invalidateQueries({ queryKey: ["/api/solo-connect/groups"] });
+          // Match the generated list query key by predicate (it isn't a clean
+          // "/api/..." string), so the new group appears without a manual reload.
+          qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && q.queryKey[0].includes("solo-connect") });
           onClose();
         },
         onError: (e) =>
@@ -277,10 +298,10 @@ export function CreateGroupModal({
             style={{ background: `linear-gradient(145deg, ${GOLD}26, ${RED}1a)`, border: `1px solid ${GOLD}44`, boxShadow: `0 0 22px ${GOLD}1f` }}>
             <Plus className="h-5 w-5" style={{ color: GOLD }} />
           </span>
-          <h3 className="font-serif text-2xl" style={{ color: "#fff" }}>Create a group</h3>
+          <h3 className="font-serif text-2xl" style={{ color: "#fff" }}>{isParty ? "Create your party" : "Create a group"}</h3>
         </div>
         <div className="flex flex-wrap gap-1.5 mb-6 ml-[3.25rem]">
-          {[city, "Open to everyone", "3–15 members"].map((chip) => (
+          {(isParty ? [city, "You're the host", "Discoverable in your city"] : [city, "Open to everyone", "3–15 members"]).map((chip) => (
             <span key={chip} className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: `${GOLD}14`, color: GOLD, border: `1px solid ${GOLD}33` }}>{chip}</span>
           ))}
         </div>
@@ -312,6 +333,10 @@ export function CreateGroupModal({
             </div>
           </div>
 
+          {isParty ? (
+            <CreatePartyWizard city={city} onClose={onClose} />
+          ) : (
+          <>
           <input className={field} style={fieldStyle} placeholder="Group name (e.g. Pub Crawl Tonight)" value={name} onChange={(e) => setName(e.target.value)} />
           <input className={field} style={fieldStyle} placeholder="Activity label (optional)" value={activityLabel} onChange={(e) => setActivityLabel(e.target.value)} />
 
@@ -325,6 +350,17 @@ export function CreateGroupModal({
                 setVenueVendorId(vendorId);
                 setVenueEventId(eventId);
               }}
+            />
+          </div>
+
+          <div>
+            <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Location <span style={{ color: "rgba(255,255,255,0.35)" }}>— people in your state can discover this group</span></p>
+            <LocationSelect
+              compact
+              country={groupCountry}
+              state={groupState}
+              city={groupCity}
+              onChange={(n) => { setGroupCountry(n.country); setGroupState(n.state); setGroupCity(n.city); }}
             />
           </div>
 
@@ -383,6 +419,8 @@ export function CreateGroupModal({
               {create.isPending ? "Creating…" : "Create group"}
             </button>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>

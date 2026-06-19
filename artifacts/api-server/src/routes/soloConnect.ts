@@ -193,12 +193,19 @@ router.get("/solo-connect/access", async (req, res) => {
 //   events      → ticketed events
 //   activities  → events (sports screenings, trivia nights…)
 //   games       → game zones (games ⋈ game_organizers)
+//   party       → user's own party — no fixed catalog, venue is always a
+//                 free-typed custom name (a home, rooftop, rented room…)
 // `kind` tells the client which id to link on the group (vendorId / eventId);
 // games have no group FK column, so they're stored by name only.
 router.get("/solo-connect/venues", async (req, res) => {
   const user = await requireEligible(req, res);
   if (!user) return;
   const at = String(req.query["activityType"] ?? "nightlife");
+  if (at === "party") {
+    // No venue catalog for self-organized parties — always a custom name.
+    res.json([]);
+    return;
+  }
   let result;
   switch (at) {
     case "happy_hours":
@@ -658,6 +665,16 @@ function groupToPublic(
     ratingCount: g.ratingCount,
     createdAt: g.createdAt.toISOString(),
     lastActivityAt: g.lastActivityAt ? g.lastActivityAt.toISOString() : null,
+    // "Create Your Own Party" fields (empty/zero/null for non-party groups).
+    coverImageUrl: g.coverImageUrl,
+    address: g.address,
+    pinCode: g.pinCode,
+    mapLocation: g.mapLocation,
+    organizerName: g.organizerName,
+    endTime: g.endTime,
+    ticketType: g.ticketType,
+    ticketPrice: g.ticketPrice,
+    capacity: g.capacity,
     // Real member-gender breakdown for the card.
     memberCount: counts.total,
     menCount: counts.men,
@@ -682,12 +699,16 @@ async function touchGroupActivity(groupId: number): Promise<void> {
 // request so users can never browse other-city groups. Soft-deleted groups
 // (deletedAt set) are excluded.
 router.get("/solo-connect/groups", async (req, res) => {
-  const user = await requireApproved(req, res);
-  if (!user) return;
+  // Public browse: logged-out and non-premium visitors can SEE every group in a
+  // city. The premium + verified gate only applies when they try to join/create
+  // (enforced by requireApproved on those endpoints). Membership/admin flags are
+  // populated only when the caller is authenticated.
+  const user = await loadUserFromRequest(req);
   const city = typeof req.query["city"] === "string" ? req.query["city"] : "";
+  const state = typeof req.query["state"] === "string" ? req.query["state"] : "";
   const activityType = typeof req.query["activityType"] === "string" ? req.query["activityType"] : "";
-  if (!city.trim()) {
-    res.status(400).json({ error: "Your current city is required to view groups." });
+  if (!city.trim() && !state.trim()) {
+    res.status(400).json({ error: "Your current city or state is required to view groups." });
     return;
   }
   const all = await db
@@ -695,41 +716,93 @@ router.get("/solo-connect/groups", async (req, res) => {
     .from(soloGroupsTable)
     .where(and(ne(soloGroupsTable.status, "closed"), isNull(soloGroupsTable.deletedAt)))
     .orderBy(desc(soloGroupsTable.createdAt));
-  // City + (optional) activity filtering done in JS for case-insensitive match.
+  // When a state is supplied, show every group across that state; otherwise fall
+  // back to the original same-city scope. Optional activity filter on top.
   const filtered = all.filter(
-    (g) => norm(g.city) === norm(city) && (!activityType || g.activityType === activityType),
+    (g) =>
+      (state.trim() ? norm(g.state) === norm(state) : norm(g.city) === norm(city)) &&
+      (!activityType || g.activityType === activityType),
   );
   const counts = await memberCounts(filtered.map((g) => g.id));
-  const myMemberships = await db
-    .select({ groupId: soloGroupMembersTable.groupId, status: soloGroupMembersTable.status })
-    .from(soloGroupMembersTable)
-    .where(eq(soloGroupMembersTable.userId, user.id));
-  const myMap = new Map(myMemberships.map((m) => [m.groupId, m.status]));
+  const myMap = new Map<number, string>();
+  if (user) {
+    const myMemberships = await db
+      .select({ groupId: soloGroupMembersTable.groupId, status: soloGroupMembersTable.status })
+      .from(soloGroupMembersTable)
+      .where(eq(soloGroupMembersTable.userId, user.id));
+    for (const m of myMemberships) myMap.set(m.groupId, m.status);
+  }
   res.json(
     filtered.map((g) =>
-      groupToPublic(g, counts.get(g.id) ?? emptyCounts(), myMap.get(g.id) ?? null, g.adminUserId === user.id),
+      groupToPublic(g, counts.get(g.id) ?? emptyCounts(), myMap.get(g.id) ?? null, !!user && g.adminUserId === user.id),
     ),
   );
 });
 
-const CreateGroupBody = z.object({
-  name: z.string().min(3).max(160),
-  activityType: z.enum(["nightlife", "events", "games", "activities", "happy_hours", "food_drinks"]),
-  activityLabel: z.string().max(160).optional(),
-  venueName: z.string().max(255).optional(),
-  vendorId: z.number().int().optional(),
-  eventId: z.number().int().optional(),
-  groupDate: z.string().optional(),
-  startTime: z.string().max(8).optional(),
-  description: z.string().max(2000).optional(),
-  maxMembers: z.number().int().min(3).max(15),
-  visibility: z.enum(["public", "private"]).optional(),
-  // Non-gating vibe label chosen by the creator (defaults to mixed).
-  genderType: z.enum(["male", "female", "mixed"]).optional(),
-  country: z.string().optional(),
-  state: z.string().optional(),
-  city: z.string().min(1),
-});
+const CreateGroupBody = z
+  .object({
+    name: z.string().min(3).max(160),
+    activityType: z.enum(["nightlife", "events", "games", "activities", "happy_hours", "food_drinks", "party"]),
+    activityLabel: z.string().max(160).optional(),
+    venueName: z.string().max(255).optional(),
+    vendorId: z.number().int().optional(),
+    eventId: z.number().int().optional(),
+    groupDate: z.string().optional(),
+    startTime: z.string().max(8).optional(),
+    description: z.string().max(2000).optional(),
+    // Optional: required for non-party groups, derived from capacity for parties.
+    maxMembers: z.number().int().min(3).max(15).optional(),
+    visibility: z.enum(["public", "private"]).optional(),
+    // Non-gating vibe label chosen by the creator (defaults to mixed).
+    genderType: z.enum(["male", "female", "mixed"]).optional(),
+    country: z.string().optional(),
+    state: z.string().optional(),
+    city: z.string().min(1),
+    // ── "Create Your Own Party" fields (required when activityType==='party') ──
+    coverImageUrl: z.string().max(500).optional(),
+    address: z.string().max(500).optional(),
+    pinCode: z.string().max(12).optional(),
+    mapLocation: z.string().max(500).optional(),
+    organizerName: z.string().max(120).optional(),
+    endTime: z.string().max(8).optional(),
+    ticketType: z.enum(["free", "paid"]).optional(),
+    ticketPrice: z.number().min(0).max(1_000_000).optional(),
+    capacity: z.number().int().min(1).max(100_000).optional(),
+  })
+  .superRefine((d, ctx) => {
+    if (d.activityType === "party") {
+      // Every party field is mandatory per the create-party workflow.
+      const req = (cond: boolean, path: string, message: string) => {
+        if (!cond) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+      };
+      req(!!d.coverImageUrl, "coverImageUrl", "Please upload a party cover photo.");
+      req(!!d.venueName, "venueName", "Please enter the venue name.");
+      req(!!d.address, "address", "Please enter the full address.");
+      req(!!d.city, "city", "Please enter the city.");
+      req(!!d.pinCode, "pinCode", "Please enter the pin code.");
+      // mapLocation (Google Maps) is optional.
+      req(!!d.organizerName, "organizerName", "Please enter the organizer name.");
+      req(!!d.groupDate, "groupDate", "Please select the party date.");
+      req(!!d.startTime, "startTime", "Please select the start time.");
+      req(!!d.endTime, "endTime", "Please select the end time.");
+      req(d.ticketType === "free" || d.ticketType === "paid", "ticketType", "Please choose Free or Paid ticket.");
+      if (d.ticketType === "paid") {
+        req(typeof d.ticketPrice === "number" && d.ticketPrice > 0, "ticketPrice", "Please enter a ticket price.");
+        req(typeof d.capacity === "number" && d.capacity > 0, "capacity", "Please enter the total capacity.");
+      }
+      const desc = d.description?.trim() ?? "";
+      req(desc.length >= 50, "description", "Describe your plan so people know what to expect.");
+    } else {
+      // Standard groups still require the member-cap slider value.
+      req_maxMembers(d.maxMembers, ctx);
+    }
+  });
+
+function req_maxMembers(v: number | undefined, ctx: z.RefinementCtx) {
+  if (typeof v !== "number") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["maxMembers"], message: "maxMembers is required." });
+  }
+}
 
 // Create a group. genderType is a non-gating vibe label (default mixed); the
 // location is taken from the request body (the user's verified location); the
@@ -743,6 +816,12 @@ router.post("/solo-connect/groups", async (req, res) => {
     return;
   }
   const d = parsed.data;
+  const isParty = d.activityType === "party";
+  // Party join-cap comes from the paid capacity (clamped to the column's
+  // member model); free parties and standard groups fall back to the slider.
+  const maxMembers = isParty
+    ? Math.max(3, Math.min(15, d.capacity ?? 15))
+    : (d.maxMembers ?? 15);
   const inserted = await db
     .insert(soloGroupsTable)
     .values({
@@ -756,13 +835,23 @@ router.post("/solo-connect/groups", async (req, res) => {
       groupDate: d.groupDate ?? null,
       startTime: d.startTime ?? "",
       description: d.description ?? "",
-      maxMembers: d.maxMembers,
+      maxMembers,
       visibility: d.visibility ?? "public",
       country: d.country ?? "India",
       state: d.state ?? "",
       city: d.city,
       genderType: d.genderType ?? "mixed",
       lastActivityAt: new Date(),
+      // Party-specific fields (empty/zero for other activity types).
+      coverImageUrl: isParty ? (d.coverImageUrl ?? "") : "",
+      address: isParty ? (d.address ?? "") : "",
+      pinCode: isParty ? (d.pinCode ?? "") : "",
+      mapLocation: isParty ? (d.mapLocation ?? "") : "",
+      organizerName: isParty ? (d.organizerName ?? "") : "",
+      endTime: isParty ? (d.endTime ?? "") : "",
+      ticketType: isParty ? (d.ticketType ?? "") : "",
+      ticketPrice: isParty && d.ticketType === "paid" ? String(d.ticketPrice ?? 0) : "0",
+      capacity: isParty && d.ticketType === "paid" ? (d.capacity ?? null) : null,
     })
     .returning();
   const group = inserted[0]!;
@@ -785,7 +874,6 @@ router.post("/solo-connect/groups", async (req, res) => {
 // Returns null + sends a response when access is denied or the group is gone.
 async function loadAccessibleGroup(
   groupId: number,
-  _user: AuthUser,
   callerCity: string,
   res: Response,
 ): Promise<typeof soloGroupsTable.$inferSelect | null> {
@@ -807,15 +895,17 @@ async function loadAccessibleGroup(
 }
 
 router.get("/solo-connect/groups/:id", async (req, res) => {
-  const user = await requireApproved(req, res);
-  if (!user) return;
+  // Public group profile — viewable by logged-out and non-premium visitors.
+  // Joining/chat remain gated; the caller (if any) only drives the membership
+  // and admin flags returned below.
+  const user = await loadUserFromRequest(req);
   const id = parseInt(req.params.id, 10);
   if (Number.isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
   const callerCity = typeof req.query["city"] === "string" ? req.query["city"] : "";
-  const g = await loadAccessibleGroup(id, user, callerCity, res);
+  const g = await loadAccessibleGroup(id, callerCity, res);
   if (!g) return;
 
   const members = await db
@@ -835,7 +925,7 @@ router.get("/solo-connect/groups/:id", async (req, res) => {
     .where(eq(soloGroupMembersTable.groupId, id))
     .orderBy(desc(soloGroupMembersTable.id));
 
-  const mine = members.find((m) => m.userId === user.id);
+  const mine = user ? members.find((m) => m.userId === user.id) : undefined;
   const counts = emptyCounts();
   for (const m of members) {
     if (m.status !== "approved") continue;
@@ -845,7 +935,7 @@ router.get("/solo-connect/groups/:id", async (req, res) => {
     else counts.other++;
   }
   res.json({
-    group: groupToPublic(g, counts, mine?.status ?? null, g.adminUserId === user.id),
+    group: groupToPublic(g, counts, mine?.status ?? null, !!user && g.adminUserId === user.id),
     members: members.map((m) => ({
       id: m.id,
       groupId: m.groupId,
@@ -872,6 +962,13 @@ const JoinBody = z.object({
 router.post("/solo-connect/groups/:id/join", async (req, res) => {
   const user = await requireApproved(req, res);
   if (!user) return;
+  // Every joiner — any role — must have a binary gender on file (it drives the
+  // group's 👨/👩 member counts). Already-set gender is reused; otherwise the
+  // client collects it first. Safety net behind the frontend's gender prompt.
+  if (user.gender !== "male" && user.gender !== "female") {
+    res.status(400).json({ error: "Select your gender (male or female) before joining a group.", code: "gender_required" });
+    return;
+  }
   const id = parseInt(req.params.id, 10);
   if (Number.isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
@@ -882,7 +979,7 @@ router.post("/solo-connect/groups/:id/join", async (req, res) => {
     respondInvalid(res, parsed.error);
     return;
   }
-  const g = await loadAccessibleGroup(id, user, parsed.data.city, res);
+  const g = await loadAccessibleGroup(id, parsed.data.city, res);
   if (!g) return;
   if (g.status !== "open") {
     res.status(403).json({ error: "This group is locked or closed." });

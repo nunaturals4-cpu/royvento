@@ -7,6 +7,7 @@
  */
 import type { SoloGroupBodyActivityType } from './soloGroupBodyActivityType';
 import type { SoloGroupBodyGenderType } from './soloGroupBodyGenderType';
+import type { SoloGroupBodyTicketType } from './soloGroupBodyTicketType';
 import type { SoloGroupBodyVisibility } from './soloGroupBodyVisibility';
 
 export interface SoloGroupBody {
@@ -19,10 +20,19 @@ export interface SoloGroupBody {
   groupDate?: string;
   startTime?: string;
   description?: string;
-  maxMembers: number;
+  maxMembers?: number;
   visibility?: SoloGroupBodyVisibility;
   genderType?: SoloGroupBodyGenderType;
   country?: string;
   state?: string;
   city: string;
+  coverImageUrl?: string;
+  address?: string;
+  pinCode?: string;
+  mapLocation?: string;
+  organizerName?: string;
+  endTime?: string;
+  ticketType?: SoloGroupBodyTicketType;
+  ticketPrice?: number;
+  capacity?: number;
 }

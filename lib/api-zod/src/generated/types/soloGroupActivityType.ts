@@ -16,4 +16,5 @@ export const SoloGroupActivityType = {
   activities: 'activities',
   happy_hours: 'happy_hours',
   food_drinks: 'food_drinks',
+  party: 'party',
 } as const;

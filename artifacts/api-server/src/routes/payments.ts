@@ -32,6 +32,11 @@ import {
   sendBookingCreatedEmails,
   sendInvoiceEmail,
 } from "../lib/notifications";
+import {
+  activatePartyBookingAfterPayment,
+  failPartyBookingAfterPayment,
+  refundPartyBooking,
+} from "./createYourParty";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { z } from "zod";
 
@@ -715,6 +720,9 @@ router.post("/payments/razorpay/webhook", async (req, res) => {
         await activateBookingAfterRazorpayPayment(payment.bookingId, razorpayPaymentId, razorpayOrderId);
       } else if (payment?.subscriptionId) {
         await activateSubscriptionAfterRazorpayPayment(payment.subscriptionId, razorpayPaymentId, razorpayOrderId);
+      } else if (!payment) {
+        // Not a shared payment — may be a "Create Your Own Party" booking.
+        await activatePartyBookingAfterPayment(razorpayOrderId, razorpayPaymentId);
       }
     }
 
@@ -745,6 +753,9 @@ router.post("/payments/razorpay/webhook", async (req, res) => {
               .set({ status: "expired" })
               .where(and(eq(subscriptionsTable.id, payment.subscriptionId), eq(subscriptionsTable.status, "pending")));
           }
+        } else {
+          // Not a shared payment — may be a party booking.
+          await failPartyBookingAfterPayment(razorpayOrderId);
         }
       }
     }
@@ -760,6 +771,9 @@ router.post("/payments/razorpay/webhook", async (req, res) => {
           await db.update(bookingsTable)
             .set({ status: "cancelled", approvedBy: "refund" })
             .where(eq(bookingsTable.id, payment.bookingId));
+        } else if (!payment) {
+          // Not a shared payment — may be a party booking refund.
+          await refundPartyBooking(razorpayPaymentId);
         }
       }
     }

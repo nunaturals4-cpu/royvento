@@ -257,13 +257,282 @@ paths:
               schema:
                 $ref: "#/components/schemas/SoloVerification"
 
+  /create-your-party:
+    get:
+      operationId: listParties
+      tags: [create-your-party]
+      summary: List published parties (optionally by city)
+      parameters:
+        - { name: city, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Parties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Party"
+    post:
+      operationId: createParty
+      tags: [create-your-party]
+      summary: Create a party
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartyCreateBody"
+      responses:
+        "200":
+          description: Created party
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+
+  /create-your-party/mine:
+    get:
+      operationId: listMyParties
+      tags: [create-your-party]
+      summary: The caller's own parties (organizer dashboard)
+      responses:
+        "200":
+          description: Parties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Party"
+
+  /create-your-party/{id}:
+    get:
+      operationId: getParty
+      tags: [create-your-party]
+      summary: Party detail
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Party
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+    patch:
+      operationId: updateParty
+      tags: [create-your-party]
+      summary: Edit a party (host only)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartyUpdateBody"
+      responses:
+        "200":
+          description: Updated party
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+    delete:
+      operationId: cancelParty
+      tags: [create-your-party]
+      summary: Cancel a party (host only)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+  /create-your-party/{id}/book:
+    post:
+      operationId: bookParty
+      tags: [create-your-party]
+      summary: Book a party (free → confirmed; paid → Razorpay)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartyBookBody"
+      responses:
+        "200":
+          description: Booking result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartyBookResult"
+
+  /create-your-party/{id}/messages:
+    get:
+      operationId: listPartyMessages
+      tags: [create-your-party]
+      summary: Group chat messages (host + confirmed attendees only)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PartyMessage"
+    post:
+      operationId: sendPartyMessage
+      tags: [create-your-party]
+      summary: Send a group chat message (host + confirmed attendees only)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartyMessageBody"
+      responses:
+        "200":
+          description: Sent message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartyMessage"
+
+  /create-your-party/payments/verify:
+    post:
+      operationId: verifyPartyPayment
+      tags: [create-your-party]
+      summary: Verify a Razorpay payment for a party booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartyVerifyBody"
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+  /admin/create-your-party/commission:
+    get:
+      operationId: getPartyCommission
+      tags: [create-your-party]
+      summary: Get the platform party-commission config (admin)
+      responses:
+        "200":
+          description: Commission config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartyCommission"
+    put:
+      operationId: setPartyCommission
+      tags: [create-your-party]
+      summary: Update the platform party-commission config (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartyCommission"
+      responses:
+        "200":
+          description: Commission config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartyCommission"
+
+  /create-your-party/{id}/dashboard:
+    get:
+      operationId: getPartyDashboard
+      tags: [create-your-party]
+      summary: Organizer dashboard aggregates for one party (host only)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartyDashboard"
+
+  /create-your-party/{id}/scan:
+    post:
+      operationId: scanPartyTicket
+      tags: [create-your-party]
+      summary: Scan/check-in a ticket for this party (host only)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartyScanBody"
+      responses:
+        "200":
+          description: Check-in result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartyScanResult"
+
+  /create-your-party/mine/bookings:
+    get:
+      operationId: listMyPartyBookings
+      tags: [create-your-party]
+      summary: The caller's own party bookings (history)
+      responses:
+        "200":
+          description: Bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PartyMyBooking"
+
+  /create-your-party/bookings/{bookingId}/cancel:
+    post:
+      operationId: cancelPartyBooking
+      tags: [create-your-party]
+      summary: Cancel your own party booking
+      parameters:
+        - { name: bookingId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
   /solo-connect/groups:
     get:
       operationId: listSoloGroups
       tags: [solo-connect]
       summary: List groups in the caller's gender + current city
       parameters:
-        - { name: city, in: query, required: true, schema: { type: string } }
+        - { name: city, in: query, required: false, schema: { type: string } }
+        - { name: state, in: query, required: false, schema: { type: string } }
         - { name: activityType, in: query, required: false, schema: { type: string } }
       responses:
         "200":
@@ -3151,6 +3420,241 @@ components:
         rejectionReason: { type: string }
       required: [decision]
 
+    Party:
+      type: object
+      properties:
+        id: { type: integer }
+        organizerUserId: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        coverImageUrl: { type: string }
+        galleryImages: { type: array, items: { type: string } }
+        description: { type: string }
+        rules: { type: string }
+        category: { type: string }
+        visibility: { type: string, enum: [public, private] }
+        venueName: { type: string }
+        address: { type: string }
+        city: { type: string }
+        state: { type: string }
+        pinCode: { type: string }
+        mapLocation: { type: string }
+        partyDate: { type: string, nullable: true }
+        startTime: { type: string }
+        endTime: { type: string }
+        joinType: { type: string, enum: [male_only, female_only, mixed] }
+        organizerName: { type: string }
+        capacity: { type: integer }
+        ageGroup: { type: string }
+        dressCode: { type: string }
+        drinking: { type: string }
+        smoking: { type: string }
+        coupleFriendly: { type: string }
+        lgbtqFriendly: { type: string }
+        status: { type: string, enum: [published, sales_stopped, cancelled, completed] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+        ticketType: { type: string, enum: [free, paid] }
+        ticketPrice: { type: string }
+        soldCount: { type: integer }
+        seatsLeft: { type: integer, nullable: true }
+        isOrganizer: { type: boolean }
+        canChat: { type: boolean }
+      required: [id, organizerUserId, name, slug, coverImageUrl, galleryImages, description, rules, category, visibility, venueName, address, city, state, pinCode, mapLocation, startTime, endTime, joinType, organizerName, capacity, ageGroup, dressCode, drinking, smoking, coupleFriendly, lgbtqFriendly, status, createdAt, updatedAt, ticketType, ticketPrice, soldCount, isOrganizer]
+
+    PartyCreateBody:
+      type: object
+      properties:
+        name: { type: string }
+        coverImageUrl: { type: string }
+        galleryImages: { type: array, items: { type: string } }
+        description: { type: string }
+        rules: { type: string }
+        category: { type: string }
+        visibility: { type: string, enum: [public, private] }
+        venueName: { type: string }
+        address: { type: string }
+        city: { type: string }
+        state: { type: string }
+        pinCode: { type: string }
+        mapLocation: { type: string }
+        partyDate: { type: string }
+        startTime: { type: string }
+        endTime: { type: string }
+        joinType: { type: string, enum: [male_only, female_only, mixed] }
+        organizerName: { type: string }
+        ticketType: { type: string, enum: [free, paid] }
+        ticketPrice: { type: number }
+        capacity: { type: integer }
+        ageGroup: { type: string, enum: ["", 18-25, 25-35, 35+] }
+        dressCode: { type: string, enum: ["", casual, smart_casual, black_theme, white_theme] }
+        drinking: { type: string, enum: ["", yes, no] }
+        smoking: { type: string, enum: ["", yes, no] }
+        coupleFriendly: { type: string, enum: ["", yes, no] }
+        lgbtqFriendly: { type: string, enum: ["", yes, no] }
+      required: [name, city, joinType, organizerName, ticketType]
+
+    PartyUpdateBody:
+      type: object
+      properties:
+        name: { type: string }
+        coverImageUrl: { type: string }
+        galleryImages: { type: array, items: { type: string } }
+        description: { type: string }
+        rules: { type: string }
+        category: { type: string }
+        visibility: { type: string, enum: [public, private] }
+        venueName: { type: string }
+        address: { type: string }
+        city: { type: string }
+        state: { type: string }
+        pinCode: { type: string }
+        mapLocation: { type: string }
+        partyDate: { type: string }
+        startTime: { type: string }
+        endTime: { type: string }
+        joinType: { type: string, enum: [male_only, female_only, mixed] }
+        organizerName: { type: string }
+        status: { type: string, enum: [published, sales_stopped, cancelled] }
+        ageGroup: { type: string, enum: ["", 18-25, 25-35, 35+] }
+        dressCode: { type: string, enum: ["", casual, smart_casual, black_theme, white_theme] }
+        drinking: { type: string, enum: ["", yes, no] }
+        smoking: { type: string, enum: ["", yes, no] }
+        coupleFriendly: { type: string, enum: ["", yes, no] }
+        lgbtqFriendly: { type: string, enum: ["", yes, no] }
+
+    PartyMessage:
+      type: object
+      properties:
+        id: { type: integer }
+        partyId: { type: integer }
+        userId: { type: integer }
+        userName: { type: string }
+        isHost: { type: boolean }
+        body: { type: string }
+        createdAt: { type: string }
+        isMine: { type: boolean }
+      required: [id, partyId, userId, userName, isHost, body, createdAt, isMine]
+
+    PartyMessageBody:
+      type: object
+      properties:
+        body: { type: string }
+      required: [body]
+
+    PartyBookBody:
+      type: object
+      properties:
+        quantity: { type: integer }
+        name: { type: string }
+        phone: { type: string }
+
+    PartyBookResult:
+      type: object
+      properties:
+        ok: { type: boolean }
+        bookingId: { type: integer }
+        bookingCode: { type: string }
+        paymentPending: { type: boolean }
+        razorpayOrderId: { type: string }
+        razorpayKeyId: { type: string }
+        amountPaise: { type: integer }
+      required: [ok]
+
+    PartyVerifyBody:
+      type: object
+      properties:
+        razorpayOrderId: { type: string }
+        razorpayPaymentId: { type: string }
+        razorpaySignature: { type: string }
+      required: [razorpayOrderId, razorpayPaymentId, razorpaySignature]
+
+    PartyCommission:
+      type: object
+      properties:
+        commissionType: { type: string, enum: [fixed, percentage] }
+        value: { type: number }
+      required: [commissionType, value]
+
+    PartyBookingRow:
+      type: object
+      properties:
+        id: { type: integer }
+        bookingCode: { type: string }
+        name: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        quantity: { type: integer }
+        totalPrice: { type: string }
+        netAmount: { type: string }
+        status: { type: string }
+        paymentStatus: { type: string }
+        checkedIn: { type: boolean }
+        checkedInAt: { type: string, nullable: true }
+        createdAt: { type: string }
+      required: [id, bookingCode, name, quantity, totalPrice, netAmount, status, paymentStatus, createdAt]
+
+    PartyDashboardStats:
+      type: object
+      properties:
+        totalBookings: { type: integer }
+        cancelledBookings: { type: integer }
+        guestsGoing: { type: integer }
+        checkedInCount: { type: integer }
+        revenue: { type: string }
+        commission: { type: string }
+        netEarnings: { type: string }
+        seatsLeft: { type: integer, nullable: true }
+        capacity: { type: integer }
+        # Platform commission rate currently set by the admin (config, not realised).
+        commissionType: { type: string, enum: [fixed, percentage] }
+        commissionValue: { type: number }
+      required: [totalBookings, cancelledBookings, guestsGoing, revenue, commission, netEarnings, capacity, commissionType, commissionValue]
+
+    PartyDashboard:
+      type: object
+      properties:
+        party: { $ref: "#/components/schemas/Party" }
+        stats: { $ref: "#/components/schemas/PartyDashboardStats" }
+        bookings: { type: array, items: { $ref: "#/components/schemas/PartyBookingRow" } }
+        cancelled: { type: array, items: { $ref: "#/components/schemas/PartyBookingRow" } }
+      required: [party, stats, bookings, cancelled]
+
+    PartyMyBooking:
+      type: object
+      properties:
+        id: { type: integer }
+        partyId: { type: integer }
+        partyName: { type: string }
+        coverImageUrl: { type: string }
+        partyDate: { type: string, nullable: true }
+        bookingCode: { type: string }
+        quantity: { type: integer }
+        totalPrice: { type: string }
+        status: { type: string }
+        paymentStatus: { type: string }
+        checkedIn: { type: boolean }
+        createdAt: { type: string }
+      required: [id, partyId, partyName, coverImageUrl, bookingCode, quantity, totalPrice, status, paymentStatus, createdAt]
+
+    PartyScanBody:
+      type: object
+      properties:
+        code: { type: string }
+      required: [code]
+
+    PartyScanResult:
+      type: object
+      properties:
+        ok: { type: boolean }
+        bookingId: { type: integer }
+        bookingCode: { type: string }
+        name: { type: string }
+        quantity: { type: integer }
+        partyName: { type: string }
+        checkedInAt: { type: string }
+      required: [ok]
+
     SoloGroup:
       type: object
       properties:
@@ -3159,7 +3663,7 @@ components:
         name: { type: string }
         activityType:
           type: string
-          enum: [nightlife, events, games, activities, happy_hours, food_drinks]
+          enum: [nightlife, events, games, activities, happy_hours, food_drinks, party]
         activityLabel: { type: string }
         venueName: { type: string }
         vendorId: { type: integer, nullable: true }
@@ -3185,6 +3689,15 @@ components:
         ratingCount: { type: integer }
         createdAt: { type: string }
         lastActivityAt: { type: string, nullable: true }
+        coverImageUrl: { type: string }
+        address: { type: string }
+        pinCode: { type: string }
+        mapLocation: { type: string }
+        organizerName: { type: string }
+        endTime: { type: string }
+        ticketType: { type: string }
+        ticketPrice: { type: string }
+        capacity: { type: integer, nullable: true }
         memberCount: { type: integer }
         menCount: { type: integer }
         womenCount: { type: integer }
@@ -3193,7 +3706,7 @@ components:
           type: string
           nullable: true
         isAdmin: { type: boolean }
-      required: [id, adminUserId, name, activityType, activityLabel, venueName, startTime, description, minMembers, maxMembers, country, state, city, genderType, visibility, status, reputationScore, ratingCount, createdAt, memberCount, menCount, womenCount, otherCount, isAdmin]
+      required: [id, adminUserId, name, activityType, activityLabel, venueName, startTime, description, minMembers, maxMembers, country, state, city, genderType, visibility, status, reputationScore, ratingCount, createdAt, coverImageUrl, address, pinCode, mapLocation, organizerName, endTime, ticketType, ticketPrice, memberCount, menCount, womenCount, otherCount, isAdmin]
 
     SoloGroupMember:
       type: object
@@ -3230,7 +3743,7 @@ components:
         name: { type: string }
         activityType:
           type: string
-          enum: [nightlife, events, games, activities, happy_hours, food_drinks]
+          enum: [nightlife, events, games, activities, happy_hours, food_drinks, party]
         activityLabel: { type: string }
         venueName: { type: string }
         vendorId: { type: integer }
@@ -3248,7 +3761,18 @@ components:
         country: { type: string }
         state: { type: string }
         city: { type: string }
-      required: [name, activityType, maxMembers, city]
+        coverImageUrl: { type: string }
+        address: { type: string }
+        pinCode: { type: string }
+        mapLocation: { type: string }
+        organizerName: { type: string }
+        endTime: { type: string }
+        ticketType:
+          type: string
+          enum: [free, paid]
+        ticketPrice: { type: number }
+        capacity: { type: integer }
+      required: [name, activityType, city]
 
     SoloJoinBody:
       type: object

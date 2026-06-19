@@ -7,6 +7,7 @@
  */
 
 export type ListSoloGroupsParams = {
-city: string;
+city?: string;
+state?: string;
 activityType?: string;
 };

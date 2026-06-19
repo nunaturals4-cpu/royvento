@@ -34,6 +34,15 @@ export interface SoloGroup {
   ratingCount: number;
   createdAt: string;
   lastActivityAt?: string | null;
+  coverImageUrl: string;
+  address: string;
+  pinCode: string;
+  mapLocation: string;
+  organizerName: string;
+  endTime: string;
+  ticketType: string;
+  ticketPrice: string;
+  capacity?: number | null;
   memberCount: number;
   menCount: number;
   womenCount: number;
