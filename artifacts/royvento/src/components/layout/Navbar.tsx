@@ -192,6 +192,17 @@ export function Navbar() {
           } border-b border-border/60`}
         >
           <div className="container mx-auto px-4 md:px-6 h-[68px] flex items-center gap-3 md:gap-5">
+            {/* Hamburger — mobile/tablet only, far LEFT */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`lg:hidden -ml-1.5 shrink-0 ${iconBtn}`}
+              onClick={() => setMobileOpen((v) => !v)}
+              aria-label={mobileOpen ? t("nav.close_menu", "Close menu") : t("nav.open_menu", "Open menu")}
+            >
+              {mobileOpen ? <XIcon className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2.5 group shrink-0" aria-label="Royvento home">
               <Logo size={44} className="transition-transform duration-300 group-hover:scale-[1.05] drop-shadow-[0_2px_10px_rgba(var(--theme-glow-rgb),0.25)]" />
@@ -459,16 +470,6 @@ export function Navbar() {
                 </Link>
               )}
 
-              {/* Hamburger — tablet/mobile only, far right (BookMyShow position). */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`lg:hidden -mr-1.5 ${iconBtn}`}
-                onClick={() => setMobileOpen((v) => !v)}
-                aria-label={mobileOpen ? t("nav.close_menu", "Close menu") : t("nav.open_menu", "Open menu")}
-              >
-                {mobileOpen ? <XIcon className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </Button>
             </div>
           </div>
         </div>
