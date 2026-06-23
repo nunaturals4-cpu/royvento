@@ -354,7 +354,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
         issues.push({ path: "ticketWomen", message: "Women entry is not allowed at this venue" });
       }
       if (disabledGenders.includes("men") && parsed.data.ticketMen > 0) {
-        issues.push({ path: "ticketMen", message: "Men entry is not allowed at this venue" });
+        issues.push({ path: "ticketMen", message: "Stag entry is not allowed at this venue" });
       }
       if (disabledGenders.includes("couple") && parsed.data.ticketCouple > 0) {
         issues.push({ path: "ticketCouple", message: "Couple entry is not allowed at this venue" });

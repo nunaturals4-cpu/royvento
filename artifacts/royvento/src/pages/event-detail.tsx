@@ -406,7 +406,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const dayPricingMap = ev.dayPricing as Record<string, { women: number; men: number; couple: number } | null> | null;
   const disabledGenders: string[] = Array.isArray(ev.disabledGenders) ? ev.disabledGenders : [];
   const isGenderDisabled = (g: "women" | "men" | "couple") => disabledGenders.includes(g);
-  const disabledGenderLabels = disabledGenders.map((g) => g === "women" ? t("events.women") : g === "men" ? t("events.men") : g === "couple" ? t("events.couple") : g);
+  const disabledGenderLabels = disabledGenders.map((g) => g === "women" ? t("events.women") : g === "men" ? "Stag" : g === "couple" ? t("events.couple") : g);
 
   const formatHour = (t: string): string => {
     const [h, m] = t.split(":").map(Number);
@@ -589,7 +589,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       errs.ticketWomen = "Women entry is not allowed at this venue";
     }
     if (isPub && pubMode === "ticket" && (isGenderDisabled("men") ? ticketMen > 0 : false)) {
-      errs.ticketWomen = "Men entry is not allowed at this venue";
+      errs.ticketWomen = "Stag entry is not allowed at this venue";
     }
     if (isPub && pubMode === "ticket" && (isGenderDisabled("couple") ? ticketCouple > 0 : false)) {
       errs.ticketWomen = "Couple entry is not allowed at this venue";
