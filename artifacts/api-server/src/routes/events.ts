@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, eventsTable, vendorsTable, drinkPlansTable } from "@workspace/db";
+import { db, eventsTable, vendorsTable, drinkPlansTable, bookingsTable, wishlistsTable } from "@workspace/db";
 import { eq, desc, and, ilike, sql, gte, lte, or, inArray } from "drizzle-orm";
 import {
   CreateEventBody,
@@ -605,6 +605,17 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
   res.json(out);
 });
 
+// `bookings.event_id` is ON DELETE RESTRICT, so deleting an event while
+// bookings still reference it FK-errors out as an unhandled 500. Wishlists
+// have no FK but are cleaned up too so they don't dangle on a deleted event.
+async function deleteEventCascade(id: number) {
+  await db.transaction(async (tx) => {
+    await tx.delete(bookingsTable).where(eq(bookingsTable.eventId, id));
+    await tx.delete(wishlistsTable).where(eq(wishlistsTable.eventId, id));
+    await tx.delete(eventsTable).where(eq(eventsTable.id, id));
+  });
+}
+
 router.delete("/events/:eventId", requireAuth(), async (req, res) => {
   const id = Number(req.params["eventId"]);
   if (!Number.isFinite(id)) {
@@ -628,7 +639,13 @@ router.delete("/events/:eventId", requireAuth(), async (req, res) => {
   }
   if (user.role === "admin") {
     const imageUrl = evt.imageUrl;
-    await db.delete(eventsTable).where(eq(eventsTable.id, id));
+    try {
+      await deleteEventCascade(id);
+    } catch (err) {
+      req.log.error({ err, eventId: id }, "Failed to delete event");
+      res.status(500).json({ error: `Failed to delete event: ${err instanceof Error ? err.message : "Unknown error"}` });
+      return;
+    }
     if (imageUrl) { try { await objectStorage.deleteObject(imageUrl); } catch {} }
     res.json({ ok: true });
     return;
@@ -644,7 +661,13 @@ router.delete("/events/:eventId", requireAuth(), async (req, res) => {
     return;
   }
   const imageUrl = evt.imageUrl;
-  await db.delete(eventsTable).where(eq(eventsTable.id, id));
+  try {
+    await deleteEventCascade(id);
+  } catch (err) {
+    req.log.error({ err, eventId: id }, "Failed to delete event");
+    res.status(500).json({ error: `Failed to delete event: ${err instanceof Error ? err.message : "Unknown error"}` });
+    return;
+  }
   if (imageUrl) { try { await objectStorage.deleteObject(imageUrl); } catch {} }
   res.json({ ok: true });
 });

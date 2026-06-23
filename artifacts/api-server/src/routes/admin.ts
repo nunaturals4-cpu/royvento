@@ -53,6 +53,9 @@ import {
 
 const router: IRouter = Router();
 
+// Venue categories selectable from the admin Venues tab create/edit form.
+const VENUE_CATEGORIES = ["Pub", "Club", "Pub & Club", "Bar & Club"] as const;
+
 const _istFmt = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Kolkata",
   year: "numeric",
@@ -729,7 +732,21 @@ router.delete("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
-  await db.delete(eventsTable).where(eq(eventsTable.id, id));
+  try {
+    await db.transaction(async (tx) => {
+      // `bookings.event_id` is ON DELETE RESTRICT, so deleting an event while
+      // bookings still reference it FK-errors out as an unhandled 500 (the
+      // bug reported from the admin Events tab). Wishlists have no FK but are
+      // cleaned up too so they don't dangle on a deleted event.
+      await tx.delete(bookingsTable).where(eq(bookingsTable.eventId, id));
+      await tx.delete(wishlistsTable).where(eq(wishlistsTable.eventId, id));
+      await tx.delete(eventsTable).where(eq(eventsTable.id, id));
+    });
+  } catch (err) {
+    req.log.error({ err, eventId: id }, "Failed to delete event");
+    res.status(500).json({ error: `Failed to delete event: ${err instanceof Error ? err.message : "Unknown error"}` });
+    return;
+  }
   res.json({ ok: true });
 });
 
@@ -1164,8 +1181,8 @@ router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
     return;
   }
   const cat = (category ?? "Pub").trim() || "Pub";
-  if (cat !== "Pub" && cat !== "Club") {
-    res.status(400).json({ error: "category must be 'Pub' or 'Club'" });
+  if (!VENUE_CATEGORIES.includes(cat as typeof VENUE_CATEGORIES[number])) {
+    res.status(400).json({ error: `category must be one of: ${VENUE_CATEGORIES.join(", ")}` });
     return;
   }
 
@@ -1642,7 +1659,7 @@ router.patch("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
 
   const title = typeof businessName === "string" ? businessName.trim() : vendor.businessName;
   if (!title) { res.status(400).json({ error: "Venue name is required" }); return; }
-  const cat = typeof category === "string" && (category === "Pub" || category === "Club") ? category : vendor.category;
+  const cat = typeof category === "string" && VENUE_CATEGORIES.includes(category as typeof VENUE_CATEGORIES[number]) ? category : vendor.category;
 
   const menus = Array.isArray(menuUrls) ? (menuUrls as string[]) : (vendor.menuUrls ?? []);
   const freeEntryRules =

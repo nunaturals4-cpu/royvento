@@ -7697,10 +7697,12 @@ type LookupResult = {
   blockReason: string | null;
 };
 
+type VenueCategory = "Pub" | "Club" | "Pub & Club" | "Bar & Club";
+
 // Shape accepted by both POST /admin/create-venue and PATCH /admin/venues/:id.
 interface VenuePayload {
   businessName: string;
-  category: "Pub" | "Club";
+  category: VenueCategory;
   description?: string;
   imageUrl?: string;
   location?: string;
@@ -7764,7 +7766,11 @@ function VenueForm({
   const { toast } = useToast();
 
   const [title, setTitle] = useState(initial?.businessName ?? "");
-  const [category, setCategory] = useState<"Pub" | "Club">(initial?.category === "Club" ? "Club" : "Pub");
+  const [category, setCategory] = useState<VenueCategory>(
+    initial?.category === "Club" || initial?.category === "Pub & Club" || initial?.category === "Bar & Club"
+      ? initial.category
+      : "Pub",
+  );
   const [description, setDescription] = useState(initial?.description ?? "");
   const [imageUrl, setImageUrl] = useState(initial?.bannerImage ?? "");
   const [imageUploading, setImageUploading] = useState(false);
@@ -7994,11 +8000,13 @@ function VenueForm({
               </div>
               <div className="space-y-1.5">
                 <Label>Category</Label>
-                <Select value={category} onValueChange={(v) => setCategory(v as "Pub" | "Club")}>
+                <Select value={category} onValueChange={(v) => setCategory(v as VenueCategory)}>
                   <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Pub">Pub</SelectItem>
                     <SelectItem value="Club">Club</SelectItem>
+                    <SelectItem value="Pub & Club">Pub & Club</SelectItem>
+                    <SelectItem value="Bar & Club">Bar & Club</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
