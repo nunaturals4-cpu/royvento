@@ -67,7 +67,7 @@ const FE_GENDER_OPTIONS: { canon: "women" | "men" | "couple"; label: string }[] 
   { canon: "couple", label: "Couples" },
 ];
 
-function normalizeFreeEntryGenders(raw: unknown): string[] {
+function normalizeGenderList(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   const out = new Set<string>();
   for (const g of raw) {
@@ -1766,8 +1766,9 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
     }
     return {};
   });
+  const [disabledGenders, setDisabledGenders] = useState<string[]>(normalizeGenderList((event as any).disabledGenders));
   const [freeEntryEnabled, setFreeEntryEnabled] = useState<boolean>(!!(event.freeEntryRules?.enabled));
-  const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>(normalizeFreeEntryGenders(event.freeEntryRules?.genders));
+  const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>(normalizeGenderList(event.freeEntryRules?.genders));
   const [freeEntryDays, setFreeEntryDays] = useState<string[]>(event.freeEntryRules?.days ?? []);
   const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState<string>(event.freeEntryRules?.beforeTime ?? "");
   const [freeEntryForTable, setFreeEntryForTable] = useState<boolean>(!!(event.freeEntryForTable));
@@ -1923,7 +1924,7 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
         price: recalcPrice, galleryImages,
         ...tonightVis,
         ...(isPub ? {
-          pubMode, priceWomen, priceMen, priceCouple, pubEventTypes,
+          pubMode, priceWomen, priceMen, priceCouple, pubEventTypes, disabledGenders,
           dayPricing: (() => {
             if (!varyByDay) return null;
             const result: Record<string, { women: number; men: number; couple: number }> = {};
@@ -2152,6 +2153,22 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
                         : "border-white/10 text-white/60 hover:bg-white/5"
                     }`}
                   >{t}</button>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 space-y-2.5">
+              <p className="text-sm font-medium flex items-center gap-2 text-red-300">
+                <UserX className="h-4 w-4" />Entry Restrictions
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Disable entry for a gender — booking that tier will be blocked everywhere on Royvento.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {FE_GENDER_OPTIONS.map(({ canon, label }) => (
+                  <button key={canon} type="button"
+                    onClick={() => setDisabledGenders((prev) => prev.includes(canon) ? prev.filter((x) => x !== canon) : [...prev, canon])}
+                    className={`text-xs px-3 py-1.5 rounded-full border ${disabledGenders.includes(canon) ? "bg-red-500/20 border-red-500/50 text-red-300" : "border-white/10 text-white/60 hover:bg-white/5"}`}
+                  >{disabledGenders.includes(canon) ? `${label} entry disabled` : `Disable ${label.toLowerCase()} entry`}</button>
                 ))}
               </div>
             </div>

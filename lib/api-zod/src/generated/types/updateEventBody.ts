@@ -46,6 +46,7 @@ export interface UpdateEventBody {
   /** @minimum 0 */
   priceCouple?: number;
   pubEventTypes?: string[];
+  disabledGenders?: string[];
   dayPricing?: DayPricing | null;
   freeEntryRules?: FreeEntryRules | null;
 }

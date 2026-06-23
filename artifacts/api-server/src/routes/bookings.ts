@@ -343,6 +343,23 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     if (parsed.data.pubMode === "ticket" && parsed.data.ticketWomen + parsed.data.ticketMen + parsed.data.ticketCouple <= 0) {
       issues.push({ path: "ticketWomen", message: "Select at least one ticket" });
     }
+    // Reject ticket counts for genders the partner has disabled entry for —
+    // mirrors the disabled TicketRow inputs on the client so a stale/edited
+    // request can't bypass the restriction.
+    if (parsed.data.pubMode === "ticket") {
+      const disabledGenders: string[] = Array.isArray((evt as { disabledGenders?: string[] | null }).disabledGenders)
+        ? (evt as { disabledGenders?: string[] | null }).disabledGenders!
+        : [];
+      if (disabledGenders.includes("women") && parsed.data.ticketWomen > 0) {
+        issues.push({ path: "ticketWomen", message: "Women entry is not allowed at this venue" });
+      }
+      if (disabledGenders.includes("men") && parsed.data.ticketMen > 0) {
+        issues.push({ path: "ticketMen", message: "Men entry is not allowed at this venue" });
+      }
+      if (disabledGenders.includes("couple") && parsed.data.ticketCouple > 0) {
+        issues.push({ path: "ticketCouple", message: "Couple entry is not allowed at this venue" });
+      }
+    }
     if (parsed.data.pubMode && parsed.data.pubMode !== "event_booking" && !parsed.data.arrivalTime.trim()) {
       issues.push({ path: "arrivalTime", message: "Arrival time is required" });
     }

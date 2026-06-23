@@ -1150,13 +1150,14 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "table_size" integer NOT NULL DEFAULT 0`);
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "vip_capacity" integer NOT NULL DEFAULT 0`);
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "date_night" boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "disabled_genders" text[] NOT NULL DEFAULT '{}'`);
 
     // ── Razorpay payment gateway columns ──────────────────────────────────
     await db.execute(sql`ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "razorpay_order_id" varchar(100) NOT NULL DEFAULT ''`);
     await db.execute(sql`ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "razorpay_payment_id" varchar(100) NOT NULL DEFAULT ''`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "payments_razorpay_order_idx" ON "payments" ("razorpay_order_id") WHERE "razorpay_order_id" <> ''`);
 
-    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url + announcements.approval_status + razorpay columns ensured");
+    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url + announcements.approval_status + razorpay columns + events.disabled_genders ensured");
   } catch (err) {
     logger.error({ err }, "Schema migration warning");
   }

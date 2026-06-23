@@ -32,6 +32,8 @@ export interface Event {
   approvalStatus: string;
   approvedAt?: Date | null;
   pubEventTypes?: string[];
+  /** Genders disabled from entry at this venue (e.g. ["men"] for a women-only night). */
+  disabledGenders?: string[];
   dayPricing?: EventDayPricing;
   freeEntryRules?: FreeEntryRules | null;
   hasDrinkPlans?: boolean;

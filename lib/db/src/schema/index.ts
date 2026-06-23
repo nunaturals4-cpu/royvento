@@ -186,6 +186,10 @@ export const eventsTable = pgTable(
       .notNull()
       .default("0"),
     pubEventTypes: text("pub_event_types").array().notNull().default([]),
+    // Genders the partner has disabled entry for at this venue (e.g. ["men"]
+    // for a women-only night). Gates both the ticket-booking UI and the
+    // booking API for the disabled tiers.
+    disabledGenders: text("disabled_genders").array().notNull().default([]),
     dayPricing: jsonb("day_pricing").$type<Record<string, { women: number; men: number; couple: number } | null>>(),
     freeEntryRules: jsonb("free_entry_rules").$type<{ enabled: boolean; genders: string[]; days: string[]; beforeTime?: string }>(),
     galleryImages: text("gallery_images").array(),

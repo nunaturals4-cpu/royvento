@@ -38,6 +38,7 @@ interface EventRow {
   priceMen: string;
   priceCouple: string;
   pubEventTypes: string[];
+  disabledGenders: string[] | null;
   dayPricing: Record<string, { women: number; men: number; couple: number } | null> | null;
   freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
   galleryImages: string[] | null;
@@ -111,6 +112,7 @@ async function serializeEvents(rows: EventRow[]) {
       priceMen: Number(e.priceMen),
       priceCouple: Number(e.priceCouple),
       pubEventTypes: e.pubEventTypes ?? [],
+      disabledGenders: e.disabledGenders ?? [],
       dayPricing: e.dayPricing ?? null,
       freeEntryRules: e.freeEntryRules ?? null,
       freeEntryForTable: (e as unknown as { freeEntryForTable?: boolean }).freeEntryForTable ?? false,
@@ -469,6 +471,7 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
       priceMen: data.priceMen != null ? String(data.priceMen) : "0",
       priceCouple: data.priceCouple != null ? String(data.priceCouple) : "0",
       pubEventTypes: data.pubEventTypes ?? [],
+      disabledGenders: data.disabledGenders ?? [],
       dayPricing: data.dayPricing ?? null,
       freeEntryRules: data.freeEntryRules ?? null,
       freeEntryForTable: rawFET !== undefined ? Boolean(rawFET) : false,
@@ -561,6 +564,7 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
   if (data.priceMen !== undefined) updates["priceMen"] = String(data.priceMen);
   if (data.priceCouple !== undefined) updates["priceCouple"] = String(data.priceCouple);
   if (data.pubEventTypes !== undefined) updates["pubEventTypes"] = data.pubEventTypes;
+  if (data.disabledGenders !== undefined) updates["disabledGenders"] = data.disabledGenders;
   if (data.dayPricing !== undefined) updates["dayPricing"] = data.dayPricing;
   if (data.freeEntryRules !== undefined) {
     const fer = data.freeEntryRules;

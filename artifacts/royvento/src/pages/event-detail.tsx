@@ -380,6 +380,15 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     }
   }, [event, date, couponState, couponInput]);
 
+  // Zero out any ticket count for a gender the venue has disabled, so a
+  // restriction toggled on by the partner can't leave a stale count selected.
+  useEffect(() => {
+    const dg: string[] = Array.isArray((event as any)?.disabledGenders) ? (event as any).disabledGenders : [];
+    if (dg.includes("women")) setTicketWomen(0);
+    if (dg.includes("men")) setTicketMen(0);
+    if (dg.includes("couple")) setTicketCouple(0);
+  }, [event]);
+
   if (isLoading) return <div className="container mx-auto px-4 py-20">Loading…</div>;
   if (!event) return <div className="container mx-auto px-4 py-20">{t("events.not_found")}</div>;
 
@@ -395,6 +404,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const vendorDayHours = ev.vendor?.dayHours as Record<string, { open: string; close: string } | null> | null | undefined;
   const vendorAddress: string = ev.vendor?.address ?? "";
   const dayPricingMap = ev.dayPricing as Record<string, { women: number; men: number; couple: number } | null> | null;
+  const disabledGenders: string[] = Array.isArray(ev.disabledGenders) ? ev.disabledGenders : [];
+  const isGenderDisabled = (g: "women" | "men" | "couple") => disabledGenders.includes(g);
+  const disabledGenderLabels = disabledGenders.map((g) => g === "women" ? t("events.women") : g === "men" ? t("events.men") : g === "couple" ? t("events.couple") : g);
 
   const formatHour = (t: string): string => {
     const [h, m] = t.split(":").map(Number);
@@ -573,6 +585,15 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     // Collect per-field validation issues (every booking-request field is
     // required except couponCode / pointsToUse / notes).
     const errs: Record<string, string> = {};
+    if (isPub && pubMode === "ticket" && (isGenderDisabled("women") ? ticketWomen > 0 : false)) {
+      errs.ticketWomen = "Women entry is not allowed at this venue";
+    }
+    if (isPub && pubMode === "ticket" && (isGenderDisabled("men") ? ticketMen > 0 : false)) {
+      errs.ticketWomen = "Men entry is not allowed at this venue";
+    }
+    if (isPub && pubMode === "ticket" && (isGenderDisabled("couple") ? ticketCouple > 0 : false)) {
+      errs.ticketWomen = "Couple entry is not allowed at this venue";
+    }
     if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) {
       errs.ticketWomen = t("events.add_tickets");
     }
@@ -1160,6 +1181,17 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                 </div>
               )}
             </div>
+
+            {/* Entry restriction notice */}
+            {isPub && disabledGenders.length > 0 && (
+              <div className="flex items-start gap-3 rounded-2xl border border-red-500/25 bg-red-500/8 p-5">
+                <Lock className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-red-300">Entry restricted</p>
+                  <p className="text-sm text-white/60 mt-0.5">{disabledGenderLabels.join(" & ")} entry is not allowed at this venue.</p>
+                </div>
+              </div>
+            )}
 
             {/* Event types */}
             {isPub && (ev.pubEventTypes as string[] | undefined)?.length ? (
@@ -1787,9 +1819,12 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       <div className="rounded-xl border border-white/8 bg-black/20 p-4 space-y-2 mt-2">
                         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">{t("events.ticket_counts")} <span className="text-primary normal-case">*</span></p>
                         {fieldErrors.ticketWomen && <p className="text-xs text-destructive">{fieldErrors.ticketWomen}</p>}
-                        <TicketRow label={t("events.women")} price={isTierFree("women") ? 0 : effectiveWomen} value={ticketWomen} onChange={setTicketWomen} hidePrice={isFreeEntryDay} freeBadge={isTierFree("women") && !isFreeEntryDay} />
-                        <TicketRow label={t("events.men")} price={isTierFree("men") ? 0 : effectiveMen} value={ticketMen} onChange={setTicketMen} hidePrice={isFreeEntryDay} freeBadge={isTierFree("men") && !isFreeEntryDay} />
-                        <TicketRow label={t("events.couple")} price={isTierFree("couple") ? 0 : effectiveCouple} value={ticketCouple} onChange={setTicketCouple} hidePrice={isFreeEntryDay} freeBadge={isTierFree("couple") && !isFreeEntryDay} />
+                        <TicketRow label={t("events.women")} price={isTierFree("women") ? 0 : effectiveWomen} value={ticketWomen} onChange={setTicketWomen} hidePrice={isFreeEntryDay} freeBadge={isTierFree("women") && !isFreeEntryDay} disabled={isGenderDisabled("women")} />
+                        <TicketRow label={t("events.men")} price={isTierFree("men") ? 0 : effectiveMen} value={ticketMen} onChange={setTicketMen} hidePrice={isFreeEntryDay} freeBadge={isTierFree("men") && !isFreeEntryDay} disabled={isGenderDisabled("men")} />
+                        <TicketRow label={t("events.couple")} price={isTierFree("couple") ? 0 : effectiveCouple} value={ticketCouple} onChange={setTicketCouple} hidePrice={isFreeEntryDay} freeBadge={isTierFree("couple") && !isFreeEntryDay} disabled={isGenderDisabled("couple")} />
+                        {disabledGenders.length > 0 && (
+                          <p className="text-xs text-red-400 pt-1">{disabledGenderLabels.join(" & ")} entry is not allowed at this venue.</p>
+                        )}
                       </div>
                     )}
                     {pubMode === "event" && (
@@ -2341,7 +2376,17 @@ function StepProgress({ current, steps, onStepClick }: { current: number; steps:
   );
 }
 
-function TicketRow({ label, price, value, onChange, hidePrice, freeBadge }: { label: string; price: number; value: number; onChange: (n: number) => void; hidePrice?: boolean; freeBadge?: boolean }) {
+function TicketRow({ label, price, value, onChange, hidePrice, freeBadge, disabled }: { label: string; price: number; value: number; onChange: (n: number) => void; hidePrice?: boolean; freeBadge?: boolean; disabled?: boolean }) {
+  if (disabled) {
+    return (
+      <div className="flex items-center justify-between gap-3 text-sm opacity-50">
+        <div className="flex-1">
+          <span className="font-medium line-through">{label}</span>
+          <span className="ml-2 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/30">Not allowed</span>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
       <div className="flex-1">

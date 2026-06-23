@@ -1916,6 +1916,7 @@ export const ListEventsResponseItem = zod.object({
   "approvalStatus": zod.string(),
   "approvedAt": zod.coerce.date().nullish(),
   "pubEventTypes": zod.array(zod.string()).optional(),
+  "disabledGenders": zod.array(zod.string()).optional().describe('Genders disabled from entry at this venue (e.g. [\"men\"] for a women-only night).'),
   "dayPricing": zod.record(zod.string(), zod.object({
   "women": zod.number().optional(),
   "men": zod.number().optional(),
@@ -1968,6 +1969,8 @@ export const createEventBodyPriceMenMin = 0;
 export const createEventBodyPriceCoupleMin = 0;
 
 export const createEventBodyPubEventTypesItemMax = 100;
+
+export const createEventBodyDisabledGendersItemMax = 20;
 
 export const createEventBodyDayPricingOneMonOneWomenMin = 0;
 
@@ -2033,6 +2036,7 @@ export const CreateEventBody = zod.object({
   "priceMen": zod.number().min(createEventBodyPriceMenMin).optional(),
   "priceCouple": zod.number().min(createEventBodyPriceCoupleMin).optional(),
   "pubEventTypes": zod.array(zod.string().max(createEventBodyPubEventTypesItemMax)).optional(),
+  "disabledGenders": zod.array(zod.string().max(createEventBodyDisabledGendersItemMax)).optional(),
   "dayPricing": zod.union([zod.object({
   "Mon": zod.union([zod.object({
   "women": zod.number().min(createEventBodyDayPricingOneMonOneWomenMin),
@@ -2104,6 +2108,7 @@ export const CreateEventResponse = zod.object({
   "approvalStatus": zod.string(),
   "approvedAt": zod.coerce.date().nullish(),
   "pubEventTypes": zod.array(zod.string()).optional(),
+  "disabledGenders": zod.array(zod.string()).optional().describe('Genders disabled from entry at this venue (e.g. [\"men\"] for a women-only night).'),
   "dayPricing": zod.record(zod.string(), zod.object({
   "women": zod.number().optional(),
   "men": zod.number().optional(),
@@ -2149,6 +2154,7 @@ export const ListFeaturedEventsResponseItem = zod.object({
   "approvalStatus": zod.string(),
   "approvedAt": zod.coerce.date().nullish(),
   "pubEventTypes": zod.array(zod.string()).optional(),
+  "disabledGenders": zod.array(zod.string()).optional().describe('Genders disabled from entry at this venue (e.g. [\"men\"] for a women-only night).'),
   "dayPricing": zod.record(zod.string(), zod.object({
   "women": zod.number().optional(),
   "men": zod.number().optional(),
@@ -2200,6 +2206,7 @@ export const GetEventResponse = zod.object({
   "approvalStatus": zod.string(),
   "approvedAt": zod.coerce.date().nullish(),
   "pubEventTypes": zod.array(zod.string()).optional(),
+  "disabledGenders": zod.array(zod.string()).optional().describe('Genders disabled from entry at this venue (e.g. [\"men\"] for a women-only night).'),
   "dayPricing": zod.record(zod.string(), zod.object({
   "women": zod.number().optional(),
   "men": zod.number().optional(),
@@ -2290,6 +2297,8 @@ export const updateEventBodyPriceCoupleMin = 0;
 
 export const updateEventBodyPubEventTypesItemMax = 100;
 
+export const updateEventBodyDisabledGendersItemMax = 20;
+
 export const updateEventBodyDayPricingOneMonOneWomenMin = 0;
 
 export const updateEventBodyDayPricingOneMonOneMenMin = 0;
@@ -2353,6 +2362,7 @@ export const UpdateEventBody = zod.object({
   "priceMen": zod.number().min(updateEventBodyPriceMenMin).optional(),
   "priceCouple": zod.number().min(updateEventBodyPriceCoupleMin).optional(),
   "pubEventTypes": zod.array(zod.string().max(updateEventBodyPubEventTypesItemMax)).optional(),
+  "disabledGenders": zod.array(zod.string().max(updateEventBodyDisabledGendersItemMax)).optional(),
   "dayPricing": zod.union([zod.object({
   "Mon": zod.union([zod.object({
   "women": zod.number().min(updateEventBodyDayPricingOneMonOneWomenMin),
@@ -2424,6 +2434,7 @@ export const UpdateEventResponse = zod.object({
   "approvalStatus": zod.string(),
   "approvedAt": zod.coerce.date().nullish(),
   "pubEventTypes": zod.array(zod.string()).optional(),
+  "disabledGenders": zod.array(zod.string()).optional().describe('Genders disabled from entry at this venue (e.g. [\"men\"] for a women-only night).'),
   "dayPricing": zod.record(zod.string(), zod.object({
   "women": zod.number().optional(),
   "men": zod.number().optional(),
@@ -2490,6 +2501,7 @@ export const ListMyVendorEventsResponse = zod.object({
   "approvalStatus": zod.string(),
   "approvedAt": zod.coerce.date().nullish(),
   "pubEventTypes": zod.array(zod.string()).optional(),
+  "disabledGenders": zod.array(zod.string()).optional().describe('Genders disabled from entry at this venue (e.g. [\"men\"] for a women-only night).'),
   "dayPricing": zod.record(zod.string(), zod.object({
   "women": zod.number().optional(),
   "men": zod.number().optional(),
@@ -4431,6 +4443,7 @@ export const GetWishlistResponseItem = zod.object({
   "approvalStatus": zod.string(),
   "approvedAt": zod.coerce.date().nullish(),
   "pubEventTypes": zod.array(zod.string()).optional(),
+  "disabledGenders": zod.array(zod.string()).optional().describe('Genders disabled from entry at this venue (e.g. [\"men\"] for a women-only night).'),
   "dayPricing": zod.record(zod.string(), zod.object({
   "women": zod.number().optional(),
   "men": zod.number().optional(),

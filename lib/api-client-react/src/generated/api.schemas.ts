@@ -1146,6 +1146,8 @@ export interface Event {
   approvalStatus: string;
   approvedAt?: string | null;
   pubEventTypes?: string[];
+  /** Genders disabled from entry at this venue (e.g. ["men"] for a women-only night). */
+  disabledGenders?: string[];
   dayPricing?: EventDayPricing;
   freeEntryRules?: FreeEntryRules | null;
   hasDrinkPlans?: boolean;
@@ -1225,6 +1227,7 @@ export interface CreateEventBody {
   /** @minimum 0 */
   priceCouple?: number;
   pubEventTypes?: string[];
+  disabledGenders?: string[];
   dayPricing?: DayPricing | null;
   freeEntryRules?: FreeEntryRules | null;
 }
@@ -1267,6 +1270,7 @@ export interface UpdateEventBody {
   /** @minimum 0 */
   priceCouple?: number;
   pubEventTypes?: string[];
+  disabledGenders?: string[];
   dayPricing?: DayPricing | null;
   freeEntryRules?: FreeEntryRules | null;
 }
