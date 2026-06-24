@@ -55,7 +55,7 @@ export const PARTY_PREFS = [
 
 const GOLD = "#d4af37";
 const RED = "#b91c1c";
-const PARTY = "#f472b6";
+const PARTY = "#d4af37";
 
 // Cover photo constraints per the create-party workflow (JPG/PNG, ≤5 MB).
 const PARTY_IMAGE_TYPES = ["image/jpeg", "image/png"];
@@ -399,7 +399,7 @@ export function CreatePartyWizard({ city, onClose }: { city: string; onClose: ()
             type="button"
             onClick={next}
             className="flex-1 flex items-center justify-center gap-1.5 py-3.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
-            style={{ background: `linear-gradient(135deg, ${PARTY}, #db2777)`, color: "#fff", boxShadow: `0 10px 28px ${PARTY}40` }}
+            style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 10px 28px ${RED}40` }}
           >
             Continue <ChevronRight className="h-4 w-4" />
           </button>

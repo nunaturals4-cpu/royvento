@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useGetSoloAccess, useGetMe, useListSoloGroups, useListParties, type SoloGroup, type Party } from "@workspace/api-client-react";
+import { useGetSoloAccess, useGetMe, useListSoloGroups, type SoloGroup } from "@workspace/api-client-react";
 import { useSelectedCity } from "@/components/LocationContext";
 import { SEO } from "@/components/SEO";
 import { Spinner } from "@/components/ui/spinner";
 import { SoloVerificationFlow } from "@/components/solo-connect/SoloVerificationFlow";
 import { CreateGroupModal } from "@/components/solo-connect/CreateGroupModal";
-import { joinBadge } from "@/components/solo-connect/CreatePartyWizard";
 import { SoloGroupDetail } from "@/components/solo-connect/SoloGroupDetail";
 import {
   Crown,
@@ -24,7 +23,6 @@ import {
   CalendarDays,
   Gamepad2,
   Trophy,
-  PartyPopper,
   LogIn,
   Smartphone,
   Camera,
@@ -32,13 +30,11 @@ import {
   MessageCircle,
   CheckCircle2,
   ChevronRight,
-  Search,
   Eye,
 } from "lucide-react";
 
 const GOLD = "#d4af37";
 const RED = "#b91c1c";
-const PARTY_ACCENT = "#f472b6";
 
 // What stands between a visitor and joining/booking a group. `null` means the
 // visitor is fully approved and can act; otherwise it names the next step they
@@ -844,8 +840,6 @@ function BrowseExperience({ gate, gender, activity }: { gate: BookingGate; gende
         <GuestBanner gate={gate} />
       )}
 
-      <PartyList city={selectedCity} />
-
       <GroupList city={selectedCity} activity={activity} canCreate={canAct} onOpen={setOpenGroupId} />
 
       {canAct && showCreate && (
@@ -855,228 +849,6 @@ function BrowseExperience({ gate, gender, activity }: { gate: BookingGate; gende
         <SoloGroupDetail groupId={openGroupId} city={selectedCity} gate={gate} onClose={() => setOpenGroupId(null)} />
       )}
     </div>
-  );
-}
-
-// Discovery rail for standalone "Create Your Own Party" entities (their own
-// ticketed product — not solo groups). Cards link to the party profile page.
-function PartyList({ city }: { city: string }) {
-  const { data: parties = [], isLoading } = useListParties(
-    { city },
-    { query: { retry: false } as any },
-  );
-  const [q, setQ] = useState("");
-  const [tType, setTType] = useState<"all" | "free" | "paid">("all");
-  const [minP, setMinP] = useState("");
-  const [maxP, setMaxP] = useState("");
-
-  if (isLoading) return null;
-  const live = (parties as Party[]).filter((p) => p.status !== "cancelled");
-  if (live.length === 0) return null;
-
-  const filtered = live.filter((p) => {
-    if (tType !== "all" && p.ticketType !== tType) return false;
-    if (q.trim()) {
-      const hay = `${p.name} ${p.venueName} ${p.city}`.toLowerCase();
-      if (!hay.includes(q.trim().toLowerCase())) return false;
-    }
-    // Price range applies to paid parties; a min > 0 excludes free entries.
-    if (p.ticketType === "paid") {
-      const price = Number(p.ticketPrice);
-      if (minP && price < Number(minP)) return false;
-      if (maxP && price > Number(maxP)) return false;
-    } else if (minP && Number(minP) > 0) {
-      return false;
-    }
-    return true;
-  });
-
-  const seg = (v: "all" | "free" | "paid", label: string) => {
-    const active = tType === v;
-    return (
-      <button key={v} type="button" onClick={() => setTType(v)}
-        className="px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all duration-200"
-        style={{
-          background: active ? `linear-gradient(135deg, ${PARTY_ACCENT}33, ${RED}22)` : "transparent",
-          border: `1px solid ${active ? PARTY_ACCENT : "transparent"}`,
-          color: active ? "#fff" : "rgba(255,255,255,0.5)",
-          boxShadow: active ? `0 0 14px ${PARTY_ACCENT}30` : "none",
-        }}>
-        {label}
-      </button>
-    );
-  };
-
-  return (
-    <section className="mb-9">
-      {/* Premium header card */}
-      <div
-        className="relative mb-5 overflow-hidden rounded-2xl p-5 md:p-6"
-        style={{
-          background: `linear-gradient(135deg, rgba(8,6,0,0.99) 0%, rgba(26,20,3,0.97) 40%, rgba(18,13,1,0.98) 70%, rgba(8,6,0,0.99) 100%)`,
-          border: `1px solid ${GOLD}28`,
-          boxShadow: `0 0 80px ${GOLD}12, 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 ${GOLD}18`,
-        }}
-      >
-        {/* Ambient glows */}
-        <div className="pointer-events-none absolute -top-16 -right-16 h-52 w-52 rounded-full blur-3xl opacity-50"
-          style={{ background: `${PARTY_ACCENT}1a` }} />
-        <div className="pointer-events-none absolute -bottom-16 -left-16 h-52 w-52 rounded-full blur-3xl opacity-35"
-          style={{ background: `${RED}18` }} />
-
-        {/* Top shimmer line */}
-        <div className="absolute top-0 left-0 right-0 h-px"
-          style={{ background: `linear-gradient(90deg, transparent 5%, ${GOLD}cc 40%, ${GOLD}cc 60%, transparent 95%)` }} />
-
-        {/* Header row */}
-        <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 mb-5">
-          <span
-            className="flex items-center justify-center h-[52px] w-[52px] rounded-2xl shrink-0"
-            style={{
-              background: `linear-gradient(145deg, ${PARTY_ACCENT}28, ${RED}1e)`,
-              border: `1px solid ${PARTY_ACCENT}50`,
-              boxShadow: `0 0 32px ${PARTY_ACCENT}38, inset 0 1px 0 rgba(255,255,255,0.07)`,
-            }}
-          >
-            <PartyPopper className="h-6 w-6" style={{ color: PARTY_ACCENT }} />
-          </span>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-baseline gap-2.5 mb-1">
-              <h3
-                className="font-serif text-2xl md:text-[1.75rem] leading-none"
-                style={{
-                  background: `linear-gradient(135deg, #ffffff 0%, #fddcee 45%, ${PARTY_ACCENT} 100%)`,
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                Parties near you
-              </h3>
-              <span
-                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold"
-                style={{
-                  background: `${PARTY_ACCENT}20`,
-                  color: PARTY_ACCENT,
-                  border: `1px solid ${PARTY_ACCENT}50`,
-                  boxShadow: `0 0 12px ${PARTY_ACCENT}28`,
-                }}
-              >
-                {filtered.length} live
-              </span>
-            </div>
-            <p className="text-[13px] leading-relaxed" style={{ color: "rgba(255,255,255,0.42)" }}>
-              Host-run parties you can book — free RSVP or paid tickets
-            </p>
-          </div>
-        </div>
-
-        {/* Premium filter panel */}
-        <div
-          className="relative flex flex-wrap items-center gap-2 rounded-xl p-1.5"
-          style={{
-            background: "rgba(0,0,0,0.4)",
-            border: "1px solid rgba(255,255,255,0.06)",
-          }}
-        >
-          {/* Search */}
-          <div className="relative flex-1 min-w-[160px]">
-            <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "rgba(255,255,255,0.28)" }} />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search parties…"
-              className="w-full pl-9 pr-3 py-2.5 rounded-lg text-sm outline-none"
-              style={{
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.07)",
-                color: "#fff",
-              }}
-            />
-          </div>
-
-          {/* Segment: All / Free / Paid */}
-          <div
-            className="flex items-center gap-0.5 rounded-lg p-1"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
-          >
-            {seg("all", "All")}{seg("free", "Free")}{seg("paid", "Paid")}
-          </div>
-
-          {/* Price range */}
-          <div className="flex items-center gap-1.5">
-            <input
-              value={minP}
-              onChange={(e) => setMinP(e.target.value.replace(/[^0-9]/g, ""))}
-              inputMode="numeric"
-              placeholder="₹ min"
-              disabled={tType === "free"}
-              className="w-20 px-2.5 py-2.5 rounded-lg text-sm outline-none"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", color: "#fff", opacity: tType === "free" ? 0.3 : 1, transition: "opacity 0.2s" }}
-            />
-            <span className="text-xs" style={{ color: "rgba(255,255,255,0.22)" }}>—</span>
-            <input
-              value={maxP}
-              onChange={(e) => setMaxP(e.target.value.replace(/[^0-9]/g, ""))}
-              inputMode="numeric"
-              placeholder="₹ max"
-              disabled={tType === "free"}
-              className="w-20 px-2.5 py-2.5 rounded-lg text-sm outline-none"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", color: "#fff", opacity: tType === "free" ? 0.3 : 1, transition: "opacity 0.2s" }}
-            />
-          </div>
-        </div>
-
-        {/* Bottom fade line */}
-        <div className="absolute bottom-0 left-0 right-0 h-px"
-          style={{ background: `linear-gradient(90deg, transparent, ${GOLD}30, transparent)` }} />
-      </div>
-
-      {filtered.length === 0 ? (
-        <p className="text-sm text-center py-8 rounded-2xl" style={{ color: "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.1)" }}>No parties match your filters.</p>
-      ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filtered.map((p) => <PartyCard key={p.id} p={p} />)}
-        </div>
-      )}
-    </section>
-  );
-}
-
-// Mirrors the homepage EventCard visual language so listings read consistently.
-function PartyCard({ p }: { p: Party }) {
-  const isPaid = p.ticketType === "paid";
-  const loc = [p.venueName, p.city].filter(Boolean).join(", ");
-  return (
-    <Link href={`/party/${p.id}`}>
-      <article className="group cursor-pointer overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111111] transition-all duration-300 hover:border-[#f472b6]/30 hover:shadow-[0_0_0_1px_rgba(244,114,182,0.18),0_8px_32px_rgba(0,0,0,0.6)]">
-        {/* Image */}
-        <div className="relative aspect-video overflow-hidden bg-black/40">
-          {p.coverImageUrl
-            ? <img src={p.coverImageUrl} alt={p.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.05]" />
-            : <div className="h-full w-full" style={{ background: `linear-gradient(135deg, ${PARTY_ACCENT}33, ${RED}22)` }} />}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30" />
-          <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/5" />
-        </div>
-        {/* Body */}
-        <div className="p-3.5">
-          <div className="mb-2 flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white" style={{ background: PARTY_ACCENT }}>Party</span>
-            {!isPaid && <span className="inline-flex items-center rounded-md bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Free Entry</span>}
-            <span className="inline-flex items-center rounded-md border border-white/20 bg-white/[0.08] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white/85">{joinBadge(p.joinType)}</span>
-          </div>
-          <h3 className="text-[15px] font-bold leading-tight text-white line-clamp-1 transition-colors duration-200 group-hover:text-[#f472b6]">{p.name}</h3>
-          <p className="mt-0.5 text-[12px] text-muted-foreground line-clamp-1">
-            {[loc, p.partyDate].filter(Boolean).join(" · ") || "Party"}
-          </p>
-          <div className="mt-2.5 flex items-center justify-between border-t border-white/[0.06] pt-2.5">
-            <span className="text-[11px] text-muted-foreground/70">Entry</span>
-            <span className="text-sm font-bold text-white">{isPaid ? `₹${Number(p.ticketPrice).toLocaleString("en-IN")}` : "Free"}</span>
-          </div>
-        </div>
-      </article>
-    </Link>
   );
 }
 

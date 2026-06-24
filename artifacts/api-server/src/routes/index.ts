@@ -36,6 +36,7 @@ import happeningTonightRouter from "./happeningTonight";
 import goingOutRouter from "./goingOut";
 import soloConnectRouter from "./soloConnect";
 import createYourPartyRouter from "./createYourParty";
+import siteSettingsRouter from "./siteSettings";
 
 const router: IRouter = Router();
 
@@ -76,5 +77,6 @@ router.use(happeningTonightRouter);
 router.use(goingOutRouter);
 router.use(soloConnectRouter);
 router.use(createYourPartyRouter);
+router.use(siteSettingsRouter);
 
 export default router;

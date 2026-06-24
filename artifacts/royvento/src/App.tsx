@@ -64,6 +64,7 @@ const TonightPlans = lazy(() => import("@/pages/tonight-plans").then((m) => ({ d
 const Blogs = lazy(() => import("@/pages/blogs").then((m) => ({ default: m.Blogs })));
 const BlogDetail = lazy(() => import("@/pages/blog-detail").then((m) => ({ default: m.BlogDetail })));
 const SoloConnect = lazy(() => import("@/pages/solo-connect").then((m) => ({ default: m.SoloConnect })));
+const PrivateParties = lazy(() => import("@/pages/private-parties").then((m) => ({ default: m.PrivateParties })));
 
 function PageFallback() {
   return (
@@ -179,6 +180,7 @@ function Router() {
           <Route path="/pub-offers" component={PubOffers} />
           <Route path="/events" component={Events} />
           <Route path="/games" component={GamesAndSports} />
+          <Route path="/private-parties" component={PrivateParties} />
           <Route path="/party/:id" component={PartyDetail} />
           <Route path="/vendors" component={Vendors} />
           <Route path="/partners" component={Vendors} />

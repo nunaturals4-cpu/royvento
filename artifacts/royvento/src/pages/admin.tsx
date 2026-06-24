@@ -66,6 +66,7 @@ import { useEffect, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useLocation, useSearch } from "wouter";
 import { pubDetailSlug } from "@/lib/seo-slug";
+import { NAV_ITEMS } from "@/lib/navItems";
 import { apiGet, apiPost, apiDelete, apiPatch, apiPut, formatINR, PUB_EVENT_TYPES } from "@/lib/api";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { cn } from "@/lib/utils";
@@ -327,7 +328,7 @@ export function AdminPanel() {
               <TabsContent value="live-occupancy" className="mt-0"><LiveOccupancyAdmin /></TabsContent>
               <TabsContent value="crm-leads" className="mt-0"><CrmLeads /></TabsContent>
               <TabsContent value="create-pub" className="mt-0"><CreatePubAdmin /></TabsContent>
-              <TabsContent value="announcement-slider" className="mt-0"><AnnouncementSliderAdmin /><OrganizerEventSliderAdmin /><DrinkPlanPriorityAdmin /></TabsContent>
+              <TabsContent value="announcement-slider" className="mt-0"><SiteNavVisibilityAdmin /><AnnouncementSliderAdmin /><OrganizerEventSliderAdmin /><DrinkPlanPriorityAdmin /></TabsContent>
               <TabsContent value="commissions" className="mt-0"><CommissionsAdmin /></TabsContent>
               <TabsContent value="settlements" className="mt-0"><SettlementsAdmin /></TabsContent>
               <TabsContent value="reviews" className="mt-0"><ReviewsAdmin /></TabsContent>
@@ -5031,6 +5032,91 @@ interface AdminAnnouncement {
   vendorId: number;
   vendorName: string;
   createdAt: string;
+}
+
+// Admin: show/hide each primary navigation item (Home, Tonight Plans, Pubs &
+// Clubs, …) independently across the public site (desktop bar + mobile menu).
+function SiteNavVisibilityAdmin() {
+  const [hidden, setHidden] = useState<string[] | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    apiGet<{ hiddenNavLinks: string[] }>("/api/site-settings")
+      .then((s) => setHidden(s.hiddenNavLinks ?? []))
+      .catch(() => setHidden([]));
+  }, []);
+
+  const toggle = async (item: { key: string; label: string }) => {
+    if (hidden === null) return;
+    const isHidden = hidden.includes(item.key);
+    const next = isHidden ? hidden.filter((k) => k !== item.key) : [...hidden, item.key];
+    setSaving(item.key);
+    setHidden(next); // optimistic
+    try {
+      const updated = await apiPatch<{ hiddenNavLinks: string[] }>(
+        "/api/admin/site-settings",
+        { hiddenNavLinks: next },
+      );
+      setHidden(updated.hiddenNavLinks ?? next);
+      toast({ title: isHidden ? `"${item.label}" shown` : `"${item.label}" hidden` });
+    } catch {
+      setHidden(hidden); // revert
+      toast({ title: "Failed to update", variant: "destructive" });
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl glass-card p-6">
+      <div className="flex items-start gap-3 mb-6">
+        <div className="w-9 h-9 rounded-lg bg-amber-400/15 flex items-center justify-center shrink-0">
+          <Menu className="h-4 w-4 text-amber-400" />
+        </div>
+        <div>
+          <h2 className="font-serif text-2xl">Navigation Menu</h2>
+          <p className="text-sm text-muted-foreground mt-0.5 max-w-xl">
+            Show or hide each primary menu item independently across the public site — desktop bar
+            and mobile menu. Turn a switch off to hide that item for all visitors.
+          </p>
+        </div>
+      </div>
+
+      {hidden === null ? (
+        <p className="text-muted-foreground text-sm">Loading...</p>
+      ) : (
+        <div className="space-y-2">
+          {NAV_ITEMS.map((item) => {
+            const isHidden = hidden.includes(item.key);
+            return (
+              <div
+                key={item.key}
+                className={`flex items-center gap-4 rounded-xl border px-4 py-3 transition-colors ${
+                  isHidden ? "border-white/8 bg-white/[0.02]" : "border-amber-400/30 bg-amber-400/5"
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm leading-snug truncate">{item.label}</p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {item.href}
+                    {isHidden && <span className="ml-2 text-amber-400/80">· Hidden</span>}
+                  </p>
+                </div>
+                <Switch
+                  checked={!isHidden}
+                  onCheckedChange={() => toggle(item)}
+                  disabled={saving === item.key}
+                  aria-label={isHidden ? `Show ${item.label}` : `Hide ${item.label}`}
+                  className="data-[state=checked]:bg-amber-400"
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function AnnouncementSliderAdmin() {

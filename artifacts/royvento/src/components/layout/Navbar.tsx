@@ -20,6 +20,7 @@ import { LANGUAGES } from "@/components/ui/LanguageSwitcher";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/components/ThemeProvider";
 import { THEMES } from "@/components/ui/ThemeSwitcher";
+import { NAV_ITEMS } from "@/lib/navItems";
 
 interface Notification {
   id: number;
@@ -66,6 +67,14 @@ export function Navbar() {
     staleTime: 10 * 60 * 60 * 1000,
     refetchInterval: false,
   });
+
+  // Global, admin-controlled visibility: which primary-nav items are hidden.
+  const { data: siteSettings } = useQuery<{ hiddenNavLinks: string[] }>({
+    queryKey: ["site-settings"],
+    queryFn: () => apiGet<{ hiddenNavLinks: string[] }>("/api/site-settings"),
+    staleTime: 5 * 60 * 1000,
+  });
+  const hiddenNavLinks = siteSettings?.hiddenNavLinks ?? [];
 
   const markReadMutation = useMutation({
     mutationFn: (id: number) => apiPatch(`/api/notifications/${id}/read`, {}),
@@ -141,21 +150,13 @@ export function Navbar() {
   const unreadCount = notifs.filter((n) => !n.isRead).length;
 
   // Primary navigation (left of the second tier) — shared by the desktop bar and
-  // the mobile drawer so the two never drift out of sync.
-  const navItems = [
-    { href: "/", label: t("nav.home") },
-    { href: "/tonight-plans", label: t("nav.tonight_plans", "Tonight Plans") },
-    { href: "/pubs", label: t("nav.pubs") },
-    { href: "/events", label: t("nav.events", "Events") },
-    { href: "/games", label: t("nav.games", "Games & Sports") },
-    { href: "/pub-offers", label: t("nav.pub_offers") },
-    // Solo Connect: shown to everyone — logged-out visitors land on the public
-    // showcase + login prompt, eligible accounts get the full experience, and
-    // non-premium members see the in-page PremiumGate upsell. The premium
-    // condition is enforced on the page, not by hiding the nav entry (which left
-    // normal logged-in users with no way to discover or upgrade into it).
-    { href: "/solo-connect", label: t("nav.solo_connect", "Solo Connect") },
-  ];
+  // the mobile drawer so the two never drift out of sync. Built from the shared
+  // NAV_ITEMS list and filtered by the admin-controlled per-item hide settings.
+  // (Solo Connect stays visible to everyone — the premium gate is enforced on
+  // the page, not by hiding the nav entry — unless an admin hides it here.)
+  const navItems = NAV_ITEMS
+    .filter((item) => !hiddenNavLinks.includes(item.key))
+    .map((item) => ({ href: item.href, label: t(item.labelKey, item.label) }));
   // "List Your Venue" must land partners on the Become-a-Partner form without a
   // double click: logged-in users go straight there; logged-out users are routed
   // through login with a `next` param so they bounce back automatically after
@@ -170,8 +171,6 @@ export function Navbar() {
   // mirroring BookMyShow's "ListYourShow · Corporates · Offers · Gift Cards" rail.
   const utilityItems = [
     ...(isPartner ? [] : [{ href: becomeVendorHref, label: t("home.list_your_venue", "List Your Venue") }]),
-    { href: "/subscription", label: t("nav.premium", "Premium") },
-    { href: "/contact", label: t("footer.contact", "Contact") },
   ];
   const isActive = (href: string) =>
     href === "/" ? location === "/" : location.startsWith(href);
@@ -475,13 +474,14 @@ export function Navbar() {
         </div>
 
         {/* ───────────── TIER 2 — primary nav (left) · utility links (right) ───────────── */}
+        {/* Individual items here can be hidden site-wide from Admin → Site Settings. */}
         <div
           className={`hidden lg:block border-b border-border/50 transition-all duration-300 ${
             scrolled ? "bg-background/90 backdrop-blur-xl" : "bg-card/40"
           }`}
         >
           <div className="container mx-auto px-4 md:px-6 h-11 flex items-center justify-between">
-            <nav className="flex items-center gap-8 xl:gap-10 text-sm font-medium">
+            <nav className="flex items-center gap-5 xl:gap-7 text-sm font-medium">
               {navItems.map((item) => {
                 const active = isActive(item.href);
                 return (
@@ -543,7 +543,7 @@ export function Navbar() {
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
               </button>
 
-              {/* Mobile primary nav links */}
+              {/* Mobile primary nav links (already filtered by admin hide settings) */}
               <nav className="flex flex-col">
                 {navItems.map(({ href, label }) => {
                   const active = isActive(href);

@@ -4,7 +4,6 @@ import { useCreateSoloGroup, useListSoloVenues } from "@workspace/api-client-rea
 import { useToast } from "@/hooks/use-toast";
 import { useSelectedCity } from "@/components/LocationContext";
 import { LocationSelect } from "@/components/LocationSelect";
-import { CreatePartyWizard } from "./CreatePartyWizard";
 import { X, Search, ChevronDown, Check, Plus } from "lucide-react";
 
 const GOLD = "#d4af37";
@@ -17,7 +16,6 @@ const ACTIVITY_TYPES = [
   { value: "events", label: "Events", hint: "Concert · Comedy · Live" },
   { value: "games", label: "Games", hint: "Bowling · VR · Arcade" },
   { value: "activities", label: "Activities", hint: "Sports Screening · Trivia" },
-  { value: "party", label: "Create Your Own Party", hint: "Host it your way, anywhere" },
 ] as const;
 
 type ActivityType = (typeof ACTIVITY_TYPES)[number]["value"];
@@ -29,7 +27,6 @@ const ACTIVITY_ACCENT: Record<string, string> = {
   events: "#60a5fa",
   games: "#34d399",
   activities: "#fb923c",
-  party: "#f472b6",
 };
 
 interface VenueOption {
@@ -207,8 +204,6 @@ export function CreateGroupModal({
   const [groupState, setGroupState] = useState(selectedState || "");
   const [groupCity, setGroupCity] = useState(city || "");
 
-  const isParty = activityType === "party";
-
   function pickActivity(value: ActivityType) {
     setActivityType(value);
     // Venue options differ per activity type — clear any prior selection.
@@ -298,10 +293,10 @@ export function CreateGroupModal({
             style={{ background: `linear-gradient(145deg, ${GOLD}26, ${RED}1a)`, border: `1px solid ${GOLD}44`, boxShadow: `0 0 22px ${GOLD}1f` }}>
             <Plus className="h-5 w-5" style={{ color: GOLD }} />
           </span>
-          <h3 className="font-serif text-2xl" style={{ color: "#fff" }}>{isParty ? "Create your party" : "Create a group"}</h3>
+          <h3 className="font-serif text-2xl" style={{ color: "#fff" }}>Create a group</h3>
         </div>
         <div className="flex flex-wrap gap-1.5 mb-6 ml-[3.25rem]">
-          {(isParty ? [city, "You're the host", "Discoverable in your city"] : [city, "Open to everyone", "3–15 members"]).map((chip) => (
+          {[city, "Open to everyone", "3–15 members"].map((chip) => (
             <span key={chip} className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: `${GOLD}14`, color: GOLD, border: `1px solid ${GOLD}33` }}>{chip}</span>
           ))}
         </div>
@@ -333,10 +328,6 @@ export function CreateGroupModal({
             </div>
           </div>
 
-          {isParty ? (
-            <CreatePartyWizard city={city} onClose={onClose} />
-          ) : (
-          <>
           <input className={field} style={fieldStyle} placeholder="Group name (e.g. Pub Crawl Tonight)" value={name} onChange={(e) => setName(e.target.value)} />
           <input className={field} style={fieldStyle} placeholder="Activity label (optional)" value={activityLabel} onChange={(e) => setActivityLabel(e.target.value)} />
 
@@ -419,8 +410,6 @@ export function CreateGroupModal({
               {create.isPending ? "Creating…" : "Create group"}
             </button>
           </div>
-          </>
-          )}
         </div>
       </div>
     </div>

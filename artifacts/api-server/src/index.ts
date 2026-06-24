@@ -595,6 +595,12 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "base_fee" integer DEFAULT 0`);
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "capacity" integer`);
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "site_settings" (
+        "key" varchar(100) PRIMARY KEY NOT NULL,
+        "value" text NOT NULL DEFAULT '',
+        "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
     await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "announcement_id" integer`);
     await db.execute(sql`ALTER TABLE "vendor_commissions" ADD COLUMN IF NOT EXISTS "event_rate" numeric(8,2) NOT NULL DEFAULT '0'`);
     await db.execute(sql`ALTER TABLE "vendor_commissions" ADD COLUMN IF NOT EXISTS "event_commission_enabled" boolean NOT NULL DEFAULT true`);
