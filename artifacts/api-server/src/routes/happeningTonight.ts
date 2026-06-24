@@ -158,7 +158,7 @@ router.get("/happening-tonight", async (req, res) => {
         (SELECT COALESCE(AVG(rating), 0) FROM reviews WHERE vendor_id = v.id) AS "rating",
         (SELECT COUNT(*) FROM bookings b WHERE b.event_id = e.id AND b.booking_date = ${today}) AS "todayBookings"
       FROM events e JOIN vendors v ON v.id = e.vendor_id
-      WHERE e.approval_status = 'approved' AND e.hidden = false AND e.happening_tonight = true
+      WHERE e.approval_status = 'approved' AND e.hidden = false AND v.status = 'approved' AND v.hidden = false AND e.happening_tonight = true
         AND (e.type = 'pub' OR e.event_date IS NULL OR e.event_date = ${today})
       LIMIT 200
     `)).rows as Record<string, unknown>[];
@@ -198,7 +198,12 @@ router.get("/happening-tonight", async (req, res) => {
         COALESCE(a.event_id, (SELECT id FROM events WHERE vendor_id = a.vendor_id ORDER BY id DESC LIMIT 1)) AS "eventId",
         (SELECT COALESCE(AVG(rating), 0) FROM reviews WHERE vendor_id = v.id) AS "rating"
       FROM announcements a JOIN vendors v ON v.id = a.vendor_id
-      WHERE a.approval_status = 'approved' AND (a.announce_date = '' OR a.announce_date = ${today})
+      WHERE a.approval_status = 'approved' AND v.status = 'approved' AND v.hidden = false
+        AND (a.announce_date = '' OR a.announce_date = ${today})
+        AND (a.event_id IS NULL OR EXISTS (
+          SELECT 1 FROM events e
+          WHERE e.id = a.event_id AND e.hidden = false AND e.approval_status = 'approved'
+        ))
       LIMIT 100
     `)).rows as Record<string, unknown>[];
     for (const r of djRows) {
@@ -308,7 +313,7 @@ router.get("/happening-tonight", async (req, res) => {
         (SELECT COALESCE(AVG(rating), 0) FROM reviews WHERE vendor_id = v.id) AS "rating",
         (SELECT id FROM events WHERE vendor_id = v.id AND type = 'pub' ORDER BY id DESC LIMIT 1) AS "pubEventId"
       FROM vendor_offers vo JOIN vendors v ON v.id = vo.vendor_id
-      WHERE vo.active = true
+      WHERE vo.active = true AND v.status = 'approved' AND v.hidden = false
       LIMIT 200
     `)).rows as Record<string, unknown>[];
     for (const r of offerRows) {

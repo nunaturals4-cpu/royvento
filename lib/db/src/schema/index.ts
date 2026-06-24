@@ -76,6 +76,12 @@ export const vendorsTable = pgTable(
     address: text("address"),
     isPremium: boolean("is_premium").notNull().default(false),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
+    // Admin "hide" lever, independent of the approval `status`. When true the
+    // venue and everything it created (events, offers, announcements, drink
+    // plans) is removed from every public surface; flipping back to false
+    // restores it. Set when an admin hides the venue's pub/club row in the
+    // Events tab. Read-filters require status='approved' AND hidden=false.
+    hidden: boolean("hidden").notNull().default(false),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     ticketPrefix: varchar("ticket_prefix", { length: 8 }).notNull().default(""),
     ticketSalt: varchar("ticket_salt", { length: 32 }).notNull().default(""),

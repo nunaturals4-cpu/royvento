@@ -167,6 +167,12 @@ router.get("/announcements/recent", async (_req, res) => {
     JOIN vendors v ON v.id = a.vendor_id
     WHERE (a.announce_date = '' OR a.announce_date >= ${today})
       AND a.approval_status = 'approved'
+      AND v.status = 'approved'
+      AND v.hidden = false
+      AND (a.event_id IS NULL OR EXISTS (
+        SELECT 1 FROM events e
+        WHERE e.id = a.event_id AND e.hidden = false AND e.approval_status = 'approved'
+      ))
     ORDER BY a.created_at DESC
     LIMIT 10
   `);
@@ -202,6 +208,12 @@ router.get("/announcements/slider", async (_req, res) => {
     WHERE (a.announce_date = '' OR a.announce_date >= ${today})
       AND a.is_featured_slider = true
       AND a.approval_status = 'approved'
+      AND v.status = 'approved'
+      AND v.hidden = false
+      AND (a.event_id IS NULL OR EXISTS (
+        SELECT 1 FROM events e
+        WHERE e.id = a.event_id AND e.hidden = false AND e.approval_status = 'approved'
+      ))
     ORDER BY a.created_at DESC
     LIMIT 10
   `);
@@ -235,6 +247,12 @@ router.get("/announcements/slider", async (_req, res) => {
     JOIN vendors v ON v.id = a.vendor_id
     WHERE (a.announce_date = '' OR a.announce_date >= ${today})
       AND a.approval_status = 'approved'
+      AND v.status = 'approved'
+      AND v.hidden = false
+      AND (a.event_id IS NULL OR EXISTS (
+        SELECT 1 FROM events e
+        WHERE e.id = a.event_id AND e.hidden = false AND e.approval_status = 'approved'
+      ))
     ORDER BY a.created_at DESC
     LIMIT 10
   `);
@@ -431,6 +449,8 @@ router.get("/vendors/:vendorId/announcements", async (req, res) => {
       and(
         eq(announcementsTable.vendorId, vendorId),
         eq(announcementsTable.approvalStatus, "approved"),
+        // Hidden pubs (status != 'approved') expose none of their announcements.
+        sql`EXISTS (SELECT 1 FROM vendors v WHERE v.id = ${announcementsTable.vendorId} AND v.status = 'approved' AND v.hidden = false)`,
         or(
           eq(announcementsTable.announceDate, ""),
           sql`${announcementsTable.announceDate} >= ${today}`,
@@ -452,6 +472,8 @@ router.get("/events/:eventId/announcements", async (req, res) => {
     .limit(1);
   const ev = evRows[0];
   if (!ev) return res.status(404).json({ error: "Event not found" });
+  // A hidden/unapproved event, or one under a hidden pub, surfaces nothing.
+  if (ev.hidden || ev.approvalStatus !== "approved") return res.json([]);
   const today = todayIstDate();
   const rows = await db
     .select()
@@ -459,6 +481,8 @@ router.get("/events/:eventId/announcements", async (req, res) => {
     .where(
       and(
         eq(announcementsTable.vendorId, ev.vendorId),
+        eq(announcementsTable.approvalStatus, "approved"),
+        sql`EXISTS (SELECT 1 FROM vendors v WHERE v.id = ${announcementsTable.vendorId} AND v.status = 'approved' AND v.hidden = false)`,
         or(
           eq(announcementsTable.announceDate, ""),
           sql`${announcementsTable.announceDate} >= ${today}`,

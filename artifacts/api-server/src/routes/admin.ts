@@ -692,6 +692,16 @@ router.patch("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
+  // A `type='pub'` event IS the venue's listing — hiding/showing it hides/shows
+  // the whole venue (and therefore all its events, offers, announcements and
+  // drink plans, via the vendor.hidden read-filters). Reversible: un-hiding the
+  // pub row clears vendor.hidden again.
+  if (data.hidden !== undefined && updated.type === "pub") {
+    await db
+      .update(vendorsTable)
+      .set({ hidden: data.hidden })
+      .where(eq(vendorsTable.id, updated.vendorId));
+  }
   res.json({ ok: true, approvalStatus: updated.approvalStatus });
   // Send email + in-app notification to the vendor owner when their event is approved
   if (data.approvalStatus === "approved") {
@@ -734,6 +744,29 @@ router.delete("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
+  // A `type='pub'` event IS the venue's listing. Deleting it from the Events tab
+  // deletes the entire venue and everything it created (all events, offers,
+  // announcements, drink plans, bookings, …) via the shared vendor cascade.
+  const [ev] = await db
+    .select({ type: eventsTable.type, vendorId: eventsTable.vendorId })
+    .from(eventsTable)
+    .where(eq(eventsTable.id, id))
+    .limit(1);
+  if (ev && ev.type === "pub") {
+    try {
+      const ok = await deleteVendorCascade(ev.vendorId);
+      if (!ok) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+    } catch (err) {
+      req.log.error({ err, vendorId: ev.vendorId, eventId: id }, "Failed to delete venue from event row");
+      res.status(500).json({ error: `Failed to delete venue: ${err instanceof Error ? err.message : "Unknown error"}` });
+      return;
+    }
+    res.json({ ok: true, deletedVenue: true });
+    return;
+  }
   try {
     await db.transaction(async (tx) => {
       // `bookings.event_id` is ON DELETE RESTRICT, so deleting an event while
@@ -742,6 +775,9 @@ router.delete("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
       // cleaned up too so they don't dangle on a deleted event.
       await tx.delete(bookingsTable).where(eq(bookingsTable.eventId, id));
       await tx.delete(wishlistsTable).where(eq(wishlistsTable.eventId, id));
+      // Remove announcements created for this event so none dangle on a deleted
+      // event (the slider/feeds would otherwise still surface them).
+      await tx.execute(sql`DELETE FROM announcements WHERE event_id = ${id}`);
       await tx.delete(eventsTable).where(eq(eventsTable.id, id));
     });
   } catch (err) {
@@ -1827,72 +1863,57 @@ router.delete("/admin/venues/:id/blocked-dates/:blockId", requireAuth(["admin"])
   res.json({ ok: true });
 });
 
-router.delete("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
-  const id = Number(req.params["id"]);
-  if (!Number.isFinite(id)) {
-    res.status(400).json({ error: "Invalid id" });
-    return;
-  }
+// Fully delete a vendor and every row scoped to it, then revoke the owner's
+// partner role. Returns false if no such vendor; throws on DB failure (caller
+// maps to a 500). Shared by the vendor-delete route and the Events-tab pub/club
+// delete (deleting a venue's pub row deletes the whole venue).
+//
+// Manually delete every child row that does NOT cascade from `vendors`.
+// Wrapped in db.transaction; do NOT use DO $$ ... END $$ — PostgreSQL rejects
+// bind parameters inside DO blocks ("bind message supplies N parameters, but
+// prepared statement requires 0").
+// - `bookings.event_id` is `ON DELETE RESTRICT`, so deleting `events` while
+//   bookings exist FK-errors out (the original 500 root cause).
+// - `events.vendor_id`, `bookings.vendor_id`, and several other vendor-scoped
+//   tables have no FK to `vendors` at all (just an integer column), so the
+//   cascade chain skips them entirely. Order matters: leaf rows, then events,
+//   then vendors. (vendor_offers / vendor_coupons / drink_plans DO cascade via
+//   FK, so they're removed automatically by the final `DELETE FROM vendors`.)
+async function deleteVendorCascade(vendorId: number): Promise<boolean> {
   const [target] = await db
     .select({ userId: vendorsTable.userId })
     .from(vendorsTable)
-    .where(eq(vendorsTable.id, id))
+    .where(eq(vendorsTable.id, vendorId))
     .limit(1);
-  if (!target) {
-    res.status(404).json({ error: "Not found" });
-    return;
-  }
-  // Manually delete every child row that does NOT cascade from `vendors`.
-  // Wrapped in db.transaction; do NOT use DO $$ ... END $$ — PostgreSQL
-  // rejects bind parameters inside DO blocks ("bind message supplies N
-  // parameters, but prepared statement requires 0").
-  // - `bookings.event_id` is `ON DELETE RESTRICT`, so deleting `events` while
-  //   bookings exist FK-errors out (this was the original 500 root cause).
-  // - `events.vendor_id`, `bookings.vendor_id`, and several other vendor-
-  //   scoped tables have no FK to `vendors` at all (just an integer column),
-  //   so the cascade chain skips them entirely.
-  // Order matters: leaf rows first, then events, then vendors.
-  //
-  // We run individual DELETEs rather than a single `DO $$ ... END $$;` block
-  // because PostgreSQL does NOT support bind parameters inside DO blocks
-  // ("bind message supplies N parameters, but prepared statement requires 0").
-  try {
-    await db.transaction(async (tx) => {
-      const evRows = await tx.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.vendorId, id));
-      const eventIds = evRows.map((r) => r.id);
+  if (!target) return false;
+  await db.transaction(async (tx) => {
+    const evRows = await tx.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.vendorId, vendorId));
+    const eventIds = evRows.map((r) => r.id);
 
-      await tx.execute(sql`DELETE FROM commission_ledger WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM bookings WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM reviews WHERE vendor_id = ${id}`);
-      // Drizzle's typed delete + inArray produces `IN ($1, $2, ...)` which
-      // PostgreSQL accepts — `ANY((1,2,3))` (a row, not an array) does NOT
-      // work and was the cause of "Failed query: DELETE FROM wishlists".
-      if (eventIds.length > 0) {
-        await tx.delete(wishlistsTable).where(inArray(wishlistsTable.eventId, eventIds));
-      }
-      await tx.execute(sql`DELETE FROM announcements WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM events WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM partner_media WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM partner_blocked_dates WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM ads_requests WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM profile_views WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM coupons WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM vendor_managers WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM availability WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM review_deletions WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM vendor_commissions WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM venue_assignment_log WHERE vendor_id = ${id}`);
-      await tx.execute(sql`DELETE FROM vendors WHERE id = ${id}`);
-    });
-  } catch (err) {
-    req.log.error({ err, vendorId: id }, "Failed to delete vendor");
-    const errMsg = err instanceof Error ? err.message : "Unknown error";
-    res.status(500).json({ error: `Failed to delete vendor: ${errMsg}` });
-    return;
-  }
-  // Revoke partner access and wipe prior applications so the user is locked
-  // out of the partner dashboard and the become-vendor form treats them as a
-  // fresh applicant.
+    await tx.execute(sql`DELETE FROM commission_ledger WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM bookings WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM reviews WHERE vendor_id = ${vendorId}`);
+    // Drizzle's typed delete + inArray produces `IN ($1, $2, ...)` which
+    // PostgreSQL accepts — `ANY((1,2,3))` (a row, not an array) does NOT work.
+    if (eventIds.length > 0) {
+      await tx.delete(wishlistsTable).where(inArray(wishlistsTable.eventId, eventIds));
+    }
+    await tx.execute(sql`DELETE FROM announcements WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM events WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM partner_media WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM partner_blocked_dates WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM ads_requests WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM profile_views WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM coupons WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM vendor_managers WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM availability WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM review_deletions WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM vendor_commissions WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM venue_assignment_log WHERE vendor_id = ${vendorId}`);
+    await tx.execute(sql`DELETE FROM vendors WHERE id = ${vendorId}`);
+  });
+  // Revoke partner access and wipe prior applications so the user is locked out
+  // of the partner dashboard and the become-vendor form treats them as fresh.
   await db
     .update(usersTable)
     .set({ role: "user" })
@@ -1900,6 +1921,27 @@ router.delete("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => 
   await db
     .delete(vendorRequestsTable)
     .where(eq(vendorRequestsTable.userId, target.userId));
+  return true;
+}
+
+router.delete("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  try {
+    const ok = await deleteVendorCascade(id);
+    if (!ok) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+  } catch (err) {
+    req.log.error({ err, vendorId: id }, "Failed to delete vendor");
+    const errMsg = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: `Failed to delete vendor: ${errMsg}` });
+    return;
+  }
   res.json({ ok: true });
 });
 

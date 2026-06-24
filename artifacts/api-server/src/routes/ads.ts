@@ -157,6 +157,7 @@ router.get("/partners/popular", async (_req, res) => {
       .where(
         and(
           eq(vendorsTable.status, "approved"),
+          eq(vendorsTable.hidden, false),
           eq(vendorsTable.isPremium, true),
         ),
       )
@@ -165,7 +166,7 @@ router.get("/partners/popular", async (_req, res) => {
   }
   const vendors = await db.select().from(vendorsTable);
   const filtered = vendors.filter(
-    (v) => vendorIds.includes(v.id) && v.status === "approved",
+    (v) => vendorIds.includes(v.id) && v.status === "approved" && !v.hidden,
   );
   return res.json(filtered);
 });

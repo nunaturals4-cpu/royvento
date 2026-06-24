@@ -1739,11 +1739,17 @@ function EventsAdmin() {
   };
   useEffect(() => { load(); }, []);
 
-  const remove = async (id: number, title: string) => {
-    if (!confirm(`Delete "${title}"?`)) return;
+  const remove = async (ev: AdminEvent) => {
+    // A pub/club row IS the whole venue — deleting it wipes the venue and
+    // everything it created. Warn loudly so it isn't mistaken for a single event.
+    const isVenue = ev.type === "pub";
+    const message = isVenue
+      ? `Delete the venue "${ev.partnerName || ev.title}" and EVERYTHING it created — all its events, offers, announcements, drink plans and bookings? This cannot be undone.`
+      : `Delete "${ev.title}"?`;
+    if (!confirm(message)) return;
     try {
-      await apiDelete(`/api/admin/events/${id}`);
-      toast({ title: "Deleted" });
+      await apiDelete(`/api/admin/events/${ev.id}`);
+      toast({ title: isVenue ? "Venue and all its content deleted" : "Deleted" });
       load();
     } catch (e: any) {
       toast({ title: "Failed", description: e?.message, variant: "destructive" });
@@ -1779,9 +1785,14 @@ function EventsAdmin() {
   };
 
   const toggleHidden = async (e: AdminEvent) => {
+    const isVenue = e.type === "pub";
     try {
       await apiPatch(`/api/admin/events/${e.id}`, { hidden: !e.hidden });
-      toast({ title: e.hidden ? "Now visible to customers" : "Hidden from customers" });
+      toast({
+        title: e.hidden
+          ? (isVenue ? "Venue and all its content are visible again" : "Now visible to customers")
+          : (isVenue ? "Venue hidden — its events, offers & announcements are too" : "Hidden from customers"),
+      });
       load();
     } catch (err: any) {
       toast({ title: "Failed", description: err?.message, variant: "destructive" });
@@ -2030,7 +2041,7 @@ function EventsAdmin() {
                       >
                         {e.hidden ? "🚫 Hidden" : "👁 Visible"}
                       </button>
-                      <Button size="sm" variant="ghost" onClick={() => remove(e.id, e.title)}>
+                      <Button size="sm" variant="ghost" onClick={() => remove(e)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>

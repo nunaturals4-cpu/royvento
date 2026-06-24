@@ -227,7 +227,7 @@ router.get("/cities/:citySlug/summary", async (req, res) => {
   const rows = await db
     .select()
     .from(vendorsTable)
-    .where(and(eq(vendorsTable.status, "approved"), cityWhere))
+    .where(and(eq(vendorsTable.status, "approved"), eq(vendorsTable.hidden, false), cityWhere))
     .orderBy(desc(vendorsTable.createdAt))
     .limit(500);
 
@@ -283,7 +283,7 @@ router.get("/cities/:citySlug/localities/:localitySlug", async (req, res) => {
   const rows = await db
     .select()
     .from(vendorsTable)
-    .where(and(eq(vendorsTable.status, "approved"), cityWhere))
+    .where(and(eq(vendorsTable.status, "approved"), eq(vendorsTable.hidden, false), cityWhere))
     .orderBy(desc(vendorsTable.createdAt))
     .limit(500);
 
@@ -329,7 +329,7 @@ router.get("/cities/:citySlug/categories/:categorySlug", async (req, res) => {
   const rows = await db
     .select()
     .from(vendorsTable)
-    .where(and(eq(vendorsTable.status, "approved"), cityWhere))
+    .where(and(eq(vendorsTable.status, "approved"), eq(vendorsTable.hidden, false), cityWhere))
     .orderBy(desc(vendorsTable.createdAt))
     .limit(500);
 

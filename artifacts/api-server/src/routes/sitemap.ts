@@ -194,7 +194,7 @@ router.get("/sitemap-cities.xml", async (req, res) => {
         location: vendorsTable.location,
       })
       .from(vendorsTable)
-      .where(eq(vendorsTable.status, "approved"))
+      .where(and(eq(vendorsTable.status, "approved"), eq(vendorsTable.hidden, false)))
       .limit(50000);
 
     const cityCounts = new Map<string, number>();
@@ -291,7 +291,7 @@ router.get("/sitemap-pubs.xml", async (req, res) => {
         createdAt: vendorsTable.createdAt,
       })
       .from(vendorsTable)
-      .where(eq(vendorsTable.status, "approved"))
+      .where(and(eq(vendorsTable.status, "approved"), eq(vendorsTable.hidden, false)))
       .orderBy(desc(vendorsTable.id))
       .limit(50000);
     const urls: UrlEntry[] = rows.map((r) => ({
@@ -367,6 +367,7 @@ router.get("/sitemap-offers.xml", async (req, res) => {
       .where(
         and(
           eq(vendorsTable.status, "approved"),
+          eq(vendorsTable.hidden, false),
           sql`(${drinkPlansTable.validUntil} IS NULL OR ${drinkPlansTable.validUntil} >= ${todayStr})`,
         ),
       )

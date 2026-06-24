@@ -247,6 +247,7 @@ router.get("/vendors/all-drink-deals", async (_req, res) => {
         eq(vendorOffersTable.active, true),
         eq(vendorOffersTable.category, "drink"),
         eq(vendorsTable.status, "approved"),
+        eq(vendorsTable.hidden, false),
       ))
       .orderBy(desc(vendorOffersTable.createdAt));
     const live = rows.filter((o) => {

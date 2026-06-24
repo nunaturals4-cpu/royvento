@@ -16,6 +16,13 @@ const objectStorage = new ObjectStorageService();
 
 const router: IRouter = Router();
 
+// An event is only public when its parent vendor is still live (status
+// 'approved'). When an admin hides a pub (status -> rejected/pending), this
+// condition removes all of that pub's events from every public feed — and
+// restores them automatically when the pub is re-approved. Reversible, no
+// destructive writes to the event rows.
+const vendorApproved = sql`EXISTS (SELECT 1 FROM vendors v WHERE v.id = ${eventsTable.vendorId} AND v.status = 'approved' AND v.hidden = false)`;
+
 interface EventRow {
   id: number;
   vendorId: number;
@@ -160,7 +167,7 @@ router.get("/events", async (req, res) => {
   // after validation so 400s aren't cached. Matches the featured/popular siblings.
   res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const hasPage = q.page !== undefined;
-  const conditions = [eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false)];
+  const conditions = [eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false), vendorApproved];
   if (q.category) conditions.push(eq(eventsTable.category, q.category));
   if (q.type) conditions.push(eq(eventsTable.type, q.type));
   if (q.state) conditions.push(ilike(eventsTable.state, `%${q.state}%`));
@@ -228,14 +235,14 @@ router.get("/events/featured", async (_req, res) => {
   const rows = await db
     .select()
     .from(eventsTable)
-    .where(and(eq(eventsTable.featured, true), eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false)))
+    .where(and(eq(eventsTable.featured, true), eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false), vendorApproved))
     .orderBy(desc(eventsTable.createdAt))
     .limit(8);
   if (rows.length === 0) {
     const fallback = await db
       .select()
       .from(eventsTable)
-      .where(and(eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false)))
+      .where(and(eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false), vendorApproved))
       .orderBy(desc(eventsTable.createdAt))
       .limit(6);
     res.json(await serializeEvents(fallback));
@@ -246,7 +253,7 @@ router.get("/events/featured", async (_req, res) => {
 
 router.get("/events/popular", async (req, res) => {
   res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
-  const conditions = [eq(eventsTable.popular, true), eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false)];
+  const conditions = [eq(eventsTable.popular, true), eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false), vendorApproved];
   const country = req.query["country"] as string | undefined;
   const state = req.query["state"] as string | undefined;
   if (country) conditions.push(ilike(eventsTable.country, `%${country}%`));
@@ -264,7 +271,7 @@ router.get("/events/popular", async (req, res) => {
     const fallback = await db
       .select()
       .from(eventsTable)
-      .where(and(eq(eventsTable.popular, true), eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false)))
+      .where(and(eq(eventsTable.popular, true), eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false), vendorApproved))
       .orderBy(desc(eventsTable.createdAt))
       .limit(20);
     res.json(await serializeEvents(fallback));
@@ -335,6 +342,12 @@ router.get("/events/:eventId", async (req, res) => {
     .where(eq(vendorsTable.id, e.vendorId))
     .limit(1);
   const v = vrows[0];
+  // Hide the event detail page too when its parent pub is hidden (status not
+  // 'approved'), mirroring how the event disappears from every listing.
+  if (!v || v.status !== "approved" || v.hidden) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
   const { getVendorRating } = await import("../lib/aggregates");
   const rating = v ? await getVendorRating(v.id) : { rating: 0, reviewCount: 0 };
   // Public event detail — identical for all viewers. Edge-cache on the success

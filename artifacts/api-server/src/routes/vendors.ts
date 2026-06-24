@@ -214,7 +214,7 @@ router.get("/vendors", async (req, res) => {
   res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const parsed = ListVendorsQueryParams.safeParse(req.query);
   const filters = parsed.success ? parsed.data : {};
-  const conditions = [eq(vendorsTable.status, "approved")];
+  const conditions = [eq(vendorsTable.status, "approved"), eq(vendorsTable.hidden, false)];
   if (filters.category) conditions.push(eq(vendorsTable.category, filters.category));
   if (filters.country) conditions.push(ilike(vendorsTable.country, `%${filters.country}%`));
   if (filters.state) conditions.push(ilike(vendorsTable.state, `%${filters.state}%`));
@@ -390,7 +390,7 @@ router.get("/vendors/drink-offers", async (_req, res) => {
   const vendors = await db
     .select({ id: vendorsTable.id, businessName: vendorsTable.businessName, coverImageUrl: vendorsTable.coverImageUrl })
     .from(vendorsTable)
-    .where(and(eq(vendorsTable.status, "approved"), inArray(vendorsTable.id, ids)));
+    .where(and(eq(vendorsTable.status, "approved"), eq(vendorsTable.hidden, false), inArray(vendorsTable.id, ids)));
   const today = todayIstDate();
   const plans = await db
     .select()
@@ -460,6 +460,13 @@ router.get("/vendors/:vendorId", async (req, res) => {
     .limit(1);
   const v = rows[0];
   if (!v) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  // Only live (approved) pubs are publicly visible. An admin hiding a pub
+  // (status -> rejected/pending) takes down its detail page too; re-approving
+  // restores it. Mirrors the approved-only vendor listing.
+  if (v.status !== "approved" || v.hidden) {
     res.status(404).json({ error: "Not found" });
     return;
   }
@@ -636,6 +643,8 @@ router.get("/vendors/:vendorId/drink-plans", async (req, res) => {
     .from(drinkPlansTable)
     .where(and(
       eq(drinkPlansTable.vendorId, id),
+      // Hidden pubs (status != 'approved') expose none of their drink plans.
+      sql`EXISTS (SELECT 1 FROM vendors v WHERE v.id = ${drinkPlansTable.vendorId} AND v.status = 'approved' AND v.hidden = false)`,
       sql`(${drinkPlansTable.validFrom} IS NULL OR ${drinkPlansTable.validFrom} <= ${today})`,
       sql`(${drinkPlansTable.validUntil} IS NULL OR ${drinkPlansTable.validUntil} >= ${today})`,
     ))

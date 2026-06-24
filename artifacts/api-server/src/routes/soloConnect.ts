@@ -212,21 +212,22 @@ router.get("/solo-connect/venues", async (req, res) => {
       result = await db.execute(sql`
         SELECT DISTINCT v.id, v.business_name AS name, v.location AS sub, 'vendor' AS kind
         FROM vendors v JOIN drink_plans dp ON dp.vendor_id = v.id
-        WHERE v.status = 'approved'
+        WHERE v.status = 'approved' AND v.hidden = false
         ORDER BY name LIMIT 100`);
       break;
     case "food_drinks":
       result = await db.execute(sql`
         SELECT DISTINCT v.id, v.business_name AS name, v.location AS sub, 'vendor' AS kind
         FROM vendors v JOIN vendor_offers vo ON vo.vendor_id = v.id AND vo.active = true
-        WHERE v.status = 'approved'
+        WHERE v.status = 'approved' AND v.hidden = false
         ORDER BY name LIMIT 100`);
       break;
     case "events":
     case "activities":
       result = await db.execute(sql`
         SELECT id, title AS name, location AS sub, 'event' AS kind
-        FROM events WHERE approval_status = 'approved'
+        FROM events e WHERE approval_status = 'approved' AND e.hidden = false
+          AND EXISTS (SELECT 1 FROM vendors v WHERE v.id = e.vendor_id AND v.status = 'approved' AND v.hidden = false)
         ORDER BY name LIMIT 100`);
       break;
     case "games":
@@ -240,7 +241,7 @@ router.get("/solo-connect/venues", async (req, res) => {
     default:
       result = await db.execute(sql`
         SELECT id, business_name AS name, location AS sub, 'vendor' AS kind
-        FROM vendors WHERE status = 'approved'
+        FROM vendors WHERE status = 'approved' AND hidden = false
         ORDER BY name LIMIT 100`);
   }
   const rows = (result as unknown as { rows?: Array<Record<string, unknown>> }).rows ?? [];
