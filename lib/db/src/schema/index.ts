@@ -1099,6 +1099,9 @@ export const vendorOffersTable = pgTable(
     startsAt: timestamp("starts_at", { withTimezone: true }),
     endsAt: timestamp("ends_at", { withTimezone: true }),
     active: boolean("active").notNull().default(true),
+    // Optional per-offer deal image. Null/empty = the customer card falls back
+    // to the venue's cover photo (mirrors drink_plans.image_url behaviour).
+    imageUrl: text("image_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

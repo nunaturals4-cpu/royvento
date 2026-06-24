@@ -19,6 +19,7 @@ interface AllDrinkDeal {
   vendorLocation: string;
   vendorCity: string;
   vendorCoverImage: string;
+  imageUrl?: string | null;
   title: string;
   description: string;
   discountType: "percent" | "fixed" | "bogo" | "free_item";
@@ -299,13 +300,15 @@ export function PubOffers() {
                 const timeLabel = deal.timeFrom && deal.timeTo
                   ? `${deal.timeFrom} – ${deal.timeTo}`
                   : deal.timeFrom || "";
+                // Prefer the offer's own deal image; fall back to the venue cover.
+                const dealImg = deal.imageUrl || deal.vendorCoverImage;
                 return (
                   <Link key={deal.id} href={`/vendors/${deal.vendorId}`}>
                     <div className="group relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111] hover:border-amber-400/30 transition-all cursor-pointer">
-                      {deal.vendorCoverImage && (
+                      {dealImg && (
                         <div className="relative h-36 overflow-hidden">
                           <img
-                            src={deal.vendorCoverImage}
+                            src={dealImg}
                             alt={deal.vendorName}
                             className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
                           />

@@ -17,6 +17,7 @@ export interface VendorOffer {
   startsAt: string | null;
   endsAt: string | null;
   active: boolean;
+  imageUrl?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -65,15 +66,17 @@ export function OfferCard({
   greyed?: boolean;
   trailing?: React.ReactNode;
   /**
-   * Partner cover image. Food & drink offers carry no image of their own, so
-   * the customer card falls back to the partner's cover so it never looks bare.
+   * Partner cover image. Used as the fallback when an offer has no deal image
+   * of its own, so the customer card never looks bare.
    */
   coverImage?: string | null;
   className?: string;
 }) {
   const Icon = offer.category === "drink" ? Wine : Utensils;
   const badge = formatBadge(offer);
-  const showCover = variant === "customer" && !!coverImage;
+  // Prefer the offer's own deal image; fall back to the venue cover photo.
+  const dealImage = offer.imageUrl || coverImage || null;
+  const showCover = variant === "customer" && !!dealImage;
 
   return (
     <div
@@ -89,7 +92,7 @@ export function OfferCard({
       <div className="flex items-start gap-3">
         {showCover ? (
           <div className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-white/10 relative">
-            <img src={coverImage!} alt={offer.title} loading="lazy" className="h-full w-full object-cover" />
+            <img src={dealImage!} alt={offer.title} loading="lazy" className="h-full w-full object-cover" />
             <div
               className={cn(
                 "absolute bottom-0 right-0 w-5 h-5 rounded-tl-lg flex items-center justify-center",

@@ -1792,6 +1792,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
         {pubTab === "offers" && isPub && (
           <FoodDrinkOffersSection
             vendorId={(event as any)?.vendorId ?? (event as any)?.vendor?.id}
+            coverFallback={event.imageUrl || vendorCover || ev.vendor?.bannerImage || null}
             onBookClick={() => switchPubTab("book")}
           />
         )}
@@ -2631,6 +2632,7 @@ interface VendorOfferDto {
   days: string[];
   timeFrom: string;
   timeTo: string;
+  imageUrl?: string | null;
 }
 
 const OFFER_DAY_LABEL: Record<string, string> = {
@@ -2656,7 +2658,7 @@ function offerWindowLabel(from: string, to: string): string | null {
   return `${from} – ${to}`;
 }
 
-function FoodDrinkOffersSection({ vendorId, onBookClick }: { vendorId: number | undefined; onBookClick: () => void }) {
+function FoodDrinkOffersSection({ vendorId, onBookClick, coverFallback }: { vendorId: number | undefined; onBookClick: () => void; coverFallback?: string | null }) {
   const { data: offers = [], isLoading } = useQuery({
     queryKey: ["vendor-offers", vendorId],
     queryFn: () => apiGet<VendorOfferDto[]>(`/api/vendors/${vendorId}/offers`),
@@ -2705,10 +2707,10 @@ function FoodDrinkOffersSection({ vendorId, onBookClick }: { vendorId: number | 
       ) : (
         <div className="space-y-12">
           {food.length > 0 && (
-            <OfferGroup icon={Utensils} label="Food" count={food.length} offers={food} onBookClick={onBookClick} accent="amber" />
+            <OfferGroup icon={Utensils} label="Food" count={food.length} offers={food} onBookClick={onBookClick} accent="amber" coverFallback={coverFallback} />
           )}
           {drink.length > 0 && (
-            <OfferGroup icon={Wine} label="Drinks" count={drink.length} offers={drink} onBookClick={onBookClick} accent="primary" />
+            <OfferGroup icon={Wine} label="Drinks" count={drink.length} offers={drink} onBookClick={onBookClick} accent="primary" coverFallback={coverFallback} />
           )}
         </div>
       )}
@@ -2722,6 +2724,7 @@ function OfferGroup({
   offers,
   onBookClick,
   accent,
+  coverFallback,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
@@ -2729,6 +2732,7 @@ function OfferGroup({
   offers: VendorOfferDto[];
   onBookClick: () => void;
   accent: "primary" | "amber";
+  coverFallback?: string | null;
 }) {
   const accentText = accent === "amber" ? "text-amber-400" : "text-primary";
   return (
@@ -2740,7 +2744,7 @@ function OfferGroup({
       <p className="text-xs text-muted-foreground mb-6">Tap on any deal to book a table</p>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
         {offers.map((o, i) => (
-          <PremiumOfferCard key={o.id} offer={o} onBookClick={onBookClick} featured={i === 0} accent={accent} />
+          <PremiumOfferCard key={o.id} offer={o} onBookClick={onBookClick} featured={i === 0} accent={accent} coverFallback={coverFallback} />
         ))}
       </div>
     </div>
@@ -2752,17 +2756,21 @@ function PremiumOfferCard({
   onBookClick,
   featured = false,
   accent,
+  coverFallback,
 }: {
   offer: VendorOfferDto;
   onBookClick: () => void;
   featured?: boolean;
   accent: "primary" | "amber";
+  coverFallback?: string | null;
 }) {
   const Icon = offer.category === "drink" ? Wine : Utensils;
   const window = offerWindowLabel(offer.timeFrom, offer.timeTo);
   const category = offer.category === "drink" ? "DRINK DEAL" : "FOOD DEAL";
   const badge = offerDiscountBadge(offer);
   const daysLabel = offerDaysLabel(offer.days);
+  // Offer's own deal image, falling back to the venue cover photo.
+  const dealImage = offer.imageUrl || coverFallback || null;
 
   if (featured) {
     const gradient = accent === "amber"
@@ -2771,6 +2779,9 @@ function PremiumOfferCard({
     return (
       <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} text-white p-5 flex flex-col gap-2 red-glow border border-white/[0.10]`}>
         <Icon className="absolute -right-6 -bottom-6 h-32 w-32 text-white/10 rotate-12 pointer-events-none" />
+        {dealImage && (
+          <img src={dealImage} alt={offer.title} loading="lazy" className="relative z-[1] h-28 w-full object-cover rounded-xl border border-white/20 mb-1" />
+        )}
         <div className="flex items-start justify-between gap-3">
           <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/85">{category}</p>
           <span className="shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 border border-white/30">{badge}</span>
@@ -2801,6 +2812,9 @@ function PremiumOfferCard({
 
   return (
     <div className="rounded-2xl glass-card p-5 flex flex-col gap-2">
+      {dealImage && (
+        <img src={dealImage} alt={offer.title} loading="lazy" className="h-28 w-full object-cover rounded-xl border border-white/10 mb-1" />
+      )}
       <div className="flex items-start justify-between gap-3">
         <p className={`text-[10px] font-bold uppercase tracking-[0.22em] ${labelColor}`}>{category}</p>
         <span className={`shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${accent === "amber" ? "bg-amber-500/15 border border-amber-500/30 text-amber-400" : "bg-primary/15 border border-primary/30 text-primary"}`}>

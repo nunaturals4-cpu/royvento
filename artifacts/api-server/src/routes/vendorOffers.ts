@@ -45,6 +45,16 @@ const OfferBody = z.object({
   startsAt: z.string().datetime({ offset: true }).nullable().optional(),
   endsAt: z.string().datetime({ offset: true }).nullable().optional(),
   active: z.boolean().default(true),
+  // Optional deal image. Accepts a same-origin relative path (the HMAC-signed
+  // upload flow emits "/api/storage/…") or an explicit http(s) URL; rejects
+  // dangerous schemes (javascript:, data:, …). Null/empty = use venue cover.
+  imageUrl: z.string().max(1024)
+    .refine(
+      (v) => v === "" || v.startsWith("/") || /^https?:\/\//i.test(v),
+      { message: "imageUrl must be a relative path or an http(s) URL" },
+    )
+    .nullable()
+    .optional(),
 });
 
 async function vendorIdForUser(userId: number): Promise<number | null> {
@@ -145,6 +155,7 @@ router.post("/partner/offers", requireAuth(["vendor", "admin"]), async (req, res
         startsAt: d.startsAt ? new Date(d.startsAt) : null,
         endsAt: d.endsAt ? new Date(d.endsAt) : null,
         active: d.active,
+        imageUrl: d.imageUrl ?? null,
       })
       .returning();
     return res.status(201).json(created);
@@ -188,6 +199,7 @@ router.patch("/partner/offers/:id", requireAuth(["vendor", "admin"]), async (req
         ...(d.startsAt !== undefined && { startsAt: d.startsAt ? new Date(d.startsAt) : null }),
         ...(d.endsAt !== undefined && { endsAt: d.endsAt ? new Date(d.endsAt) : null }),
         ...(d.active !== undefined && { active: d.active }),
+        ...(d.imageUrl !== undefined && { imageUrl: d.imageUrl }),
         updatedAt: new Date(),
       })
       .where(and(eq(vendorOffersTable.id, id), eq(vendorOffersTable.vendorId, vendorId)))
@@ -236,6 +248,7 @@ router.get("/vendors/all-drink-deals", async (_req, res) => {
         timeTo: vendorOffersTable.timeTo,
         startsAt: vendorOffersTable.startsAt,
         endsAt: vendorOffersTable.endsAt,
+        imageUrl: vendorOffersTable.imageUrl,
         vendorName: vendorsTable.businessName,
         vendorLocation: vendorsTable.location,
         vendorCity: vendorsTable.city,
@@ -400,6 +413,7 @@ router.post("/admin/vendor-offers/seed", requireAuth(["admin"]), async (req, res
       startsAt: d.startsAt ? new Date(d.startsAt) : null,
       endsAt: d.endsAt ? new Date(d.endsAt) : null,
       active: d.active,
+      imageUrl: d.imageUrl ?? null,
     }).returning();
     return res.status(201).json(created);
   } catch (err) {

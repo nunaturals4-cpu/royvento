@@ -633,6 +633,8 @@ async function applyPendingSchemaChanges() {
       )`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "vendor_offers_vendor_idx" ON "vendor_offers" ("vendor_id")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "vendor_offers_vendor_active_idx" ON "vendor_offers" ("vendor_id", "active")`);
+    // Optional per-offer deal image (null = fall back to venue cover photo).
+    await db.execute(sql`ALTER TABLE "vendor_offers" ADD COLUMN IF NOT EXISTS "image_url" text`);
     // ── Hot-path event listing indexes ────────────────────────────────────
     // The public catalog endpoints (/events, /events/popular, /events/featured)
     // all filter on approval_status + (type|popular|featured) and ORDER BY

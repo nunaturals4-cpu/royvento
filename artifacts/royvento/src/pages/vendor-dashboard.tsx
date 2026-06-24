@@ -5284,6 +5284,7 @@ interface VendorOffer {
   startsAt: string | null;
   endsAt: string | null;
   active: boolean;
+  imageUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -5306,6 +5307,7 @@ interface OfferFormState {
   startsAt: string;
   endsAt: string;
   active: boolean;
+  imageUrl: string;
 }
 
 const BLANK_OFFER: OfferFormState = {
@@ -5321,6 +5323,7 @@ const BLANK_OFFER: OfferFormState = {
   startsAt: "",
   endsAt: "",
   active: true,
+  imageUrl: "",
 };
 
 function offerBadge(o: Pick<VendorOffer, "discountType" | "discountValue" | "freeItemName">): string {
@@ -5353,6 +5356,10 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [form, setForm] = useState<OfferFormState>(BLANK_OFFER);
+  // Deal image: a freshly-picked File (uploaded on save) plus a preview URL.
+  // form.imageUrl holds an already-uploaded URL when editing an existing offer.
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState("");
 
   const load = async () => {
     try {
@@ -5370,6 +5377,8 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
 
   const openCreate = () => {
     setForm({ ...BLANK_OFFER, category: tab });
+    setImageFile(null);
+    setImagePreview("");
     setEditing(null);
     setShowForm(true);
   };
@@ -5388,7 +5397,10 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
       startsAt: o.startsAt ? o.startsAt.slice(0, 10) : "",
       endsAt: o.endsAt ? o.endsAt.slice(0, 10) : "",
       active: o.active,
+      imageUrl: o.imageUrl ?? "",
     });
+    setImageFile(null);
+    setImagePreview(o.imageUrl ?? "");
     setEditing(o);
     setShowForm(true);
   };
@@ -5415,6 +5427,12 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
     }
     setSaving(true);
     try {
+      // Upload a freshly-picked deal image; otherwise keep the existing URL.
+      // Null/empty means the customer card falls back to the venue cover photo.
+      let finalImageUrl: string | null = form.imageUrl || null;
+      if (imageFile) {
+        finalImageUrl = await uploadImageToStorage(imageFile);
+      }
       const payload = {
         category: form.category,
         title: form.title.trim(),
@@ -5428,6 +5446,7 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
         startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
         endsAt: form.endsAt ? new Date(`${form.endsAt}T23:59:59`).toISOString() : null,
         active: form.active,
+        imageUrl: finalImageUrl,
       };
       if (editing) {
         await apiPatch(`/api/partner/offers/${editing.id}${vq}`, payload);
@@ -5623,6 +5642,37 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
                 ))}
               </div>
             </div>
+            <div className="sm:col-span-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">
+                Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
+                <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the offer card. Leave empty to use your venue cover photo.</span>
+              </Label>
+              {imagePreview ? (
+                <div className="relative mt-1 rounded-xl overflow-hidden group max-w-sm">
+                  <img src={imagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
+                      <Upload className="h-3 w-3" /> Change
+                      <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                        onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setImageFile(f); setForm((prev) => ({ ...prev, imageUrl: "" })); setImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
+                    </label>
+                    <button type="button" onClick={() => { setImageFile(null); setForm((prev) => ({ ...prev, imageUrl: "" })); setImagePreview(""); }}
+                      className="px-3 py-1.5 rounded-lg bg-destructive/80 hover:bg-destructive text-xs text-white">Remove</button>
+                  </div>
+                </div>
+              ) : (
+                <label
+                  className="mt-1 flex flex-col items-center justify-center gap-2 h-32 max-w-sm rounded-xl border-2 border-dashed cursor-pointer transition-colors border-white/20 bg-black/20 hover:border-amber-500/50 hover:bg-amber-500/5"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setImageFile(f); setForm((prev) => ({ ...prev, imageUrl: "" })); setImagePreview(URL.createObjectURL(f)); }}
+                >
+                  <ImageIcon className="h-7 w-7 text-white/25" />
+                  <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setImageFile(f); setForm((prev) => ({ ...prev, imageUrl: "" })); setImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
+                </label>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 cursor-pointer text-sm">
@@ -5667,8 +5717,12 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
                   return (
                     <tr key={o.id} className={`hover:bg-white/[0.02] transition-colors ${expired ? "opacity-50" : ""}`}>
                       <td className="px-4 py-3">
-                        <div className="flex items-start gap-2">
-                          {o.category === "drink" ? <Wine className="h-4 w-4 text-rose-300 mt-0.5 shrink-0" /> : <Utensils className="h-4 w-4 text-emerald-300 mt-0.5 shrink-0" />}
+                        <div className="flex items-start gap-2.5">
+                          {o.imageUrl ? (
+                            <img src={o.imageUrl} alt="" className="h-9 w-9 rounded-lg object-cover shrink-0 border border-white/10" />
+                          ) : (
+                            o.category === "drink" ? <Wine className="h-4 w-4 text-rose-300 mt-0.5 shrink-0" /> : <Utensils className="h-4 w-4 text-emerald-300 mt-0.5 shrink-0" />
+                          )}
                           <div className="min-w-0">
                             <div className="font-medium truncate">{o.title}</div>
                             {o.description && <div className="text-xs text-muted-foreground line-clamp-1">{o.description}</div>}
