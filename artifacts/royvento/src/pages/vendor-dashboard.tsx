@@ -6014,16 +6014,8 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
     if (freeEntryChecked && feDrinkTypes.length === 0) {
       toast({ title: "Select at least one drink type for free entry", variant: "destructive" }); return;
     }
-    if (freeEntryChecked && !feImageFile && !feImagePreview) {
-      setAddError("A deal image is required for Free Drinks.");
-      toast({ title: "Image required", description: "Upload a deal image for Free Drinks.", variant: "destructive" }); return;
-    }
     if (ticketChecked && ticketItems.some((i) => !i.name.trim())) {
       toast({ title: "Each ticket item must have a name", variant: "destructive" }); return;
-    }
-    if (ticketChecked && !ticketImageFile && !ticketImagePreview) {
-      setAddError("A deal image is required for Included with Ticket.");
-      toast({ title: "Image required", description: "Upload a deal image for Included with Ticket.", variant: "destructive" }); return;
     }
     if (coverChargeChecked && !coverChargeName.trim()) {
       toast({ title: "Package name is required for Cover Charges", variant: "destructive" }); return;
@@ -6031,13 +6023,10 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
     if (coverChargeChecked && (!coverChargePrice || Number(coverChargePrice) <= 0)) {
       toast({ title: "Package price must be greater than 0 for Cover Charges", variant: "destructive" }); return;
     }
-    // Offers are optional for a cover-charge package — a partner can sell a
-    // priced package with no add-on offers. Empty rows are dropped on submit
-    // (see the .filter below), so we don't block on the default blank row.
-    if (coverChargeChecked && !coverChargeImageFile && !coverChargeImagePreview) {
-      setAddError("A deal image is required for Cover Charges.");
-      toast({ title: "Image required", description: "Upload a deal image for Cover Charges.", variant: "destructive" }); return;
-    }
+    // The deal image is optional for every plan type. When a partner/admin
+    // leaves it blank, the deal card falls back to the venue's cover photo
+    // (see DrinkDealCard's fallbackImage). Offers are likewise optional for a
+    // cover-charge package — empty rows are dropped on submit (.filter below).
     setSaving(true);
     try {
       let feUploadedUrl: string | null = null;
@@ -6270,8 +6259,8 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                   </div>
                   <div className="sm:col-span-2">
                     <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
-                      Deal image <span className="text-destructive">*</span>
-                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card (required)</span>
+                      Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
+                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card. Leave empty to use your venue cover photo.</span>
                     </Label>
                     {feImagePreview ? (
                       <div className="relative mt-1 rounded-xl overflow-hidden group">
@@ -6352,8 +6341,8 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                   </div>
                   <div className="sm:col-span-2">
                     <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
-                      Deal image <span className="text-destructive">*</span>
-                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card (required)</span>
+                      Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
+                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card. Leave empty to use your venue cover photo.</span>
                     </Label>
                     {ticketImagePreview ? (
                       <div className="relative mt-1 rounded-xl overflow-hidden group">
@@ -6457,8 +6446,8 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                   </div>
                   <div className="sm:col-span-2">
                     <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
-                      Deal image <span className="text-destructive">*</span>
-                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card (required)</span>
+                      Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
+                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card. Leave empty to use your venue cover photo.</span>
                     </Label>
                     {coverChargeImagePreview ? (
                       <div className="relative mt-1 rounded-xl overflow-hidden group">
@@ -6624,7 +6613,8 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                       </div>
                       <div className="sm:col-span-2">
                         <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
-                          Deal image <span className="text-destructive">*</span>
+                          Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
+                          <span className="normal-case text-muted-foreground/60 font-normal ml-1">— leave empty to use your venue cover photo.</span>
                         </Label>
                         {editImagePreview ? (
                           <div className="relative mt-1 rounded-xl overflow-hidden group">

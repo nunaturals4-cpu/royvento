@@ -1588,7 +1588,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               const ticketPlans = drinkPlans.filter((p: any) => p.type === "ticket");
               const coverChargePlans = drinkPlans.filter((p: any) => p.type === "cover_charge");
               const otherPlans = drinkPlans.filter((p: any) => !["welcome", "unlimited", "ticket", "cover_charge"].includes(p.type));
-              const coverFallback = event.imageUrl || vendorCover || null;
+              const coverFallback = event.imageUrl || vendorCover || ev.vendor?.bannerImage || null;
 
               const Section = ({ icon: Icon, label, plans, accent }: { icon: typeof Wine; label: string; plans: any[]; accent: "primary" | "amber" }) => {
                 if (plans.length === 0) return null;

@@ -388,7 +388,7 @@ router.get("/vendors/drink-offers", async (_req, res) => {
   const ids = vendorIdsWithPlans.map((r) => r.vendorId);
   if (ids.length === 0) { res.json([]); return; }
   const vendors = await db
-    .select({ id: vendorsTable.id, businessName: vendorsTable.businessName, coverImageUrl: vendorsTable.coverImageUrl })
+    .select({ id: vendorsTable.id, businessName: vendorsTable.businessName, coverImageUrl: vendorsTable.coverImageUrl, bannerImage: vendorsTable.bannerImage })
     .from(vendorsTable)
     .where(and(eq(vendorsTable.status, "approved"), eq(vendorsTable.hidden, false), inArray(vendorsTable.id, ids)));
   const today = todayIstDate();
@@ -402,7 +402,7 @@ router.get("/vendors/drink-offers", async (_req, res) => {
     ))
     .orderBy(drinkPlansTable.createdAt);
   const pubEvents = await db
-    .select({ id: eventsTable.id, vendorId: eventsTable.vendorId })
+    .select({ id: eventsTable.id, vendorId: eventsTable.vendorId, imageUrl: eventsTable.imageUrl })
     .from(eventsTable)
     .where(and(
       inArray(eventsTable.vendorId, ids),
@@ -411,9 +411,11 @@ router.get("/vendors/drink-offers", async (_req, res) => {
     ))
     .orderBy(desc(eventsTable.createdAt));
   const pubEventByVendor = new Map<number, number>();
+  const pubEventImageByVendor = new Map<number, string>();
   for (const ev of pubEvents) {
     if (ev.vendorId !== null && !pubEventByVendor.has(ev.vendorId)) {
       pubEventByVendor.set(ev.vendorId, ev.id);
+      if (ev.imageUrl) pubEventImageByVendor.set(ev.vendorId, ev.imageUrl);
     }
   }
   const plansByVendor = new Map<number, typeof plans>();
@@ -426,7 +428,11 @@ router.get("/vendors/drink-offers", async (_req, res) => {
     .map((v) => ({
       vendorId: v.id,
       vendorName: v.businessName,
-      coverImageUrl: v.coverImageUrl || null,   // null instead of "" so JS || fallback works
+      // Deal cards fall back to this when a plan has no image of its own. Prefer
+      // the vendor cover, then the pub's listing image, then the legacy banner —
+      // so a venue almost always shows a meaningful photo. null (not "") so the
+      // client-side `||` fallback chain works.
+      coverImageUrl: v.coverImageUrl || pubEventImageByVendor.get(v.id) || v.bannerImage || null,
       pubEventId: pubEventByVendor.get(v.id) ?? null,
       plans: (plansByVendor.get(v.id) ?? []).map((p) => ({
         type: p.type,
