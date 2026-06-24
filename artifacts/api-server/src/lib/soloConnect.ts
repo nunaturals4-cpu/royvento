@@ -1,13 +1,28 @@
 import {
   db,
+  usersTable,
   subscriptionsTable,
   vendorsTable,
   organizersTable,
   gameOrganizersTable,
   soloConnectVerificationsTable,
 } from "@workspace/db";
-import { eq, and, gt, desc } from "drizzle-orm";
+import { eq, and, gt, lte, desc, sql } from "drizzle-orm";
 import type { AuthUser } from "./auth";
+
+// Launch promo: the first N registered customers ("founding members") get
+// complimentary Premium access to Solo Connect — they can verify, enter, book
+// and join groups without ever buying a membership. Ranked by signup order
+// (ascending user id) among role="user" accounts.
+const FOUNDING_MEMBER_LIMIT = 1000;
+
+async function isFoundingMember(userId: number): Promise<boolean> {
+  const [row] = await db
+    .select({ rank: sql<number>`count(*)` })
+    .from(usersTable)
+    .where(and(eq(usersTable.role, "user"), lte(usersTable.id, userId)));
+  return Number(row?.rank ?? Number.POSITIVE_INFINITY) <= FOUNDING_MEMBER_LIMIT;
+}
 
 export interface SoloAccess {
   eligible: boolean;
@@ -47,6 +62,11 @@ export async function getSoloAccess(user: AuthUser): Promise<SoloAccess> {
       )
       .limit(1);
     premium = sub.length > 0;
+    // Founding members (first 1000 customers) are treated as premium even
+    // without an active subscription.
+    if (!premium && (await isFoundingMember(user.id))) {
+      premium = true;
+    }
     eligible = premium;
   } else if (user.role === "vendor") {
     const v = await db

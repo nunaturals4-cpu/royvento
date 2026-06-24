@@ -25,4 +25,6 @@ export interface CreateBookingBody {
   ticketMen?: number;
   ticketCouple?: number;
   selectedPubEvent?: string;
+  /** Cover-charge mode: id of the selected package (a drink plan of type cover_charge). Quantity rides on `guests`. */
+  coverChargePlanId?: number;
 }

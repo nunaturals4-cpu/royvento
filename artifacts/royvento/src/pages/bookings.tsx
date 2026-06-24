@@ -158,7 +158,8 @@ function BookingCard({ b, onRefetch }: { b: BookingRecord; onRefetch: () => void
     cancelled: t("bookings.status_cancelled"),
   };
   const isOrganizer = b.kind === "organizer";
-  const isPubTicket = b.pubMode === "ticket" || b.pubMode === "free" || b.pubMode === "event";
+  const isPubTicket = b.pubMode === "ticket" || b.pubMode === "free" || b.pubMode === "event" || b.pubMode === "cover_charge";
+  const isCoverCharge = b.pubMode === "cover_charge";
   const showTicket = (isPubTicket || isOrganizer) && (b.status === "confirmed" || b.status === "completed");
   const [cancelOpen, setCancelOpen] = useState(false);
   // cancellationAllowed is computed server-side; fall back to true so old API responses stay functional
@@ -180,6 +181,7 @@ function BookingCard({ b, onRefetch }: { b: BookingRecord; onRefetch: () => void
               {b.eventType_ === "pub" && <Badge className="bg-red-600/20 border-red-500/40 text-red-200"><Wine className="h-3 w-3 mr-1" />{t("bookings.pub_badge")}</Badge>}
               {isOrganizer && <Badge className="bg-primary/20 border-primary/40 text-primary"><TicketIcon className="h-3 w-3 mr-1" />Event Ticket</Badge>}
               {b.pubMode === "ticket" && <Badge variant="outline"><TicketIcon className="h-3 w-3 mr-1" />{t("bookings.ticket_badge")}</Badge>}
+              {isCoverCharge && <Badge variant="outline"><TicketIcon className="h-3 w-3 mr-1" />Cover Charge</Badge>}
               {b.pubMode === "event" && <Badge variant="outline">{t("bookings.event_booking_badge")}</Badge>}
               <span className="text-xs text-muted-foreground">{t("bookings.booked_on")} {new Date(b.createdAt).toLocaleDateString()}</span>
             </div>
@@ -189,7 +191,7 @@ function BookingCard({ b, onRefetch }: { b: BookingRecord; onRefetch: () => void
             <p className="text-xs uppercase tracking-wider text-muted-foreground">{b.vendorName}</p>
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground pt-2">
               <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" />{b.bookingDate}{isOrganizer && b.eventStartTime ? ` · ${b.eventStartTime}` : ""}</span>
-              <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-primary" />{b.guests} {isOrganizer ? "ticket(s)" : t("bookings.guests_label")}</span>
+              <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-primary" />{b.guests} {isOrganizer ? "ticket(s)" : isCoverCharge ? (b.guests === 1 ? "package" : "packages") : t("bookings.guests_label")}</span>
               {isOrganizer && b.venueName && <span className="flex items-center gap-1.5"><Tag className="h-4 w-4 text-primary" />{b.venueName}</span>}
               {b.couponCode && (
                 <span className="flex items-center gap-1.5 text-green-400">
@@ -212,6 +214,9 @@ function BookingCard({ b, onRefetch }: { b: BookingRecord; onRefetch: () => void
             ) : null}
             {b.pubMode === "event" && b.selectedPubEvent && (
               <p className="text-sm text-muted-foreground">{t("bookings.event_booking_badge")}: {b.selectedPubEvent}</p>
+            )}
+            {isCoverCharge && b.selectedPubEvent && (
+              <p className="text-sm text-muted-foreground">Package: <span className="text-foreground/80 font-medium">{b.selectedPubEvent}</span>{b.guests > 1 ? ` × ${b.guests}` : ""}</p>
             )}
             {b.notes && <p className="text-sm italic text-muted-foreground">"{b.notes}"</p>}
             {b.status === "pending" && (
@@ -374,6 +379,7 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const isOrganizer = b.kind === "organizer";
+  const isCoverCharge = b.pubMode === "cover_charge";
   const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
   const isEventMode = b.pubMode !== "ticket";
   const ticketSum = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
@@ -435,7 +441,9 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
       b.ticketCouple ? `${b.ticketCouple}\u00d7 ${t("bookings.couple")}` : "",
     ].filter(Boolean).map(esc);
     const ticketBreakdown = pdfBreakdownParts.join(" &middot; ");
-    const ticketsFieldHtml = ticketBreakdown
+    const ticketsFieldHtml = isCoverCharge
+      ? `<div class="field-val-sm">${esc(b.selectedPubEvent || "Cover charge")}<br/><span style="color:rgba(255,255,255,.4);font-size:11px;">× ${total}</span></div>`
+      : ticketBreakdown
       ? `<div class="field-val-sm">${ticketBreakdown}<br/><span style="color:rgba(255,255,255,.4);font-size:11px;">${total} ${esc(t("bookings.guests"))}</span></div>`
       : `<div class="field-val">${total} ${esc(t("bookings.guests"))}</div>`;
 
@@ -675,9 +683,14 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
                   <TicketField label={t("bookings.guest")} value={b.personName || b.userName} />
                   <TicketField label={t("bookings.date")} value={b.bookingDate} />
                   <TicketField
-                    label={t("bookings.tickets")}
+                    label={isCoverCharge ? "Package" : t("bookings.tickets")}
                     value={
-                      ticketBreakdownParts.length > 0 ? (
+                      isCoverCharge ? (
+                        <>
+                          {b.selectedPubEvent || "Cover charge"}
+                          <span className="text-white/35 ml-1 text-xs">(× {total})</span>
+                        </>
+                      ) : ticketBreakdownParts.length > 0 ? (
                         <>
                           {ticketBreakdownParts.join(" · ")}
                           <span className="text-white/35 ml-1 text-xs">({total} {t("bookings.guests")})</span>

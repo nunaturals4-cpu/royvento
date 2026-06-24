@@ -158,7 +158,7 @@ router.get("/happening-tonight", async (req, res) => {
         (SELECT COALESCE(AVG(rating), 0) FROM reviews WHERE vendor_id = v.id) AS "rating",
         (SELECT COUNT(*) FROM bookings b WHERE b.event_id = e.id AND b.booking_date = ${today}) AS "todayBookings"
       FROM events e JOIN vendors v ON v.id = e.vendor_id
-      WHERE e.approval_status = 'approved' AND e.happening_tonight = true
+      WHERE e.approval_status = 'approved' AND e.hidden = false AND e.happening_tonight = true
         AND (e.type = 'pub' OR e.event_date IS NULL OR e.event_date = ${today})
       LIMIT 200
     `)).rows as Record<string, unknown>[];

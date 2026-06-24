@@ -604,6 +604,7 @@ router.get("/admin/events", requireAuth(["admin"]), async (_req, res) => {
         dateNight: e.dateNight,
         approvalStatus: e.approvalStatus,
         retainForever: e.retainForever,
+        hidden: (e as unknown as { hidden?: boolean }).hidden ?? false,
         partnerName: v?.businessName ?? "",
         vendorCrowdLevel: (v as unknown as { crowdLevel?: string | null })?.crowdLevel ?? null,
         vendorCategory: v?.category ?? null,
@@ -664,6 +665,7 @@ router.patch("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
   if (data.featured !== undefined) updates["featured"] = data.featured;
   if (data.dateNight !== undefined) updates["dateNight"] = data.dateNight;
   if (data.retainForever !== undefined) updates["retainForever"] = data.retainForever;
+  if (data.hidden !== undefined) updates["hidden"] = data.hidden;
   if (data.approvalStatus !== undefined) {
     updates["approvalStatus"] = data.approvalStatus;
     updates["rejectionReason"] = typeof data.rejectionReason === "string"
@@ -3080,7 +3082,7 @@ router.get("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
     .where(eq(vendorCommissionsTable.vendorId, vendorId))
     .limit(1);
   if (!row) {
-    res.json({ vendorId, freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0", eventRate: "0", eventCommissionEnabled: true });
+    res.json({ vendorId, freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0", eventRate: "0", coverChargeRate: "0", eventCommissionEnabled: true });
     return;
   }
   res.json(row);
@@ -3103,7 +3105,7 @@ router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
     respondInvalid(res, parsed.error);
     return;
   }
-  const { freeEntryRate, ticketRate, tableBookingRate, eventRate = 0, eventCommissionEnabled = true } = parsed.data;
+  const { freeEntryRate, ticketRate, tableBookingRate, eventRate = 0, coverChargeRate = 0, eventCommissionEnabled = true } = parsed.data;
   const [upserted] = await db
     .insert(vendorCommissionsTable)
     .values({
@@ -3112,6 +3114,7 @@ router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
       ticketRate: ticketRate.toFixed(2),
       tableBookingRate: tableBookingRate.toFixed(2),
       eventRate: eventRate.toFixed(2),
+      coverChargeRate: coverChargeRate.toFixed(2),
       eventCommissionEnabled,
       updatedAt: new Date(),
     })
@@ -3122,6 +3125,7 @@ router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
         ticketRate: ticketRate.toFixed(2),
         tableBookingRate: tableBookingRate.toFixed(2),
         eventRate: eventRate.toFixed(2),
+        coverChargeRate: coverChargeRate.toFixed(2),
         eventCommissionEnabled,
         updatedAt: new Date(),
       },
@@ -3250,7 +3254,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     id: number;
     finalPrice: number;
     effectiveRevenue: number;
-    bookingType: "free_entry" | "ticket" | "table" | "event_booking";
+    bookingType: "free_entry" | "ticket" | "table" | "event_booking" | "cover_charge";
     commissionRate: number;
     unitCount: number;
     commissionAmount: number;
@@ -3262,7 +3266,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     vendorId: number;
     businessName: string;
     city: string;
-    appliedRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string; eventRate: string; eventCommissionEnabled: boolean };
+    appliedRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string; eventRate: string; coverChargeRate: string; eventCommissionEnabled: boolean };
     baseFeePercent: string;
     baseFeeEnabled: boolean;
     totalBookings: number;
@@ -3291,6 +3295,11 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     eventBookingCommission: number;
     eventBookingPeople: number;
     eventBookingBaseFee: number;
+    coverChargeCount: number;
+    coverChargeRevenue: number;
+    coverChargeCommission: number;
+    coverChargePeople: number;
+    coverChargeBaseFee: number;
     bookings: BookingLineItem[];
   };
 
@@ -3308,6 +3317,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
         ticketRate: vendorRates?.ticketRate ?? "0",
         tableBookingRate: vendorRates?.tableBookingRate ?? "0",
         eventRate: vendorRates?.eventRate ?? "0",
+        coverChargeRate: (vendorRates as { coverChargeRate?: string } | undefined)?.coverChargeRate ?? "0",
         eventCommissionEnabled: vendorRates?.eventCommissionEnabled ?? true,
       },
       baseFeePercent: v.baseFeePercent ?? "3.50",
@@ -3338,6 +3348,11 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       eventBookingCommission: 0,
       eventBookingPeople: 0,
       eventBookingBaseFee: 0,
+      coverChargeCount: 0,
+      coverChargeRevenue: 0,
+      coverChargeCommission: 0,
+      coverChargePeople: 0,
+      coverChargeBaseFee: 0,
       bookings: [],
     });
   }
@@ -3412,6 +3427,12 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       s.eventBookingCommission += commissionAmount;
       s.eventBookingPeople += unitCount;
       s.eventBookingBaseFee += bkBaseFee;
+    } else if (bookingType === "cover_charge") {
+      s.coverChargeCount += 1;
+      s.coverChargeRevenue += price;
+      s.coverChargeCommission += commissionAmount;
+      s.coverChargePeople += unitCount;
+      s.coverChargeBaseFee += bkBaseFee;
     } else {
       s.tableCount += 1;
       s.tableRevenue += price;

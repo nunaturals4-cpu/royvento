@@ -432,6 +432,7 @@ router.get("/vendors/drink-offers", async (_req, res) => {
         type: p.type,
         productName: p.productName,
         gender: p.gender,
+        price: p.price,   // paise — used by the Cover Charges deal cards
         lineItems: p.lineItems,
         days: p.days,
         timeFrom: p.timeFrom,
@@ -537,10 +538,12 @@ const DrinkPlanLineItem = z.object({
 });
 
 export const DrinkPlanBody = z.object({
-  type: z.enum(["welcome", "unlimited", "ticket", "custom"]),
+  type: z.enum(["welcome", "unlimited", "ticket", "custom", "cover_charge"]),
   productName: z.string().max(255).default(""),
   gender: z.enum(["all", "female"]).default("all"),
   price: z.number().int().min(0).default(0),
+  // Cover-charge packages: people admitted per package (informational). 0/null = unset.
+  peoplePerPackage: z.number().int().min(0).max(100).nullable().optional(),
   days: z.array(z.enum(VALID_DAYS)).default([]),
   timeFrom: z.string().refine((v) => v === "" || HH_MM_RE.test(v), { message: "timeFrom must be HH:MM or empty" }).default(""),
   timeTo: z.string().refine((v) => v === "" || HH_MM_RE.test(v), { message: "timeTo must be HH:MM or empty" }).default(""),

@@ -21,6 +21,7 @@ import {
   organizersTable,
   organizerEventsTable,
   eventTicketsTable,
+  drinkPlansTable,
 } from "@workspace/db";
 import {
   computeCommissionFromPlanned,
@@ -84,12 +85,15 @@ const CreateBookingBody = z.object({
   // Required.
   eventType: z.enum(EVENT_TYPES).default("other"),
   budgetRange: z.string().default(""),
-  pubMode: z.enum(["", "ticket", "event", "event_booking"]).default(""),
+  pubMode: z.enum(["", "ticket", "event", "event_booking", "cover_charge"]).default(""),
   ticketWomen: z.number().int().nonnegative().default(0),
   ticketMen: z.number().int().nonnegative().default(0),
   ticketCouple: z.number().int().nonnegative().default(0),
   selectedPubEvent: z.string().default(""),
   announcementId: z.number().int().positive().optional(),
+  // Cover-charge mode: which package (a drink_plans row of type "cover_charge")
+  // the guest is buying. Quantity (number of packages) rides on `guests`.
+  coverChargePlanId: z.number().int().positive().optional(),
   personName: z.string().transform((s) => s.trim()).optional().default(""),
   phone: z.string().transform((s) => s.trim()).optional().default(""),
   paymentMethod: z.enum(["cod", "online"]).default("online"),
@@ -104,6 +108,12 @@ const CreateBookingBody = z.object({
     if (!/^\d{10}$/.test(val.phone)) issue("phone", "Phone must be 10 digits");
     if (val.pubMode === "ticket" && val.ticketWomen + val.ticketMen + val.ticketCouple <= 0) {
       issue("ticketWomen", "Select at least one ticket");
+    }
+    if (val.pubMode === "cover_charge" && !val.coverChargePlanId) {
+      issue("coverChargePlanId", "Please select a cover charge package");
+    }
+    if (val.pubMode === "cover_charge" && val.guests <= 0) {
+      issue("guests", "Select at least one package");
     }
     if (val.pubMode !== "event_booking" && !val.arrivalTime.trim()) {
       issue("arrivalTime", "Arrival time is required");
@@ -407,6 +417,27 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     }
   }
 
+  // Cover-charge mode: load + validate the selected package (a drink_plans row
+  // of type "cover_charge" owned by this venue). Price is taken from the DB
+  // row (paise → ₹) so the client can never dictate the amount.
+  let coverChargePlan: { id: number; productName: string; price: number } | undefined;
+  if (parsed.data.pubMode === "cover_charge") {
+    if (!parsed.data.coverChargePlanId) {
+      res.status(400).json({ error: "Please select a cover charge package" });
+      return;
+    }
+    const [cp] = await db
+      .select({ id: drinkPlansTable.id, productName: drinkPlansTable.productName, price: drinkPlansTable.price, vendorId: drinkPlansTable.vendorId, type: drinkPlansTable.type })
+      .from(drinkPlansTable)
+      .where(eq(drinkPlansTable.id, parsed.data.coverChargePlanId))
+      .limit(1);
+    if (!cp || cp.vendorId !== evt.vendorId || cp.type !== "cover_charge") {
+      res.status(400).json({ error: "Selected cover charge package is not available at this venue." });
+      return;
+    }
+    coverChargePlan = { id: cp.id, productName: cp.productName, price: cp.price };
+  }
+
   // Lock the event commission percentage at booking time so later rate changes
   // never re-price historical bookings (see lib/commission.ts → resolveEventPct).
   let lockedEventPct: string | null = null;
@@ -477,6 +508,12 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     if (guestsCount === 0) guestsCount = 1;
     const annPrice = Number(announcementRow?.price ?? 0);
     totalPrice = annPrice * Math.max(1, guestsCount);
+  } else if (evt.type === "pub" && parsed.data.pubMode === "cover_charge") {
+    // Cover-charge mode: package price (paise → ₹) × number of packages.
+    // Free-entry rules and the standard cover do NOT apply to packages.
+    if (guestsCount === 0) guestsCount = 1;
+    const pkgPrice = (coverChargePlan?.price ?? 0) / 100;
+    totalPrice = pkgPrice * Math.max(1, guestsCount);
   } else {
     // Table / event-mode: no per-gender concept, so only treat as free when
     // every gender is listed. Otherwise charge the regular cover.
@@ -620,7 +657,11 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     ticketWomen: parsed.data.ticketWomen || 0,
     ticketMen: parsed.data.ticketMen || 0,
     ticketCouple: parsed.data.ticketCouple || 0,
-    selectedPubEvent: parsed.data.pubMode === "event_booking" && announcementRow ? announcementRow.title : (parsed.data.selectedPubEvent || ""),
+    selectedPubEvent: parsed.data.pubMode === "event_booking" && announcementRow
+      ? announcementRow.title
+      : parsed.data.pubMode === "cover_charge" && coverChargePlan
+        ? coverChargePlan.productName
+        : (parsed.data.selectedPubEvent || ""),
     announcementId: parsed.data.announcementId ?? null,
     eventCommissionPct: lockedEventPct,
     personName: parsed.data.personName || user.name,
@@ -803,7 +844,9 @@ router.post("/bookings", requireAuth(), async (req, res) => {
 
   // Award loyalty points for booking: +50 for ticket, +60 for table/event/event_booking.
   try {
-    const isTicket = b.pubMode === "ticket";
+    // Cover-charge bookings follow the same ticket lifecycle, so award points
+    // like a ticket booking.
+    const isTicket = b.pubMode === "ticket" || b.pubMode === "cover_charge";
     const earnedPts = isTicket ? 50 : 60;
     const ptSource = b.pubMode === "event_booking" ? "event_booking" : isTicket ? "ticket_booking" : "table_booking";
     const ptExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
@@ -1487,6 +1530,7 @@ router.get("/partner/checkin-report", requireAuth(["vendor"]), async (req, res) 
       ticketWomen: b.ticketWomen,
       ticketMen: b.ticketMen,
       ticketCouple: b.ticketCouple,
+      selectedPubEvent: b.selectedPubEvent ?? "",
       status: b.status,
       checkedIn: b.checkedIn,
       checkedInAt: b.checkedInAt?.toISOString() ?? null,

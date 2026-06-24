@@ -14,4 +14,5 @@ export const ListEventsDrinkPlanType = {
   unlimited: 'unlimited',
   ticket: 'ticket',
   custom: 'custom',
+  cover_charge: 'cover_charge',
 } as const;

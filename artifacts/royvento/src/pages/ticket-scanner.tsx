@@ -46,6 +46,8 @@ interface BookingData {
   ticketMen: number;
   ticketCouple: number;
   guests: number;
+  // Cover-charge bookings carry the package name here (set at booking time).
+  selectedPubEvent?: string | null;
   // Pre-discount booking gross (per-tier × per-tier-price, FER applied).
   // Used with finalPrice to derive the discount ratio so the live cash
   // total at the door matches the amount printed on the guest's ticket.
@@ -1229,6 +1231,7 @@ function ScannerBookingsPanel({ onMutated }: { onMutated: () => void }) {
 
 function BookingDetails({ booking: b }: { booking: BookingData }) {
   const isPubTicket = b.pubMode === "ticket";
+  const isCoverCharge = b.pubMode === "cover_charge";
   const guestName = b.personName ?? b.userName;
   const ticketCode = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
   return (
@@ -1258,6 +1261,8 @@ function BookingDetails({ booking: b }: { booking: BookingData }) {
           <p className="text-[11px] text-muted-foreground">
             {isPubTicket ? (
               <span className="flex items-center gap-1"><TicketIcon className="h-3 w-3 text-primary inline" /> Pub ticket</span>
+            ) : isCoverCharge ? (
+              <span className="flex items-center gap-1"><TicketIcon className="h-3 w-3 text-primary inline" /> Cover charge{b.selectedPubEvent ? ` · ${b.selectedPubEvent}` : ""}</span>
             ) : b.eventType_ === "pub" ? (
               <span className="flex items-center gap-1"><Wine className="h-3 w-3 text-red-400 inline" /> Pub event</span>
             ) : "Event booking"}
@@ -1273,7 +1278,7 @@ function BookingDetails({ booking: b }: { booking: BookingData }) {
             </>
           ) : b.guests > 0 ? (
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 border border-white/10 text-muted-foreground">
-              <Users className="h-2.5 w-2.5 inline mr-0.5" />{b.guests}
+              <TicketIcon className="h-2.5 w-2.5 inline mr-0.5" />{b.guests}{isCoverCharge ? (b.guests === 1 ? " pkg" : " pkgs") : ""}
             </span>
           ) : null}
         </div>
@@ -1326,6 +1331,7 @@ function FinalizeActualEntry({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isTicket = b.pubMode === "ticket";
+  const isCoverCharge = b.pubMode === "cover_charge";
   const isCod = b.paymentMethod === "cod";
   // Pre-fill with the booked counts so a zero-edit Save records "everyone
   // showed up" — the manager only has to touch the steppers when reality
@@ -1451,7 +1457,7 @@ function FinalizeActualEntry({
         <span className="text-[10px] uppercase tracking-wider text-primary/80">Not yet finalized</span>
       </div>
       <p className="text-xs text-muted-foreground -mt-1">
-        Confirm how many guests actually entered. Tap Save Actual Entry to lock the booking and update analytics.
+        Confirm how many {isCoverCharge ? "packages were redeemed" : "guests actually entered"}. Tap Save Actual Entry to lock the booking and update analytics.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1462,7 +1468,7 @@ function FinalizeActualEntry({
             <Stepper label="Couples" value={c} max={b.ticketCouple} color="border-purple-500/30 bg-purple-500/5" onChange={setC} />
           </>
         ) : (
-          <Stepper label="Guests" value={g} max={Math.max(b.guests, 1)} color="border-primary/30 bg-primary/5" onChange={setG} />
+          <Stepper label={isCoverCharge ? "Packages" : "Guests"} value={g} max={Math.max(b.guests, 1)} color="border-primary/30 bg-primary/5" onChange={setG} />
         )}
       </div>
 
@@ -1584,6 +1590,7 @@ function FinalizeActualEntry({
  */
 function FinalizedSummary({ booking: b }: { booking: BookingData }) {
   const isTicket = b.pubMode === "ticket";
+  const isCoverCharge = b.pubMode === "cover_charge";
   const aw = b.actualWomen ?? 0;
   const am = b.actualMen ?? 0;
   const ac = b.actualCouple ?? 0;
@@ -1598,7 +1605,7 @@ function FinalizedSummary({ booking: b }: { booking: BookingData }) {
         { label: "Men", qty: am, booked: b.ticketMen },
         { label: "Couples", qty: ac, booked: b.ticketCouple },
       ].filter((r) => r.booked > 0)
-    : [{ label: "Guests", qty: ag, booked: b.guests }];
+    : [{ label: isCoverCharge ? "Packages" : "Guests", qty: ag, booked: b.guests }];
   return (
     <div className="rounded-2xl bg-black/30 border border-white/10 p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">

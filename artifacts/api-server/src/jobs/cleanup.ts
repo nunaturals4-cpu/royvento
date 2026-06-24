@@ -1,4 +1,4 @@
-import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable, emailMessagesTable, emailAttachmentsTable, emailThreadsTable, drinkPlansTable, organizerEventsTable, bookingsTable } from "@workspace/db";
+import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable, emailMessagesTable, emailAttachmentsTable, emailThreadsTable, drinkPlansTable, vendorOffersTable, organizerEventsTable, bookingsTable } from "@workspace/db";
 import { and, ne, sql, lt, gte, eq, isNotNull, inArray } from "drizzle-orm";
 
 const _istFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -23,11 +23,13 @@ async function deleteImages(urls: (string | null | undefined)[]): Promise<number
   return failCount;
 }
 
+// Delete dated events as soon as their date is over (IST). Venue/pub listings
+// have a NULL eventDate and are never touched. Events that still have bookings
+// are kept — the bookings FK is RESTRICT and those rows are revenue/history; the
+// event is removed once its bookings are gone.
 export async function deletePastEvents(): Promise<void> {
   try {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 30);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const today = todayIstDate();
 
     const rows = await db
       .select({
@@ -39,8 +41,8 @@ export async function deletePastEvents(): Promise<void> {
       .where(
         and(
           sql`${eventsTable.eventDate} IS NOT NULL`,
-          lt(eventsTable.eventDate, cutoffStr),
-          eq(eventsTable.retainForever, false),
+          sql`${eventsTable.eventDate} < ${today}`,
+          sql`NOT EXISTS (SELECT 1 FROM bookings b WHERE b.event_id = ${eventsTable.id})`,
         ),
       );
 
@@ -121,6 +123,28 @@ export async function deleteExpiredDrinkPlans(): Promise<void> {
     logger.info({ count: result.length }, "Cleanup: deleted expired drink plans");
   } catch (err) {
     logger.error({ err }, "Cleanup: failed to delete expired drink plans");
+  }
+}
+
+// Delete Food & Drink offers (vendor_offers) whose explicit end date has passed.
+// Offers with no `endsAt` (open-ended / recurring weekday offers) are kept.
+export async function deleteExpiredVendorOffers(): Promise<void> {
+  try {
+    const result = await db
+      .delete(vendorOffersTable)
+      .where(
+        and(
+          isNotNull(vendorOffersTable.endsAt),
+          lt(vendorOffersTable.endsAt, new Date()),
+        ),
+      )
+      .returning({ id: vendorOffersTable.id });
+
+    if (result.length === 0) return;
+
+    logger.info({ count: result.length }, "Cleanup: deleted expired vendor offers");
+  } catch (err) {
+    logger.error({ err }, "Cleanup: failed to delete expired vendor offers");
   }
 }
 
@@ -373,11 +397,11 @@ export async function autoCheckoutStaleBookings(): Promise<void> {
 }
 
 export async function runCleanup(): Promise<void> {
-  await warnPartnersAboutUpcomingDeletion();
   await deletePastEvents();
   await deletePastOrganizerEvents();
   await deleteExpiredAnnouncements();
   await deleteExpiredDrinkPlans();
+  await deleteExpiredVendorOffers();
   await deleteOldNotifications();
   await deleteOldEmailAttachments();
   await deleteOldEmails();

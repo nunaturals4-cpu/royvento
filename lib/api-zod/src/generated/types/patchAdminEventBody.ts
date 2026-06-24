@@ -15,4 +15,5 @@ export interface PatchAdminEventBody {
   /** @maxLength 2000 */
   rejectionReason?: string | null;
   retainForever?: boolean;
+  hidden?: boolean;
 }

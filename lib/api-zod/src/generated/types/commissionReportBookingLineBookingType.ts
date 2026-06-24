@@ -13,4 +13,6 @@ export const CommissionReportBookingLineBookingType = {
   free_entry: 'free_entry',
   ticket: 'ticket',
   table: 'table',
+  event_booking: 'event_booking',
+  cover_charge: 'cover_charge',
 } as const;

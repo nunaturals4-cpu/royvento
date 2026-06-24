@@ -15,6 +15,12 @@ export interface DrinkPlanBody {
   gender?: DrinkPlanBodyGender;
   /** @minimum 0 */
   price?: number;
+  /**
+     * Cover-charge packages: people admitted per package (informational).
+     * @minimum 0
+     * @maximum 100
+     */
+  peoplePerPackage?: number | null;
   days?: string[];
   timeFrom?: string;
   timeTo?: string;

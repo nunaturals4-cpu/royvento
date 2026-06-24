@@ -16,6 +16,8 @@ export interface DrinkPlan {
   productName: string;
   gender: DrinkPlanGender;
   price: number;
+  /** Cover-charge packages: people admitted per package (informational). */
+  peoplePerPackage?: number | null;
   days: string[];
   timeFrom: string;
   timeTo: string;

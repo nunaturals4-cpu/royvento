@@ -318,7 +318,7 @@ router.get("/sitemap-events.xml", async (req, res) => {
         createdAt: eventsTable.createdAt,
       })
       .from(eventsTable)
-      .where(eq(eventsTable.approvalStatus, "approved"))
+      .where(and(eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false)))
       .orderBy(desc(eventsTable.id))
       .limit(50000);
     const today = new Date();

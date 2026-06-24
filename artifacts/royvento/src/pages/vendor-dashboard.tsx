@@ -497,7 +497,7 @@ export function VendorDashboard() {
               onMenu={() => setDrawerOpen(true)}
             />
 
-            <div className="px-4 md:px-8 py-6 md:py-8 space-y-6">
+            <div className="px-4 md:px-8 py-6 md:py-8 space-y-6 min-w-0 overflow-x-hidden">
               {!isApprovedAndListed && (
                 <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.04] p-5 flex items-start gap-3 backdrop-blur">
                   <div className="h-8 w-8 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
@@ -4905,6 +4905,7 @@ const PLAN_TYPE_BADGE: Record<string, string> = {
   unlimited: "Unlimited Drinks",
   ticket: "Included with Ticket",
   custom: "Custom Package",
+  cover_charge: "Cover Charge",
 };
 
 // Wire/display shape — line items as they come back from the API and are
@@ -4925,6 +4926,7 @@ interface DrinkPlan {
   validUntil?: string | null;
   validFrom?: string | null;
   imageUrl?: string | null;
+  peoplePerPackage?: number | null;
 }
 
 const emptyItem = (): DrinkPlanLineItem => ({ name: "", qty: 1, discountedPrice: "" });
@@ -4939,9 +4941,13 @@ const itemForWire = (i: DrinkPlanLineItem) => ({
 function LineItemsEditor({
   items,
   onChange,
+  showPrice = true,
+  addLabel = "Add item",
 }: {
   items: DrinkPlanLineItem[];
   onChange: (items: DrinkPlanLineItem[]) => void;
+  showPrice?: boolean;
+  addLabel?: string;
 }) {
   return (
     <div className="space-y-2">
@@ -4954,25 +4960,27 @@ function LineItemsEditor({
             className="bg-black/40 border-white/10 w-full sm:flex-1 sm:min-w-0"
           />
           <div className="flex gap-2 items-center">
-            <div className="relative w-32 flex-shrink-0">
-              <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              <Input
-                type="number" min="0" placeholder="Price"
-                value={item.discountedPrice === "" ? "" : item.discountedPrice}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  const next = [...items];
-                  // Keep "" in state while the field is empty so the
-                  // placeholder stays visible. Save handlers coerce to 0.
-                  next[idx] = {
-                    ...item,
-                    discountedPrice: raw === "" ? "" : Math.max(0, parseInt(raw) || 0),
-                  };
-                  onChange(next);
-                }}
-                className="bg-black/40 border-white/10 pl-7"
-              />
-            </div>
+            {showPrice && (
+              <div className="relative w-32 flex-shrink-0">
+                <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <Input
+                  type="number" min="0" placeholder="Price"
+                  value={item.discountedPrice === "" ? "" : item.discountedPrice}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const next = [...items];
+                    // Keep "" in state while the field is empty so the
+                    // placeholder stays visible. Save handlers coerce to 0.
+                    next[idx] = {
+                      ...item,
+                      discountedPrice: raw === "" ? "" : Math.max(0, parseInt(raw) || 0),
+                    };
+                    onChange(next);
+                  }}
+                  className="bg-black/40 border-white/10 pl-7"
+                />
+              </div>
+            )}
             {items.length > 1 && (
               <button type="button" onClick={() => onChange(items.filter((_, i) => i !== idx))}
                 className="rounded-lg border border-destructive/30 p-1.5 text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0 ml-auto sm:ml-0">
@@ -4982,6 +4990,10 @@ function LineItemsEditor({
           </div>
         </div>
       ))}
+      <button type="button" onClick={() => onChange([...items, emptyItem()])}
+        className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors">
+        <Plus className="h-3.5 w-3.5" /> {addLabel}
+      </button>
     </div>
   );
 }
@@ -5893,10 +5905,27 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
   const [ticketImageFile, setTicketImageFile] = useState<File | null>(null);
   const [ticketImagePreview, setTicketImagePreview] = useState("");
 
+  // Add form — Cover Charges section
+  const [coverChargeChecked, setCoverChargeChecked] = useState(false);
+  const [coverChargeName, setCoverChargeName] = useState("");
+  const [coverChargePrice, setCoverChargePrice] = useState("");
+  const [coverChargePeople, setCoverChargePeople] = useState("");
+  const [coverChargeItems, setCoverChargeItems] = useState<DrinkPlanLineItem[]>([emptyItem()]);
+  const [coverChargeDays, setCoverChargeDays] = useState<string[]>([]);
+  const [coverChargeTimeFrom, setCoverChargeTimeFrom] = useState("");
+  const [coverChargeTimeTo, setCoverChargeTimeTo] = useState("");
+  const [coverChargeDescription, setCoverChargeDescription] = useState("");
+  const [coverChargeValidFrom, setCoverChargeValidFrom] = useState("");
+  const [coverChargeValidUntil, setCoverChargeValidUntil] = useState("");
+  const [coverChargeImageFile, setCoverChargeImageFile] = useState<File | null>(null);
+  const [coverChargeImagePreview, setCoverChargeImagePreview] = useState("");
+
   // Edit form state
-  const [editType, setEditType] = useState<"welcome" | "unlimited" | "ticket" | "custom">("welcome");
+  const [editType, setEditType] = useState<"welcome" | "unlimited" | "ticket" | "custom" | "cover_charge">("welcome");
   const [editProductName, setEditProductName] = useState("");
   const [editGender, setEditGender] = useState<"all" | "female">("all");
+  const [editPackagePrice, setEditPackagePrice] = useState("");
+  const [editPackagePeople, setEditPackagePeople] = useState("");
   const [editItems, setEditItems] = useState<DrinkPlanLineItem[]>([emptyItem()]);
   const [editDays, setEditDays] = useState<string[]>([]);
   const [editTimeFrom, setEditTimeFrom] = useState("");
@@ -5946,6 +5975,11 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
     setTicketDrinksOffer(""); setTicketFoodDiscount(""); setTicketValidUntil(""); setTicketValidFrom("");
     setTicketDays([]); setTicketTimeFrom(""); setTicketTimeTo(""); setTicketDescription("");
     setTicketImageFile(null); setTicketImagePreview("");
+    setCoverChargeChecked(false); setCoverChargeName(""); setCoverChargePrice(""); setCoverChargePeople("");
+    setCoverChargeItems([emptyItem()]);
+    setCoverChargeValidUntil(""); setCoverChargeValidFrom("");
+    setCoverChargeDays([]); setCoverChargeTimeFrom(""); setCoverChargeTimeTo(""); setCoverChargeDescription("");
+    setCoverChargeImageFile(null); setCoverChargeImagePreview("");
   };
 
   const startEdit = (plan: DrinkPlan) => {
@@ -5953,6 +5987,8 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
     setEditType(plan.type as typeof editType);
     setEditProductName(plan.productName);
     setEditGender(plan.gender as typeof editGender);
+    setEditPackagePrice(plan.type === "cover_charge" ? String(plan.price / 100) : "");
+    setEditPackagePeople(plan.type === "cover_charge" && plan.peoplePerPackage ? String(plan.peoplePerPackage) : "");
     setEditItems(plan.lineItems?.length ? plan.lineItems : [emptyItem()]);
     setEditDays(plan.days);
     setEditTimeFrom(plan.timeFrom);
@@ -5972,7 +6008,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddError(null);
-    if (!freeEntryChecked && !ticketChecked) {
+    if (!freeEntryChecked && !ticketChecked && !coverChargeChecked) {
       toast({ title: "Select at least one plan type", variant: "destructive" }); return;
     }
     if (freeEntryChecked && feDrinkTypes.length === 0) {
@@ -5989,6 +6025,19 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
       setAddError("A deal image is required for Included with Ticket.");
       toast({ title: "Image required", description: "Upload a deal image for Included with Ticket.", variant: "destructive" }); return;
     }
+    if (coverChargeChecked && !coverChargeName.trim()) {
+      toast({ title: "Package name is required for Cover Charges", variant: "destructive" }); return;
+    }
+    if (coverChargeChecked && (!coverChargePrice || Number(coverChargePrice) <= 0)) {
+      toast({ title: "Package price must be greater than 0 for Cover Charges", variant: "destructive" }); return;
+    }
+    // Offers are optional for a cover-charge package — a partner can sell a
+    // priced package with no add-on offers. Empty rows are dropped on submit
+    // (see the .filter below), so we don't block on the default blank row.
+    if (coverChargeChecked && !coverChargeImageFile && !coverChargeImagePreview) {
+      setAddError("A deal image is required for Cover Charges.");
+      toast({ title: "Image required", description: "Upload a deal image for Cover Charges.", variant: "destructive" }); return;
+    }
     setSaving(true);
     try {
       let feUploadedUrl: string | null = null;
@@ -5998,6 +6047,10 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
       let ticketUploadedUrl: string | null = null;
       if (ticketChecked && ticketImageFile) {
         ticketUploadedUrl = await uploadImageToStorage(ticketImageFile);
+      }
+      let coverChargeUploadedUrl: string | null = null;
+      if (coverChargeChecked && coverChargeImageFile) {
+        coverChargeUploadedUrl = await uploadImageToStorage(coverChargeImageFile);
       }
       if (freeEntryChecked) {
         for (const drinkType of feDrinkTypes) {
@@ -6028,6 +6081,21 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
           imageUrl: ticketUploadedUrl,
         });
       }
+      if (coverChargeChecked) {
+        await apiPost(writeBasePath, {
+          type: "cover_charge", productName: coverChargeName.trim(), gender: "all",
+          price: Math.round(Number(coverChargePrice) * 100),
+          peoplePerPackage: coverChargePeople ? Math.max(0, Number(coverChargePeople) || 0) : null,
+          lineItems: coverChargeItems.filter((i) => i.name.trim()).map(itemForWire),
+          days: coverChargeDays, timeFrom: coverChargeTimeFrom.trim(), timeTo: coverChargeTimeTo.trim(),
+          description: coverChargeDescription.trim(),
+          drinksOfferLabel: "",
+          foodDiscountLabel: "",
+          validFrom: coverChargeValidFrom || null,
+          validUntil: coverChargeValidUntil || null,
+          imageUrl: coverChargeUploadedUrl,
+        });
+      }
       toast({ title: "Drink plan(s) added" });
       resetForm();
       await fetchPlans();
@@ -6043,8 +6111,15 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     const filledTicketItems = editItems.filter((i) => i.name.trim()).map(itemForWire);
-    if (editType === "ticket" && editItems.some((i) => !i.name.trim() && (i.qty !== 1 || (i.discountedPrice !== 0 && i.discountedPrice !== "")))) {
+    const isCoverCharge = editType === "cover_charge";
+    if ((editType === "ticket" || isCoverCharge) && editItems.some((i) => !i.name.trim() && (i.qty !== 1 || (i.discountedPrice !== 0 && i.discountedPrice !== "")))) {
       toast({ title: "Each item must have a name", variant: "destructive" }); return;
+    }
+    if (isCoverCharge && !editProductName.trim()) {
+      toast({ title: "Package name is required", variant: "destructive" }); return;
+    }
+    if (isCoverCharge && (!editPackagePrice || Number(editPackagePrice) <= 0)) {
+      toast({ title: "Package price must be greater than 0", variant: "destructive" }); return;
     }
     setEditSaving(true);
     try {
@@ -6058,9 +6133,10 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
       const updated: DrinkPlan = await apiPatch(`${writeBasePath}/${editingId}`, {
         type: editType,
         productName: isTicket ? "Included with Ticket" : isFreeEntry ? (editType === "welcome" ? "Free Drink" : "Unlimited Drinks") : editProductName,
-        gender: isTicket ? "all" : editGender,
-        price: (isTicket || isFreeEntry) ? 0 : (editingPlan?.price ?? 0),
-        ...(isTicket ? { lineItems: filledTicketItems } : {}),
+        gender: (isTicket || isCoverCharge) ? "all" : editGender,
+        price: (isTicket || isFreeEntry) ? 0 : isCoverCharge ? Math.round(Number(editPackagePrice) * 100) : (editingPlan?.price ?? 0),
+        ...(isCoverCharge ? { peoplePerPackage: editPackagePeople ? Math.max(0, Number(editPackagePeople) || 0) : null } : {}),
+        ...((isTicket || isCoverCharge) ? { lineItems: filledTicketItems } : {}),
         days: editDays, timeFrom: editTimeFrom, timeTo: editTimeTo,
         description: editDescription.trim(),
         drinksOfferLabel: "",
@@ -6310,12 +6386,117 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
             )}
           </div>
 
+          {/* Cover Charges */}
+          <div className={`rounded-xl border p-4 transition-colors ${coverChargeChecked ? "border-primary/40 bg-primary/5" : "border-white/10 bg-black/10"}`}>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={coverChargeChecked}
+                onChange={(e) => setCoverChargeChecked(e.target.checked)}
+                className="h-4 w-4 accent-primary"
+              />
+              <span className="font-semibold text-sm">Cover Charges</span>
+              <span className="text-xs text-muted-foreground font-normal">— sell a priced package with included offers</span>
+            </label>
+            {coverChargeChecked && (
+              <div className="mt-4 pl-7 space-y-3">
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Package name <span className="text-destructive">*</span></Label>
+                    <Input value={coverChargeName} onChange={(e) => setCoverChargeName(e.target.value)}
+                      placeholder="e.g. Gold Package" className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Package price (₹) <span className="text-destructive">*</span></Label>
+                    <div className="relative">
+                      <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                      <Input type="number" min="0" value={coverChargePrice} onChange={(e) => setCoverChargePrice(e.target.value)}
+                        placeholder="999" className="bg-black/40 border-white/10 text-sm pl-7" />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">People per package <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <div className="relative">
+                      <Users className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                      <Input type="number" min="1" value={coverChargePeople} onChange={(e) => setCoverChargePeople(e.target.value)}
+                        placeholder="e.g. 4" className="bg-black/40 border-white/10 text-sm pl-7" />
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground/70">How many guests one package admits. Shown to customers.</p>
+                  </div>
+                </div>
+                <div>
+                  <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Offers included <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                  <LineItemsEditor items={coverChargeItems} onChange={setCoverChargeItems} showPrice={false} addLabel="Add offer" />
+                </div>
+                <div>
+                  <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Applicable days <span className="normal-case text-muted-foreground/60">(leave blank for all days)</span></Label>
+                  <DayPicker selected={coverChargeDays} onToggle={(d) => setCoverChargeDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])} />
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Time from</Label>
+                    <Input type="time" value={coverChargeTimeFrom} onChange={(e) => setCoverChargeTimeFrom(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Time to</Label>
+                    <Input type="time" value={coverChargeTimeTo} onChange={(e) => setCoverChargeTimeTo(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Valid from <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Input type="date" value={coverChargeValidFrom} onChange={(e) => setCoverChargeValidFrom(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Valid until <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Input type="date" value={coverChargeValidUntil} onChange={(e) => setCoverChargeValidUntil(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Short description <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Textarea value={coverChargeDescription} onChange={(e) => setCoverChargeDescription(e.target.value)}
+                      placeholder="Any extra details customers should know…" rows={2}
+                      className="bg-black/40 border-white/10 resize-none text-sm" maxLength={500} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
+                      Deal image <span className="text-destructive">*</span>
+                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card (required)</span>
+                    </Label>
+                    {coverChargeImagePreview ? (
+                      <div className="relative mt-1 rounded-xl overflow-hidden group">
+                        <img src={coverChargeImagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
+                            <Upload className="h-3 w-3" /> Change
+                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                              onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setCoverChargeImageFile(f); setCoverChargeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
+                          </label>
+                          <button type="button" onClick={() => { setCoverChargeImageFile(null); setCoverChargeImagePreview(""); }}
+                            className="px-3 py-1.5 rounded-lg bg-destructive/80 hover:bg-destructive text-xs text-white">Remove</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label
+                        className="mt-1 flex flex-col items-center justify-center gap-2 h-32 rounded-xl border-2 border-dashed cursor-pointer transition-colors border-white/20 bg-black/20 hover:border-primary/50 hover:bg-primary/5"
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setCoverChargeImageFile(f); setCoverChargeImagePreview(URL.createObjectURL(f)); }}
+                      >
+                        <ImageIcon className="h-7 w-7 text-white/25" />
+                        <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setCoverChargeImageFile(f); setCoverChargeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
+                      </label>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {addError && (
             <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {addError}
             </div>
           )}
-          <Button type="submit" disabled={saving || (!freeEntryChecked && !ticketChecked)} className="gap-2">
+          <Button type="submit" disabled={saving} className="gap-2">
             <Plus className="h-4 w-4" />
             {saving ? "Adding…" : "Add plan(s)"}
           </Button>
@@ -6373,6 +6554,36 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                           Items included <span className="normal-case text-muted-foreground/60">(name, discounted price)</span>
                         </Label>
                         <LineItemsEditor items={editItems} onChange={setEditItems} />
+                      </div>
+                    )}
+
+                    {/* Cover charge edit controls */}
+                    {editType === "cover_charge" && (
+                      <div className="space-y-3">
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          <div>
+                            <Label>Package name</Label>
+                            <Input value={editProductName} onChange={(e) => setEditProductName(e.target.value)} className="bg-black/40 border-white/10" />
+                          </div>
+                          <div>
+                            <Label>Package price (₹)</Label>
+                            <div className="relative">
+                              <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                              <Input type="number" min="0" value={editPackagePrice} onChange={(e) => setEditPackagePrice(e.target.value)} className="bg-black/40 border-white/10 pl-7" />
+                            </div>
+                          </div>
+                          <div>
+                            <Label>People per package <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                            <div className="relative">
+                              <Users className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                              <Input type="number" min="1" value={editPackagePeople} onChange={(e) => setEditPackagePeople(e.target.value)} placeholder="e.g. 4" className="bg-black/40 border-white/10 pl-7" />
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Offers included <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                          <LineItemsEditor items={editItems} onChange={setEditItems} showPrice={false} addLabel="Add offer" />
+                        </div>
                       </div>
                     )}
 
@@ -6467,6 +6678,11 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                         {plan.price > 0 && (
                           <span className="rounded-full bg-white/5 text-muted-foreground border border-white/10 px-2 py-0.5 text-[10px] font-medium">
                             ₹{(plan.price / 100).toFixed(0)}
+                          </span>
+                        )}
+                        {plan.type === "cover_charge" && (plan.peoplePerPackage ?? 0) > 0 && (
+                          <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] text-primary font-medium">
+                            {plan.peoplePerPackage}/pkg
                           </span>
                         )}
                         {plan.validUntil && (

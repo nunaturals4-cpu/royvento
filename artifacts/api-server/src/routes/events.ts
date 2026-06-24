@@ -160,7 +160,7 @@ router.get("/events", async (req, res) => {
   // after validation so 400s aren't cached. Matches the featured/popular siblings.
   res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const hasPage = q.page !== undefined;
-  const conditions = [eq(eventsTable.approvalStatus, "approved")];
+  const conditions = [eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false)];
   if (q.category) conditions.push(eq(eventsTable.category, q.category));
   if (q.type) conditions.push(eq(eventsTable.type, q.type));
   if (q.state) conditions.push(ilike(eventsTable.state, `%${q.state}%`));
@@ -228,14 +228,14 @@ router.get("/events/featured", async (_req, res) => {
   const rows = await db
     .select()
     .from(eventsTable)
-    .where(and(eq(eventsTable.featured, true), eq(eventsTable.approvalStatus, "approved")))
+    .where(and(eq(eventsTable.featured, true), eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false)))
     .orderBy(desc(eventsTable.createdAt))
     .limit(8);
   if (rows.length === 0) {
     const fallback = await db
       .select()
       .from(eventsTable)
-      .where(eq(eventsTable.approvalStatus, "approved"))
+      .where(and(eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false)))
       .orderBy(desc(eventsTable.createdAt))
       .limit(6);
     res.json(await serializeEvents(fallback));
@@ -246,7 +246,7 @@ router.get("/events/featured", async (_req, res) => {
 
 router.get("/events/popular", async (req, res) => {
   res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
-  const conditions = [eq(eventsTable.popular, true), eq(eventsTable.approvalStatus, "approved")];
+  const conditions = [eq(eventsTable.popular, true), eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false)];
   const country = req.query["country"] as string | undefined;
   const state = req.query["state"] as string | undefined;
   if (country) conditions.push(ilike(eventsTable.country, `%${country}%`));
@@ -264,7 +264,7 @@ router.get("/events/popular", async (req, res) => {
     const fallback = await db
       .select()
       .from(eventsTable)
-      .where(and(eq(eventsTable.popular, true), eq(eventsTable.approvalStatus, "approved")))
+      .where(and(eq(eventsTable.popular, true), eq(eventsTable.approvalStatus, "approved"), eq(eventsTable.hidden, false)))
       .orderBy(desc(eventsTable.createdAt))
       .limit(20);
     res.json(await serializeEvents(fallback));
@@ -315,6 +315,12 @@ router.get("/events/:eventId", async (req, res) => {
     .limit(1);
   const e = rows[0];
   if (!e) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  // Admin-hidden events are removed from every public surface, including their
+  // own detail page (reached via direct link). Approval state is unaffected.
+  if ((e as unknown as { hidden?: boolean }).hidden) {
     res.status(404).json({ error: "Not found" });
     return;
   }

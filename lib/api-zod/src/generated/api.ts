@@ -1310,7 +1310,7 @@ export const ListVendorsQueryParams = zod.object({
   "state": zod.coerce.string().optional(),
   "city": zod.coerce.string().optional(),
   "danceFloor": zod.enum(['dedicated', 'general', 'none']).optional(),
-  "drinkPlanType": zod.enum(['welcome', 'unlimited', 'ticket', 'custom']).optional()
+  "drinkPlanType": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']).optional()
 }).strict()
 
 export const listVendorsResponseFreeEntryRulesOneBeforeTimeRegExp = new RegExp('^([01][0-9]|2[0-3]):([0-5][0-9])$');
@@ -1695,9 +1695,10 @@ export const ListVendorDrinkOffersResponseItem = zod.object({
   "coverImageUrl": zod.string(),
   "pubEventId": zod.number().nullable(),
   "plans": zod.array(zod.object({
-  "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom']),
+  "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']),
   "productName": zod.string(),
   "gender": zod.enum(['all', 'female']),
+  "peoplePerPackage": zod.number().nullish().describe('Cover-charge packages: people admitted per package (informational).'),
   "lineItems": zod.array(zod.object({
   "name": zod.string(),
   "qty": zod.number().min(1),
@@ -1727,10 +1728,11 @@ export const listVendorDrinkPlansResponseLineItemsItemDiscountedPriceMin = 0;
 export const ListVendorDrinkPlansResponseItem = zod.object({
   "id": zod.number(),
   "vendorId": zod.number(),
-  "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom']),
+  "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']),
   "productName": zod.string(),
   "gender": zod.enum(['all', 'female']),
   "price": zod.number(),
+  "peoplePerPackage": zod.number().nullish().describe('Cover-charge packages: people admitted per package (informational).'),
   "days": zod.array(zod.string()),
   "timeFrom": zod.string(),
   "timeTo": zod.string(),
@@ -1752,16 +1754,20 @@ export const ListVendorDrinkPlansResponse = zod.array(ListVendorDrinkPlansRespon
  */
 export const createDrinkPlanBodyPriceMin = 0;
 
+export const createDrinkPlanBodyPeoplePerPackageMin = 0;
+export const createDrinkPlanBodyPeoplePerPackageMax = 100;
+
 
 export const createDrinkPlanBodyLineItemsItemDiscountedPriceMin = 0;
 
 
 
 export const CreateDrinkPlanBody = zod.object({
-  "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom']),
+  "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']),
   "productName": zod.string().optional(),
   "gender": zod.enum(['all', 'female']).optional(),
   "price": zod.number().min(createDrinkPlanBodyPriceMin).optional(),
+  "peoplePerPackage": zod.number().min(createDrinkPlanBodyPeoplePerPackageMin).max(createDrinkPlanBodyPeoplePerPackageMax).nullish().describe('Cover-charge packages: people admitted per package (informational).'),
   "days": zod.array(zod.string()).optional(),
   "timeFrom": zod.string().optional(),
   "timeTo": zod.string().optional(),
@@ -1783,10 +1789,11 @@ export const createDrinkPlanResponseLineItemsItemDiscountedPriceMin = 0;
 export const CreateDrinkPlanResponse = zod.object({
   "id": zod.number(),
   "vendorId": zod.number(),
-  "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom']),
+  "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']),
   "productName": zod.string(),
   "gender": zod.enum(['all', 'female']),
   "price": zod.number(),
+  "peoplePerPackage": zod.number().nullish().describe('Cover-charge packages: people admitted per package (informational).'),
   "days": zod.array(zod.string()),
   "timeFrom": zod.string(),
   "timeTo": zod.string(),
@@ -1811,16 +1818,20 @@ export const UpdateDrinkPlanParams = zod.object({
 
 export const updateDrinkPlanBodyPriceMin = 0;
 
+export const updateDrinkPlanBodyPeoplePerPackageMin = 0;
+export const updateDrinkPlanBodyPeoplePerPackageMax = 100;
+
 
 export const updateDrinkPlanBodyLineItemsItemDiscountedPriceMin = 0;
 
 
 
 export const UpdateDrinkPlanBody = zod.object({
-  "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom']),
+  "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']),
   "productName": zod.string().optional(),
   "gender": zod.enum(['all', 'female']).optional(),
   "price": zod.number().min(updateDrinkPlanBodyPriceMin).optional(),
+  "peoplePerPackage": zod.number().min(updateDrinkPlanBodyPeoplePerPackageMin).max(updateDrinkPlanBodyPeoplePerPackageMax).nullish().describe('Cover-charge packages: people admitted per package (informational).'),
   "days": zod.array(zod.string()).optional(),
   "timeFrom": zod.string().optional(),
   "timeTo": zod.string().optional(),
@@ -1842,10 +1853,11 @@ export const updateDrinkPlanResponseLineItemsItemDiscountedPriceMin = 0;
 export const UpdateDrinkPlanResponse = zod.object({
   "id": zod.number(),
   "vendorId": zod.number(),
-  "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom']),
+  "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']),
   "productName": zod.string(),
   "gender": zod.enum(['all', 'female']),
   "price": zod.number(),
+  "peoplePerPackage": zod.number().nullish().describe('Cover-charge packages: people admitted per package (informational).'),
   "days": zod.array(zod.string()),
   "timeFrom": zod.string(),
   "timeTo": zod.string(),
@@ -1887,7 +1899,7 @@ export const ListEventsQueryParams = zod.object({
   "maxPrice": zod.coerce.string().optional(),
   "page": zod.coerce.number().optional(),
   "limit": zod.coerce.number().optional(),
-  "drinkPlanType": zod.enum(['welcome', 'unlimited', 'ticket', 'custom']).optional()
+  "drinkPlanType": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']).optional()
 }).strict()
 
 export const listEventsResponseFreeEntryRulesOneBeforeTimeRegExp = new RegExp('^([01][0-9]|2[0-3]):([0-5][0-9])$');
@@ -2541,7 +2553,8 @@ export const CreateBookingBody = zod.object({
   "ticketWomen": zod.number().optional(),
   "ticketMen": zod.number().optional(),
   "ticketCouple": zod.number().optional(),
-  "selectedPubEvent": zod.string().optional()
+  "selectedPubEvent": zod.string().optional(),
+  "coverChargePlanId": zod.number().optional().describe('Cover-charge mode: id of the selected package (a drink plan of type cover_charge). Quantity rides on `guests`.')
 }).strict()
 
 export const CreateBookingResponse = zod.object({
@@ -3752,7 +3765,8 @@ export const PatchAdminEventBody = zod.object({
   "dateNight": zod.boolean().optional(),
   "approvalStatus": zod.enum(['pending', 'approved', 'rejected']).optional(),
   "rejectionReason": zod.string().max(patchAdminEventBodyRejectionReasonMax).nullish(),
-  "retainForever": zod.boolean().optional()
+  "retainForever": zod.boolean().optional(),
+  "hidden": zod.boolean().optional()
 }).strict()
 
 export const PatchAdminEventResponse = zod.object({
@@ -4048,6 +4062,8 @@ export const GetVendorCommissionResponse = zod.object({
   "freeEntryRate": zod.string().describe('Flat fee in INR per person (stored as decimal string)'),
   "ticketRate": zod.string().describe('Flat fee in INR per ticket (stored as decimal string)'),
   "tableBookingRate": zod.string().describe('Flat fee in INR per table booking (stored as decimal string)'),
+  "eventRate": zod.string().optional().describe('Percentage of event-booking revenue (stored as decimal string)'),
+  "coverChargeRate": zod.string().optional().describe('Percentage of cover-charge package revenue (stored as decimal string)'),
   "updatedAt": zod.string().optional()
 })
 
@@ -4071,6 +4087,9 @@ export const setVendorCommissionBodyTableBookingRateMax = 99999.99;
 export const setVendorCommissionBodyEventRateMin = 0;
 export const setVendorCommissionBodyEventRateMax = 100;
 
+export const setVendorCommissionBodyCoverChargeRateMin = 0;
+export const setVendorCommissionBodyCoverChargeRateMax = 100;
+
 
 
 export const SetVendorCommissionBody = zod.object({
@@ -4078,7 +4097,8 @@ export const SetVendorCommissionBody = zod.object({
   "ticketRate": zod.number().min(setVendorCommissionBodyTicketRateMin).max(setVendorCommissionBodyTicketRateMax).describe('Percentage of ticket revenue charged as platform commission (0–100)'),
   "tableBookingRate": zod.number().min(setVendorCommissionBodyTableBookingRateMin).max(setVendorCommissionBodyTableBookingRateMax).describe('Flat fee in INR per verified guest for table booking commission'),
   "eventRate": zod.number().min(setVendorCommissionBodyEventRateMin).max(setVendorCommissionBodyEventRateMax).optional().describe('Percentage of event-booking revenue charged as platform commission (0–100)'),
-  "eventCommissionEnabled": zod.boolean().optional().describe('Whether event-booking commission is charged for this vendor')
+  "eventCommissionEnabled": zod.boolean().optional().describe('Whether event-booking commission is charged for this vendor'),
+  "coverChargeRate": zod.number().min(setVendorCommissionBodyCoverChargeRateMin).max(setVendorCommissionBodyCoverChargeRateMax).optional().describe('Percentage of cover-charge package revenue charged as platform commission (0–100)')
 }).strict()
 
 export const SetVendorCommissionResponse = zod.object({
@@ -4087,6 +4107,8 @@ export const SetVendorCommissionResponse = zod.object({
   "freeEntryRate": zod.string().describe('Flat fee in INR per person (stored as decimal string)'),
   "ticketRate": zod.string().describe('Flat fee in INR per ticket (stored as decimal string)'),
   "tableBookingRate": zod.string().describe('Flat fee in INR per table booking (stored as decimal string)'),
+  "eventRate": zod.string().optional().describe('Percentage of event-booking revenue (stored as decimal string)'),
+  "coverChargeRate": zod.string().optional().describe('Percentage of cover-charge package revenue (stored as decimal string)'),
   "updatedAt": zod.string().optional()
 })
 
@@ -4126,7 +4148,7 @@ export const GetCommissionReportResponse = zod.object({
   "bookings": zod.array(zod.object({
   "id": zod.number(),
   "finalPrice": zod.number(),
-  "bookingType": zod.enum(['free_entry', 'ticket', 'table']),
+  "bookingType": zod.enum(['free_entry', 'ticket', 'table', 'event_booking', 'cover_charge']),
   "commissionRate": zod.number().describe('Flat fee in INR per unit (per person, per ticket, or per table booking)'),
   "unitCount": zod.number().describe('Number of units charged (persons for free_entry, tickets for ticket, 1 for table)'),
   "commissionAmount": zod.number(),

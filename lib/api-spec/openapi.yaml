@@ -867,7 +867,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [welcome, unlimited, ticket, custom]
+            enum: [welcome, unlimited, ticket, custom, cover_charge]
       responses:
         "200":
           description: Vendors list
@@ -1169,7 +1169,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [welcome, unlimited, ticket, custom]
+            enum: [welcome, unlimited, ticket, custom, cover_charge]
       responses:
         "200":
           description: Events list (Event[] when no page param; ListEventsPaginatedResponse when page param provided)
@@ -4546,6 +4546,9 @@ components:
           type: integer
         selectedPubEvent:
           type: string
+        coverChargePlanId:
+          type: integer
+          description: "Cover-charge mode: id of the selected package (a drink plan of type cover_charge). Quantity rides on `guests`."
       required: [eventId, bookingDate, guests]
 
     UpdateBookingStatusBody:
@@ -4930,6 +4933,8 @@ components:
           nullable: true
           maxLength: 2000
         retainForever:
+          type: boolean
+        hidden:
           type: boolean
 
     AdminBookingRow:
@@ -5399,7 +5404,7 @@ components:
           type: integer
         type:
           type: string
-          enum: [welcome, unlimited, ticket, custom]
+          enum: [welcome, unlimited, ticket, custom, cover_charge]
         productName:
           type: string
         gender:
@@ -5407,6 +5412,10 @@ components:
           enum: [all, female]
         price:
           type: integer
+        peoplePerPackage:
+          type: integer
+          nullable: true
+          description: "Cover-charge packages: people admitted per package (informational)."
         days:
           type: array
           items:
@@ -5437,7 +5446,7 @@ components:
       properties:
         type:
           type: string
-          enum: [welcome, unlimited, ticket, custom]
+          enum: [welcome, unlimited, ticket, custom, cover_charge]
         productName:
           type: string
         gender:
@@ -5446,6 +5455,12 @@ components:
         price:
           type: integer
           minimum: 0
+        peoplePerPackage:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: "Cover-charge packages: people admitted per package (informational)."
         days:
           type: array
           items:
@@ -5474,12 +5489,16 @@ components:
       properties:
         type:
           type: string
-          enum: [welcome, unlimited, ticket, custom]
+          enum: [welcome, unlimited, ticket, custom, cover_charge]
         productName:
           type: string
         gender:
           type: string
           enum: [all, female]
+        peoplePerPackage:
+          type: integer
+          nullable: true
+          description: "Cover-charge packages: people admitted per package (informational)."
         lineItems:
           type: array
           nullable: true
@@ -5517,6 +5536,12 @@ components:
         tableBookingRate:
           type: string
           description: Flat fee in INR per table booking (stored as decimal string)
+        eventRate:
+          type: string
+          description: Percentage of event-booking revenue (stored as decimal string)
+        coverChargeRate:
+          type: string
+          description: Percentage of cover-charge package revenue (stored as decimal string)
         updatedAt:
           type: string
       required: [vendorId, freeEntryRate, ticketRate, tableBookingRate]
@@ -5548,6 +5573,11 @@ components:
         eventCommissionEnabled:
           type: boolean
           description: Whether event-booking commission is charged for this vendor
+        coverChargeRate:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Percentage of cover-charge package revenue charged as platform commission (0–100)
       required: [freeEntryRate, ticketRate, tableBookingRate]
 
     CommissionReportBookingLine:
@@ -5559,7 +5589,7 @@ components:
           type: number
         bookingType:
           type: string
-          enum: [free_entry, ticket, table]
+          enum: [free_entry, ticket, table, event_booking, cover_charge]
         commissionRate:
           type: number
           description: Flat fee in INR per unit (per person, per ticket, or per table booking)

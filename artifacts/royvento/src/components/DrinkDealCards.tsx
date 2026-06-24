@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Wine, Ticket, Clock, Calendar, Heart, GlassWater } from "lucide-react";
+import { Wine, Ticket, Clock, Calendar, Heart, GlassWater, Coins, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CarouselRow } from "@/components/CarouselRow";
 import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-react";
@@ -22,6 +22,8 @@ export interface DrinkDealPlanLike {
   type: string;
   productName?: string;
   gender?: string;
+  price?: number;
+  peoplePerPackage?: number | null;
   lineItems?: Array<{ name: string; discountedPrice?: number }> | null;
   days?: string[];
   timeFrom?: string;
@@ -66,6 +68,9 @@ function summarizePlan(plan: DrinkDealPlanLike): { badge: string; headline: stri
       headline: plan.productName || (count > 0 ? `${count} item${count !== 1 ? "s" : ""} included` : "Drinks with ticket"),
     };
   }
+  if (plan.type === "cover_charge") {
+    return { badge: "COVER CHARGE", headline: plan.productName || "Cover charge package" };
+  }
   return { badge: "DRINKS DEAL", headline: plan.productName || "Drinks discount" };
 }
 
@@ -76,7 +81,9 @@ function pickPrimaryPlan(plans: DrinkPlanSummary[]): DrinkPlanSummary {
 const toImg = (v: string | null | undefined) => v || null;
 
 /* ─── Day pills (M T W T F S S) ─────────────────────────────────────────── */
-function DayPills({ activeDays, accent = "primary" }: { activeDays: string[]; accent?: "primary" | "amber" }) {
+type Accent = "primary" | "amber" | "violet";
+
+function DayPills({ activeDays, accent = "primary" }: { activeDays: string[]; accent?: Accent }) {
   // Match case-insensitively on the first three letters so any stored format
   // ("Thu" / "thu" / "Thursday") highlights correctly. Empty = every day.
   const activeSet = new Set((activeDays ?? []).map((d) => d.slice(0, 3).toLowerCase()));
@@ -87,7 +94,9 @@ function DayPills({ activeDays, accent = "primary" }: { activeDays: string[]; ac
         const active = isAll || activeSet.has(day.slice(0, 3).toLowerCase());
         const activeClass = accent === "amber"
           ? "bg-amber-500 text-black"
-          : "bg-primary text-primary-foreground";
+          : accent === "violet"
+            ? "bg-violet-500 text-white"
+            : "bg-primary text-primary-foreground";
         return (
           <span
             key={day}
@@ -113,7 +122,7 @@ export interface DrinkDealCardProps {
   title?: string;
   /** Fallback image when the plan has none (e.g. the vendor cover). */
   fallbackImage?: string | null;
-  accent?: "primary" | "amber";
+  accent?: Accent;
   /** "+N more plans" footnote. */
   extraPlansCount?: number;
   href?: string;
@@ -133,6 +142,7 @@ export function DrinkDealCard({
   const { badge, headline } = summarizePlan(plan);
   const items = (plan.lineItems ?? []).filter((it) => it.name);
   const isTicket = plan.type === "ticket";
+  const isCoverCharge = plan.type === "cover_charge";
   const imageUrl = toImg(plan.imageUrl) ?? toImg(fallbackImage) ?? null;
   const untilLabel = formatUntil(plan.validUntil);
   const gender = plan.gender === "female" ? t("pub_offers.filter_ladies") : null;
@@ -140,8 +150,16 @@ export function DrinkDealCard({
     ? `${fmtTime(plan.timeFrom)} – ${fmtTime(plan.timeTo)}`
     : null;
 
-  const badgeCls = accent === "amber" ? "bg-amber-500 text-black" : "bg-primary text-primary-foreground";
-  const accentText = accent === "amber" ? "text-amber-400" : "text-primary";
+  const badgeCls = accent === "amber"
+    ? "bg-amber-500 text-black"
+    : accent === "violet"
+      ? "bg-violet-500 text-white"
+      : "bg-primary text-primary-foreground";
+  const accentText = accent === "amber"
+    ? "text-amber-400"
+    : accent === "violet"
+      ? "text-violet-400"
+      : "text-primary";
 
   const dealText = isTicket && items.length > 0
     ? items.slice(0, 2).map((it) => it.name).join(" · ") + (items.length > 2 ? " +more" : "")
@@ -197,11 +215,23 @@ export function DrinkDealCard({
           </div>
         )}
 
-        <p className="text-white font-black text-[15px] leading-snug line-clamp-2 min-h-[38px]">
-          {dealText}
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-white font-black text-[15px] leading-snug line-clamp-2 min-h-[38px] flex-1">
+            {dealText}
+          </p>
+          {isCoverCharge && (plan.price ?? 0) > 0 && (
+            <span className={`shrink-0 font-black text-[15px] ${accentText}`}>₹{(plan.price! / 100).toFixed(0)}</span>
+          )}
+        </div>
 
-        {isTicket && items.length > 0 && (
+        {isCoverCharge && (plan.peoplePerPackage ?? 0) > 0 && (
+          <p className="text-[11px] text-white/55 flex items-center gap-1">
+            <Users className="h-3 w-3 flex-shrink-0 text-white/35" />
+            {plan.peoplePerPackage === 1 ? "Made just for you 🎉" : `Bring your squad of ${plan.peoplePerPackage} 🎉`}
+          </p>
+        )}
+
+        {(isTicket || isCoverCharge) && items.length > 0 && (
           <ul className="space-y-1">
             {items.slice(0, 3).map((it, i) => (
               <li key={i} className="flex items-center justify-between text-xs text-white/70">
@@ -254,7 +284,7 @@ export function DrinkDealCard({
 }
 
 /* ─── Vendor tile (wraps DrinkDealCard with offer → href) ────────────────── */
-function DealTile({ offer, plans, accent = "primary" }: { offer: VendorDrinkOffer; plans: DrinkPlanSummary[]; accent?: "primary" | "amber" }) {
+function DealTile({ offer, plans, accent = "primary" }: { offer: VendorDrinkOffer; plans: DrinkPlanSummary[]; accent?: Accent }) {
   const primary = pickPrimaryPlan(plans) as PlanWithDates;
   const offerWithImg = offer as OfferWithImage;
   const href = offer.pubEventId ? `/events/${offer.pubEventId}?book=1` : `/vendors/${offer.vendorId}`;
@@ -276,19 +306,24 @@ function DealTile({ offer, plans, accent = "primary" }: { offer: VendorDrinkOffe
 /* ─── Section panel (Free Drinks / Included with Ticket) ────────────────── */
 interface SectionProps {
   vendors: VendorWithPlans[];
-  accent: "primary" | "amber";
+  accent: Accent;
   title: string;
   subtitle: string;
 }
 
 function DealPanel({ vendors, accent, title, subtitle }: SectionProps) {
-  const Icon = accent === "amber" ? Ticket : Wine;
+  const Icon = accent === "amber" ? Ticket : accent === "violet" ? Coins : Wine;
+  const headerBox = accent === "amber"
+    ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+    : accent === "violet"
+      ? "border-violet-500/30 bg-violet-500/10 text-violet-400"
+      : "border-primary/30 bg-primary/10 text-primary";
 
   return (
     <div>
       {/* Section header */}
       <div className="flex items-center gap-2.5 mb-1.5">
-        <span className={`flex h-7 w-7 items-center justify-center rounded-lg border ${accent === "amber" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-primary/30 bg-primary/10 text-primary"}`}>
+        <span className={`flex h-7 w-7 items-center justify-center rounded-lg border ${headerBox}`}>
           <Icon className="h-3.5 w-3.5" />
         </span>
         <h3 className="text-base md:text-lg font-bold tracking-tight">{title}</h3>
@@ -330,10 +365,22 @@ export function TicketSection({ vendors }: { vendors: VendorWithPlans[] }) {
   );
 }
 
+export function CoverChargeSection({ vendors }: { vendors: VendorWithPlans[] }) {
+  if (vendors.length === 0) return null;
+  return (
+    <DealPanel
+      vendors={vendors}
+      accent="violet"
+      title="Cover Charges"
+      subtitle="Tap on any deal to view venue & book"
+    />
+  );
+}
+
 export function splitVendorsByPlanType(
   offers: VendorDrinkOffer[],
   genderFilter?: "" | "female" | "other",
-): { freeVendors: VendorWithPlans[]; ticketVendors: VendorWithPlans[] } {
+): { freeVendors: VendorWithPlans[]; ticketVendors: VendorWithPlans[]; coverChargeVendors: VendorWithPlans[] } {
   const genderMatch = (p: DrinkPlanSummary) =>
     !genderFilter ||
     (genderFilter === "female" ? p.gender === "female" : p.gender !== "female");
@@ -361,5 +408,12 @@ export function splitVendorsByPlanType(
     }))
     .filter((v) => v.plans.length > 0);
 
-  return { freeVendors, ticketVendors };
+  const coverChargeVendors = filtered
+    .map((offer) => ({
+      offer,
+      plans: offer.plans.filter((p) => p.type === "cover_charge" && genderMatch(p)),
+    }))
+    .filter((v) => v.plans.length > 0);
+
+  return { freeVendors, ticketVendors, coverChargeVendors };
 }

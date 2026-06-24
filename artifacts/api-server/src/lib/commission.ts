@@ -40,7 +40,7 @@
  * a realised ledger entry.
  */
 
-export type BookingType = "free_entry" | "ticket" | "table" | "event_booking";
+export type BookingType = "free_entry" | "ticket" | "table" | "event_booking" | "cover_charge";
 
 export type CommissionTrigger =
   | "online_payment"
@@ -57,6 +57,8 @@ export interface CommissionRatesInput {
   eventRate?: string | number | null | undefined;
   /** When false, no event commission is charged (overrides eventRate). */
   eventCommissionEnabled?: boolean | null | undefined;
+  /** Cover-charge commission as a percentage (0–100) of final package revenue. */
+  coverChargeRate?: string | number | null | undefined;
 }
 
 export interface PlannedBookingShape {
@@ -150,6 +152,7 @@ function resolveEventPct(b: PlannedBookingShape, rates: CommissionRatesInput): n
 export function classifyBookingType(b: { pubMode: string; finalPrice: string | number }): BookingType {
   const price = Number(b.finalPrice);
   if (b.pubMode === "event_booking") return "event_booking";
+  if (b.pubMode === "cover_charge") return "cover_charge";
   if (b.pubMode === "table" || b.pubMode === "event") return "table";
   if (price === 0 || b.pubMode === "free") return "free_entry";
   return "ticket";
@@ -185,6 +188,8 @@ export function computeCommissionFromPlanned(
   const ticketPct = Number(rates.ticketRate ?? 0); // stored as percentage (0–100)
   const tablePct = Number(rates.tableBookingRate ?? 0); // stored as flat ₹ per person
 
+  const coverChargePct = Number(rates.coverChargeRate ?? 0); // stored as percentage (0–100)
+
   const bookingType = classifyBookingType(b);
 
   if (bookingType === "event_booking") {
@@ -193,6 +198,14 @@ export function computeCommissionFromPlanned(
     const pct = resolveEventPct(b, rates);
     const amount = round2((pct / 100) * Number(b.finalPrice));
     return { bookingType, ratePerUnit: pct, unitCount: Math.max(0, b.guests), amount };
+  }
+
+  if (bookingType === "cover_charge") {
+    // Percentage of the final payable package revenue (package price × qty,
+    // already net of coupon / points discounts via finalPrice). Mirrors the
+    // ticket-style percentage model with its own configurable rate.
+    const amount = round2((coverChargePct / 100) * Number(b.finalPrice));
+    return { bookingType, ratePerUnit: coverChargePct, unitCount: Math.max(0, b.guests), amount };
   }
 
   if (bookingType === "table") {
@@ -282,6 +295,15 @@ export function computeCommissionFromActuals(
     const units = Math.max(0, ag);
     const amount = round2((pct / 100) * Number(b.finalPrice));
     return { bookingType: "event_booking", ratePerUnit: pct, unitCount: units, amount };
+  }
+
+  // ── Cover charge: percentage of final package revenue ────────────────────
+  if (bookingType === "cover_charge") {
+    const pct = Number(rates.coverChargeRate ?? 0);
+    const ag = b.actualGuests ?? b.guests;
+    const units = Math.max(0, ag);
+    const amount = round2((pct / 100) * Number(b.finalPrice));
+    return { bookingType: "cover_charge", ratePerUnit: pct, unitCount: units, amount };
   }
 
   // ── Table: flat ₹ per verified guest ────────────────────────────────────

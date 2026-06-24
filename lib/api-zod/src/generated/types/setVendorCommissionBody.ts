@@ -33,4 +33,10 @@ export interface SetVendorCommissionBody {
   eventRate?: number;
   /** Whether event-booking commission is charged for this vendor */
   eventCommissionEnabled?: boolean;
+  /**
+     * Percentage of cover-charge package revenue charged as platform commission (0–100)
+     * @minimum 0
+     * @maximum 100
+     */
+  coverChargeRate?: number;
 }

@@ -179,7 +179,7 @@ router.get("/going-out", async (req, res) => {
                AND b.status NOT IN ('rejected', 'cancelled')) AS "bookedGuests",
           (SELECT COUNT(*) FROM bookings b WHERE b.event_id = e.id AND b.booking_date = ${today}) AS "todayBookings"
         FROM events e JOIN vendors v ON v.id = e.vendor_id
-        WHERE e.approval_status = 'approved' AND e.type = 'pub'
+        WHERE e.approval_status = 'approved' AND e.hidden = false AND e.type = 'pub'
           AND e.group_booking_enabled = true
         LIMIT 300
       `)).rows as Record<string, unknown>[];

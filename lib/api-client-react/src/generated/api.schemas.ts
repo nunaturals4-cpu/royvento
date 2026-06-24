@@ -1466,6 +1466,8 @@ export interface CreateBookingBody {
   ticketMen?: number;
   ticketCouple?: number;
   selectedPubEvent?: string;
+  /** Cover-charge mode: id of the selected package (a drink plan of type cover_charge). Quantity rides on `guests`. */
+  coverChargePlanId?: number;
 }
 
 export interface UpdateBookingStatusBody {
@@ -1704,6 +1706,7 @@ export interface PatchAdminEventBody {
   /** @maxLength 2000 */
   rejectionReason?: string | null;
   retainForever?: boolean;
+  hidden?: boolean;
 }
 
 export interface AdminBookingRow {
@@ -1948,6 +1951,7 @@ export const DrinkPlanType = {
   unlimited: 'unlimited',
   ticket: 'ticket',
   custom: 'custom',
+  cover_charge: 'cover_charge',
 } as const;
 
 export type DrinkPlanGender = typeof DrinkPlanGender[keyof typeof DrinkPlanGender];
@@ -1965,6 +1969,8 @@ export interface DrinkPlan {
   productName: string;
   gender: DrinkPlanGender;
   price: number;
+  /** Cover-charge packages: people admitted per package (informational). */
+  peoplePerPackage?: number | null;
   days: string[];
   timeFrom: string;
   timeTo: string;
@@ -1983,6 +1989,7 @@ export const DrinkPlanBodyType = {
   unlimited: 'unlimited',
   ticket: 'ticket',
   custom: 'custom',
+  cover_charge: 'cover_charge',
 } as const;
 
 export type DrinkPlanBodyGender = typeof DrinkPlanBodyGender[keyof typeof DrinkPlanBodyGender];
@@ -1999,6 +2006,12 @@ export interface DrinkPlanBody {
   gender?: DrinkPlanBodyGender;
   /** @minimum 0 */
   price?: number;
+  /**
+     * Cover-charge packages: people admitted per package (informational).
+     * @minimum 0
+     * @maximum 100
+     */
+  peoplePerPackage?: number | null;
   days?: string[];
   timeFrom?: string;
   timeTo?: string;
@@ -2016,6 +2029,7 @@ export const DrinkPlanSummaryType = {
   unlimited: 'unlimited',
   ticket: 'ticket',
   custom: 'custom',
+  cover_charge: 'cover_charge',
 } as const;
 
 export type DrinkPlanSummaryGender = typeof DrinkPlanSummaryGender[keyof typeof DrinkPlanSummaryGender];
@@ -2030,6 +2044,8 @@ export interface DrinkPlanSummary {
   type: DrinkPlanSummaryType;
   productName: string;
   gender: DrinkPlanSummaryGender;
+  /** Cover-charge packages: people admitted per package (informational). */
+  peoplePerPackage?: number | null;
   lineItems?: DrinkPlanLineItem[] | null;
   /** Applicable days of the week (e.g. ['Monday', 'Friday']). Empty array means all days. */
   days?: string[];
@@ -2050,6 +2066,10 @@ export interface VendorCommission {
   ticketRate: string;
   /** Flat fee in INR per table booking (stored as decimal string) */
   tableBookingRate: string;
+  /** Percentage of event-booking revenue (stored as decimal string) */
+  eventRate?: string;
+  /** Percentage of cover-charge package revenue (stored as decimal string) */
+  coverChargeRate?: string;
   updatedAt?: string;
 }
 
@@ -2080,6 +2100,12 @@ export interface SetVendorCommissionBody {
   eventRate?: number;
   /** Whether event-booking commission is charged for this vendor */
   eventCommissionEnabled?: boolean;
+  /**
+     * Percentage of cover-charge package revenue charged as platform commission (0–100)
+     * @minimum 0
+     * @maximum 100
+     */
+  coverChargeRate?: number;
 }
 
 export type CommissionReportBookingLineBookingType = typeof CommissionReportBookingLineBookingType[keyof typeof CommissionReportBookingLineBookingType];
@@ -2089,6 +2115,8 @@ export const CommissionReportBookingLineBookingType = {
   free_entry: 'free_entry',
   ticket: 'ticket',
   table: 'table',
+  event_booking: 'event_booking',
+  cover_charge: 'cover_charge',
 } as const;
 
 export interface CommissionReportBookingLine {
@@ -2606,6 +2634,7 @@ export const ListVendorsDrinkPlanType = {
   unlimited: 'unlimited',
   ticket: 'ticket',
   custom: 'custom',
+  cover_charge: 'cover_charge',
 } as const;
 
 export type ListEventsParams = {
@@ -2630,6 +2659,7 @@ export const ListEventsDrinkPlanType = {
   unlimited: 'unlimited',
   ticket: 'ticket',
   custom: 'custom',
+  cover_charge: 'cover_charge',
 } as const;
 
 export type ListMyVendorEventsParams = {

@@ -13,6 +13,8 @@ export interface DrinkPlanSummary {
   type: DrinkPlanSummaryType;
   productName: string;
   gender: DrinkPlanSummaryGender;
+  /** Cover-charge packages: people admitted per package (informational). */
+  peoplePerPackage?: number | null;
   lineItems?: DrinkPlanLineItem[] | null;
   /** Applicable days of the week (e.g. ['Monday', 'Friday']). Empty array means all days. */
   days?: string[];

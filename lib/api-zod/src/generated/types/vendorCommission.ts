@@ -15,5 +15,9 @@ export interface VendorCommission {
   ticketRate: string;
   /** Flat fee in INR per table booking (stored as decimal string) */
   tableBookingRate: string;
+  /** Percentage of event-booking revenue (stored as decimal string) */
+  eventRate?: string;
+  /** Percentage of cover-charge package revenue (stored as decimal string) */
+  coverChargeRate?: string;
   updatedAt?: string;
 }

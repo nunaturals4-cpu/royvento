@@ -9,7 +9,7 @@ import { apiGet } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react";
 import type { VendorDrinkOffer } from "@workspace/api-client-react";
-import { FreeDrinkSection, TicketSection, splitVendorsByPlanType } from "@/components/DrinkDealCards";
+import { FreeDrinkSection, TicketSection, CoverChargeSection, splitVendorsByPlanType } from "@/components/DrinkDealCards";
 import { useToast } from "@/hooks/use-toast";
 
 interface AllDrinkDeal {
@@ -56,7 +56,7 @@ export function PubOffers() {
   const [dayFilter, setDayFilter]                 = useState("");
 
   // â"€â"€ split deals, then filter by selected day â"€â"€
-  const { freeVendors: allFreeVendors, ticketVendors: allTicketVendors } = splitVendorsByPlanType(
+  const { freeVendors: allFreeVendors, ticketVendors: allTicketVendors, coverChargeVendors: allCoverChargeVendors } = splitVendorsByPlanType(
     drinkOffers as VendorDrinkOffer[],
     dealGenderFilter as "" | "female" | "other",
   );
@@ -74,6 +74,12 @@ export function PubOffers() {
         v.plans.some((p) => Array.isArray(p.days) && p.days.includes(dayFilter))
       )
     : allTicketVendors;
+
+  const coverChargeVendors = dayFilter
+    ? allCoverChargeVendors.filter((v) =>
+        v.plans.some((p) => Array.isArray(p.days) && p.days.includes(dayFilter))
+      )
+    : allCoverChargeVendors;
 
   const hasDeals        = (drinkOffers as VendorDrinkOffer[]).length > 0;
 
@@ -240,7 +246,7 @@ export function PubOffers() {
               </div>
             </div>
 
-            {freeVendors.length === 0 && ticketVendors.length === 0 ? (
+            {freeVendors.length === 0 && ticketVendors.length === 0 && coverChargeVendors.length === 0 ? (
               <div className="rounded-2xl border border-white/[0.06] bg-[#111] p-10 text-center">
                 <GlassWater className="h-8 w-8 text-primary/30 mx-auto mb-3" />
                 <p className="text-white/60">
@@ -256,6 +262,10 @@ export function PubOffers() {
                   <div className="premium-divider" />
                 )}
                 <TicketSection vendors={ticketVendors} />
+                {(freeVendors.length > 0 || ticketVendors.length > 0) && coverChargeVendors.length > 0 && (
+                  <div className="premium-divider" />
+                )}
+                <CoverChargeSection vendors={coverChargeVendors} />
               </div>
             )}
           </section>

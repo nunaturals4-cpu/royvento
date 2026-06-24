@@ -151,6 +151,11 @@ export const eventsTable = pgTable(
     eventDate: date("event_date"),
     featured: boolean("featured").notNull().default(false),
     popular: boolean("popular").notNull().default(false),
+    // Admin kill-switch: when true the event (and its venue, since pubs/clubs/
+    // bars are events of type "pub") is excluded from every public discovery
+    // surface — storefront listings, featured/popular rails, search, going-out,
+    // happening-tonight and the sitemap. Approval state is left untouched.
+    hidden: boolean("hidden").notNull().default(false),
     // Admin-curated flag: surface this venue in the storefront "Date Night"
     // rail (homepage) and the Pubs-page "Date Night" category. Single source of
     // truth so both places show the exact same set.
@@ -696,6 +701,10 @@ export const drinkPlansTable = pgTable(
     productName: varchar("product_name", { length: 255 }).notNull().default(""),
     gender: varchar("gender", { length: 10 }).notNull().default("all"),
     price: integer("price").notNull().default(0),
+    // Cover-charge packages only: how many people one package admits/covers.
+    // NULL or 0 = not specified (don't surface). Purely informational — shown
+    // to customers; does not change pricing or commission.
+    peoplePerPackage: integer("people_per_package"),
     days: text("days").array().notNull().default([]),
     timeFrom: varchar("time_from", { length: 8 }).notNull().default(""),
     timeTo: varchar("time_to", { length: 8 }).notNull().default(""),
@@ -730,6 +739,8 @@ export const vendorCommissionsTable = pgTable(
     tableBookingRate: numeric("table_booking_rate", { precision: 8, scale: 2 }).notNull().default("0"),
     // Event booking commission as a percentage (0–100) of ticket revenue.
     eventRate: numeric("event_rate", { precision: 8, scale: 2 }).notNull().default("0"),
+    // Cover-charge commission as a percentage (0–100) of the final package revenue.
+    coverChargeRate: numeric("cover_charge_rate", { precision: 8, scale: 2 }).notNull().default("0"),
     eventCommissionEnabled: boolean("event_commission_enabled").notNull().default(true),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

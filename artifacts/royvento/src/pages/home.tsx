@@ -32,7 +32,7 @@ import { EventCard } from "@/components/EventCard";
 import { apiGet } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { SEO } from "@/components/SEO";
-import { FreeDrinkSection, TicketSection, splitVendorsByPlanType } from "@/components/DrinkDealCards";
+import { FreeDrinkSection, TicketSection, CoverChargeSection, splitVendorsByPlanType } from "@/components/DrinkDealCards";
 import { HeroSlider } from "@/components/HeroSlider";
 import { HappeningTonight } from "@/components/HappeningTonight";
 import { GoingOutWithFriends } from "@/components/GoingOutWithFriends";
@@ -489,8 +489,8 @@ export function Home() {
 
       {/* Drink Deals */}
       {drinkOffers.length > 0 && (() => {
-        const { freeVendors, ticketVendors } = splitVendorsByPlanType(drinkOffers as VendorDrinkOffer[]);
-        if (freeVendors.length === 0 && ticketVendors.length === 0) return null;
+        const { freeVendors, ticketVendors, coverChargeVendors } = splitVendorsByPlanType(drinkOffers as VendorDrinkOffer[]);
+        if (freeVendors.length === 0 && ticketVendors.length === 0 && coverChargeVendors.length === 0) return null;
         return (
           <section className="py-16 md:py-20">
             <div className="container mx-auto px-4 md:px-6">
@@ -504,6 +504,7 @@ export function Home() {
               <div className="space-y-10">
                 <FreeDrinkSection vendors={freeVendors} />
                 <TicketSection vendors={ticketVendors} />
+                <CoverChargeSection vendors={coverChargeVendors} />
               </div>
             </div>
           </section>

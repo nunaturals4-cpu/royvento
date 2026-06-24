@@ -129,15 +129,20 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const [myCoupons, setMyCoupons] = useState<Coupon[]>([]);
   const [booking, setBooking] = useState(false);
   const [discountInfo, setDiscountInfo] = useState<DiscountInfo | null>(null);
-  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
+  const openLightbox = (images: string[], index: number) => setLightbox({ images, index });
+  const lightboxStep = (dir: 1 | -1) =>
+    setLightbox((lb) => (lb ? { ...lb, index: (lb.index + dir + lb.images.length) % lb.images.length } : lb));
   const [expandedDrinkPlans, setExpandedDrinkPlans] = useState<Set<number>>(new Set());
 
   // Pub-specific state
   const isPub = (event as any)?.type === "pub";
-  const [pubMode, setPubMode] = useState<"ticket" | "event" | "event_booking">("ticket");
+  const [pubMode, setPubMode] = useState<"ticket" | "event" | "event_booking" | "cover_charge">("ticket");
   const [ticketWomen, setTicketWomen] = useState(0);
   const [ticketMen, setTicketMen] = useState(0);
   const [ticketCouple, setTicketCouple] = useState(0);
+  const [coverChargePlanId, setCoverChargePlanId] = useState("");
+  const [coverChargeQty, setCoverChargeQty] = useState(1);
   const [occasion, setOccasion] = useState("");
   const [arrivalTime, setArrivalTime] = useState("");
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState("");
@@ -153,12 +158,14 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   };
   // Switch booking type and clear any data entered for the previous type so
   // stale ticket counts / guests / occasion / event selection don't carry over.
-  const changePubMode = (v: "ticket" | "event" | "event_booking") => {
+  const changePubMode = (v: "ticket" | "event" | "event_booking" | "cover_charge") => {
     if (v === pubMode) return;
     setPubMode(v);
     setTicketWomen(0);
     setTicketMen(0);
     setTicketCouple(0);
+    setCoverChargePlanId("");
+    setCoverChargeQty(1);
     setGuests(1);
     setOccasion("");
     setArrivalTime("");
@@ -256,6 +263,18 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     apiGet<Coupon[]>("/api/coupons/me").then(setMyCoupons).catch(() => {});
     apiGet<DiscountInfo>("/api/users/me/discounts").then(setDiscountInfo).catch(() => {});
   }, [me?.user]);
+
+  // Keyboard navigation for the photo lightbox (← prev, → next, Esc close).
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightbox(null);
+      else if (e.key === "ArrowRight") lightboxStep(1);
+      else if (e.key === "ArrowLeft") lightboxStep(-1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightbox]);
 
   useEffect(() => {
     const vendorId = (event as any)?.vendorId;
@@ -408,6 +427,13 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const isGenderDisabled = (g: "women" | "men" | "couple") => disabledGenders.includes(g);
   const disabledGenderLabels = disabledGenders.map((g) => g === "women" ? t("events.women") : g === "men" ? "Stag" : g === "couple" ? t("events.couple") : g);
 
+  // Cover-charge packages: partner-created drink plans of type "cover_charge".
+  // `price` is in paise. Only show the Cover Charges booking option when at
+  // least one package exists for this venue.
+  const coverChargePlans = (drinkPlans as any[]).filter((p) => p.type === "cover_charge");
+  const hasCoverCharges = coverChargePlans.length > 0;
+  const selectedCoverChargePlan = coverChargePlans.find((p) => String(p.id) === coverChargePlanId);
+
   const formatHour = (t: string): string => {
     const [h, m] = t.split(":").map(Number);
     if (isNaN(h)) return t;
@@ -490,6 +516,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     subtotal = ticketWomen * pw + ticketMen * pm + ticketCouple * pc;
   } else if (isPub && pubMode === "event_booking") {
     subtotal = eventBookingPerPerson * Math.max(1, guests);
+  } else if (isPub && pubMode === "cover_charge") {
+    subtotal = (Number(selectedCoverChargePlan?.price ?? 0) / 100) * Math.max(1, coverChargeQty);
   } else if (isPub && ferAllGendersFree) {
     subtotal = 0;
   } else {
@@ -597,9 +625,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) {
       errs.ticketWomen = t("events.add_tickets");
     }
-    if (isPub && (pubMode === "ticket" || pubMode === "event") && !arrivalTime) {
+    if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && !arrivalTime) {
       errs.arrivalTime = t("events.required_field");
-    } else if (isPub && (pubMode === "ticket" || pubMode === "event") && arrivalTime && date) {
+    } else if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && arrivalTime && date) {
       if (date === todayIst()) {
         const now = new Date();
         const [h, m] = arrivalTime.split(":").map(Number);
@@ -617,6 +645,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     }
     if (isPub && pubMode === "event_booking" && !selectedAnnouncementId) {
       errs.selectedPubEvent = "Please select an event to book";
+    }
+    if (isPub && pubMode === "cover_charge" && !coverChargePlanId) {
+      errs.coverChargePlanId = "Please select a cover charge package";
     }
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) {
@@ -649,7 +680,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       const result = await apiPost<{ id?: number; status?: string; requiresPayment?: boolean; redirectUrl?: string; bookingId?: number; paymentPending?: boolean; razorpayOrderId?: string; razorpayKeyId?: string; amountPaise?: number }>("/api/bookings", {
         eventId: event.id,
         bookingDate: date,
-        guests: isPub && pubMode === "ticket" ? (ticketWomen + ticketMen + ticketCouple * 2) : guests,
+        guests: isPub && pubMode === "ticket" ? (ticketWomen + ticketMen + ticketCouple * 2) : isPub && pubMode === "cover_charge" ? coverChargeQty : guests,
         notes,
         eventType,
         budgetRange: budget === "any" ? "" : budget,
@@ -664,8 +695,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               ticketWomen, ticketMen, ticketCouple,
               selectedPubEvent: selectedAnnouncement?.title ?? "",
               announcementId: pubMode === "event_booking" && selectedAnnouncementId ? Number(selectedAnnouncementId) : undefined,
+              coverChargePlanId: pubMode === "cover_charge" && coverChargePlanId ? Number(coverChargePlanId) : undefined,
               notes: pubMode === "event" ? occasion : notes,
-              arrivalTime: isPub && (pubMode === "ticket" || pubMode === "event") ? arrivalTime : undefined,
+              arrivalTime: isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") ? arrivalTime : undefined,
             }
           : {}),
       });
@@ -751,8 +783,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       const errs: Record<string, string> = {};
       if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) errs.ticketWomen = t("events.add_tickets");
       if (isPub && pubMode === "event_booking" && !selectedAnnouncementId) errs.selectedPubEvent = "Please select an event to book";
-      if (isPub && (pubMode === "ticket" || pubMode === "event") && !arrivalTime) errs.arrivalTime = t("events.required_field");
-      else if (isPub && (pubMode === "ticket" || pubMode === "event") && arrivalTime && date) {
+      if (isPub && pubMode === "cover_charge" && !coverChargePlanId) errs.coverChargePlanId = "Please select a cover charge package";
+      if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && !arrivalTime) errs.arrivalTime = t("events.required_field");
+      else if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && arrivalTime && date) {
         if (date === todayIst()) {
           const now = new Date();
           const [h, m] = arrivalTime.split(":").map(Number);
@@ -934,8 +967,29 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       {/* Lightbox — stays full-screen over everything */}
       {lightbox && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-lg" onClick={() => setLightbox(null)}>
-          <img src={lightbox} alt="" className="max-w-[95vw] max-h-[90vh] rounded-2xl object-contain shadow-2xl" />
-          <button className="absolute top-4 right-6 h-10 w-10 rounded-full bg-white/10 border border-white/20 hover:bg-white/20 flex items-center justify-center transition-colors" onClick={() => setLightbox(null)}>
+          <img src={lightbox.images[lightbox.index]} alt="" className="max-w-[95vw] max-h-[90vh] rounded-2xl object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+          {lightbox.images.length > 1 && (
+            <>
+              <button
+                aria-label="Previous photo"
+                className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-white/10 border border-white/20 hover:bg-white/20 flex items-center justify-center transition-colors"
+                onClick={(e) => { e.stopPropagation(); lightboxStep(-1); }}
+              >
+                <ChevronLeft className="h-6 w-6 text-white" />
+              </button>
+              <button
+                aria-label="Next photo"
+                className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-white/10 border border-white/20 hover:bg-white/20 flex items-center justify-center transition-colors"
+                onClick={(e) => { e.stopPropagation(); lightboxStep(1); }}
+              >
+                <ChevronRight className="h-6 w-6 text-white" />
+              </button>
+              <div className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-black/60 border border-white/15 px-3 py-1 text-xs text-white backdrop-blur-md">
+                {lightbox.index + 1} / {lightbox.images.length}
+              </div>
+            </>
+          )}
+          <button className="absolute top-4 right-6 h-10 w-10 rounded-full bg-white/10 border border-white/20 hover:bg-white/20 flex items-center justify-center transition-colors" onClick={(e) => { e.stopPropagation(); setLightbox(null); }}>
             <X className="h-5 w-5 text-white" />
           </button>
         </div>
@@ -1105,7 +1159,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               {galleryImgs.map((src, i) => (
                 <button
                   key={i}
-                  onClick={() => setLightbox(src)}
+                  onClick={() => openLightbox(galleryImgs, i)}
                   className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-white/[0.08] hover:border-primary/40 transition-colors"
                 >
                   <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
@@ -1330,7 +1384,11 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
           {isPub && (() => {
             const hasPhotos = ((ev as any).galleryImages?.length > 0) || ((ev.vendor as any)?.danceFloorPhotos?.filter(Boolean).length > 0) || ((ev.vendor as any)?.menuUrls?.filter(Boolean).length > 0);
             if (!hasPhotos) return null;
-            const preview: string[] = [...((ev as any).galleryImages ?? []), ...((ev.vendor as any)?.danceFloorPhotos ?? []).filter(Boolean)].slice(0, 4);
+            const preview: string[] = [
+              ...((ev as any).galleryImages ?? []),
+              ...((ev.vendor as any)?.danceFloorPhotos ?? []).filter(Boolean),
+              ...((ev.vendor as any)?.menuUrls ?? []).filter(Boolean),
+            ].slice(0, 4);
             return (
               <section>
                 <div className="flex items-center justify-between mb-4">
@@ -1528,7 +1586,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
             {isPub && drinkPlans.length > 0 && (() => {
               const freePlans = drinkPlans.filter((p: any) => p.type === "welcome" || p.type === "unlimited");
               const ticketPlans = drinkPlans.filter((p: any) => p.type === "ticket");
-              const otherPlans = drinkPlans.filter((p: any) => p.type !== "welcome" && p.type !== "unlimited" && p.type !== "ticket");
+              const coverChargePlans = drinkPlans.filter((p: any) => p.type === "cover_charge");
+              const otherPlans = drinkPlans.filter((p: any) => !["welcome", "unlimited", "ticket", "cover_charge"].includes(p.type));
               const coverFallback = event.imageUrl || vendorCover || null;
 
               const Section = ({ icon: Icon, label, plans, accent }: { icon: typeof Wine; label: string; plans: any[]; accent: "primary" | "amber" }) => {
@@ -1560,6 +1619,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                 <div className="space-y-10 text-left">
                   <Section icon={Wine} label="Free Drinks" plans={freePlans} accent="primary" />
                   <Section icon={Ticket} label="Included With Ticket" plans={ticketPlans} accent="amber" />
+                  <Section icon={Ticket} label="Cover Charges" plans={coverChargePlans} accent="amber" />
                   <Section icon={Wine} label="Drink Deals" plans={otherPlans} accent="primary" />
                 </div>
               );
@@ -1622,7 +1682,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                           <>
                             {r.comment && <p className="text-sm text-white/65 leading-relaxed">{r.comment}</p>}
                             {Array.isArray(r.imageUrls) && r.imageUrls.length > 0 && (
-                              <div className="flex flex-wrap gap-2">{r.imageUrls.map((url: string, i: number) => <button key={i} type="button" onClick={() => setLightbox(url)} className="rounded-xl overflow-hidden border border-white/10 hover:border-primary/40 transition-colors"><img src={url} alt="" loading="lazy" className="w-20 h-20 object-cover" /></button>)}</div>
+                              <div className="flex flex-wrap gap-2">{r.imageUrls.map((url: string, i: number) => <button key={i} type="button" onClick={() => openLightbox(r.imageUrls, i)} className="rounded-xl overflow-hidden border border-white/10 hover:border-primary/40 transition-colors"><img src={url} alt="" loading="lazy" className="w-20 h-20 object-cover" /></button>)}</div>
                             )}
                             {!!me?.user && r.userId === me.user.id && (
                               <div className="flex items-center gap-2 pt-1 border-t border-white/6"><Button size="sm" variant="outline" onClick={() => handleEditReview(r)} className="border-white/10 text-xs">Edit</Button><Button size="sm" variant="outline" onClick={() => handleDeleteReview(r.id)} disabled={deleteReview.isPending} className="border-white/10 text-xs">Delete</Button></div>
@@ -1680,8 +1740,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                 <h2 className="font-serif text-3xl mb-6 accent-underline inline-block">Gallery</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-6">
                   {((ev as any).galleryImages ?? []).map((src: string, i: number) => (
-                    <button key={i} type="button" onClick={() => setLightbox(src)} className={`group relative overflow-hidden rounded-2xl border border-white/8 hover:border-primary/40 transition-all cursor-zoom-in ${i === 0 ? "sm:col-span-2 sm:row-span-2" : ""}`}>
-                      <img src={src} alt="" className={`w-full object-cover transition-transform duration-500 group-hover:scale-110 ${i === 0 ? "h-48 sm:h-full min-h-[280px]" : "h-36 sm:h-44"}`} />
+                    <button key={i} type="button" onClick={() => openLightbox(((ev as any).galleryImages ?? []) as string[], i)} className="group relative aspect-square overflow-hidden rounded-2xl border border-white/8 hover:border-primary/40 transition-all cursor-zoom-in">
+                      <img src={src} alt={`Gallery photo ${i + 1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                     </button>
                   ))}
@@ -1696,7 +1756,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                   <h2 className="font-serif text-3xl mb-6 accent-underline inline-block">Dance Floor</h2>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-6">
                     {dfl.map((url: string, i: number) => (
-                      <button key={i} type="button" onClick={() => setLightbox(url)} className="group relative aspect-square overflow-hidden rounded-2xl border border-white/8 hover:border-primary/40 transition-all cursor-zoom-in">
+                      <button key={i} type="button" onClick={() => openLightbox(dfl, i)} className="group relative aspect-square overflow-hidden rounded-2xl border border-white/8 hover:border-primary/40 transition-all cursor-zoom-in">
                         <img src={url} alt={`Dance floor ${i + 1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                       </button>
@@ -1794,6 +1854,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       {[
                         { value: "ticket", label: "Ticket Booking", desc: "Book your entry tickets for the night", icon: Ticket, badge: null },
                         { value: "event", label: (event as any)?.vendorCategory === "Club" ? "VIP Table Booking" : "Table Booking", desc: (event as any)?.vendorCategory === "Club" ? "Premium tables & bottle service" : "Reserve a table for your group", icon: Crown, badge: (event as any)?.freeEntryForTable ? "Free Entry" : null },
+                        ...(hasCoverCharges ? [{ value: "cover_charge", label: "Cover Charges", desc: "Pre-paid entry packages with included offers", icon: Ticket, badge: null }] : []),
                         ...(sortedAnnouncements.length > 0 ? [{ value: "event_booking", label: "Event Ticket", desc: "Special events & party tickets", icon: CalIcon, badge: null }] : []),
                       ].map((opt: any) => {
                         const active = pubMode === opt.value;
@@ -1827,6 +1888,59 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                         )}
                       </div>
                     )}
+                    {/* What the partner/admin added in "Drink Plans & Offers" — shown
+                        under Ticket Booking so guests see what's included before paying. */}
+                    {pubMode === "ticket" && (() => {
+                      const freePlans = (drinkPlans as any[]).filter((p) => p.type === "welcome" || p.type === "unlimited");
+                      const ticketPlans = (drinkPlans as any[]).filter((p) => p.type === "ticket");
+                      if (freePlans.length === 0 && ticketPlans.length === 0) return null;
+                      const PlanGroup = ({ plans, accent, label, Icon }: { plans: any[]; accent: "primary" | "amber"; label: string; Icon: typeof Wine }) => {
+                        if (plans.length === 0) return null;
+                        const chipCls = accent === "amber" ? "border-amber-500/25 bg-amber-500/10 text-amber-300" : "border-primary/25 bg-primary/10 text-primary";
+                        const headCls = accent === "amber" ? "text-amber-400" : "text-primary";
+                        return (
+                          <div className="space-y-2.5">
+                            <div className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide ${headCls}`}>
+                              <Icon className="h-3.5 w-3.5" /> {label}
+                            </div>
+                            <ul className="space-y-2">
+                              {plans.map((p: any) => {
+                                const items = (p.lineItems ?? []).filter((it: any) => it.name);
+                                const ladies = p.gender === "female";
+                                const headline = p.productName || (p.type === "unlimited" ? "Unlimited drinks" : p.type === "ticket" ? "Drinks with ticket" : "Free welcome drink");
+                                return (
+                                  <li key={p.id} className="rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[13px] font-semibold text-white leading-tight flex-1">{headline}</span>
+                                      {ladies && <span className="shrink-0 rounded-full bg-pink-500/15 border border-pink-500/25 px-2 py-0.5 text-[9px] font-semibold text-pink-400 uppercase tracking-wide">{t("pub_offers.filter_ladies")}</span>}
+                                    </div>
+                                    {items.length > 0 && (
+                                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                        {items.slice(0, 5).map((it: any, i: number) => (
+                                          <span key={i} className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${chipCls}`}>
+                                            {it.name}{(it.discountedPrice ?? 0) > 0 ? ` · ₹${it.discountedPrice}` : ""}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        );
+                      };
+                      return (
+                        <div className="rounded-xl border border-primary/15 bg-gradient-to-br from-primary/[0.06] to-transparent p-4 mt-2 space-y-4">
+                          <div className="flex items-center gap-2">
+                            <Sparkle className="h-3.5 w-3.5 text-primary" />
+                            <p className="text-xs uppercase tracking-wider text-muted-foreground">Included with your ticket</p>
+                          </div>
+                          <PlanGroup plans={freePlans} accent="primary" label="Free Drinks" Icon={Wine} />
+                          <PlanGroup plans={ticketPlans} accent="amber" label="Included With Ticket" Icon={Ticket} />
+                        </div>
+                      );
+                    })()}
                     {pubMode === "event" && (
                       <div className="grid sm:grid-cols-2 gap-3 mt-2">
                         <div>
@@ -1840,6 +1954,87 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                           <Label htmlFor="guests2" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.guests_field")}</Label>
                           <Input id="guests2" type="number" min={10} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 h-11 rounded-xl" />
                         </div>
+                      </div>
+                    )}
+                    {pubMode === "cover_charge" && (
+                      <div className="space-y-4 mt-2">
+                        <div>
+                          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2.5">Select Package <span className="text-primary normal-case">*</span></p>
+                          <div className={`grid grid-cols-1 gap-3 ${coverChargePlans.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                            {coverChargePlans.map((p: any) => {
+                              const active = String(p.id) === coverChargePlanId;
+                              const offers = (p.lineItems ?? []).filter((it: any) => it.name);
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => setCoverChargePlanId(String(p.id))}
+                                  className={`group relative overflow-hidden text-left rounded-2xl border p-4 transition-all duration-300 ${
+                                    active
+                                      ? "border-primary bg-gradient-to-br from-primary/15 via-primary/5 to-transparent shadow-[0_0_30px_-10px_hsl(var(--primary))]"
+                                      : "border-white/10 bg-black/20 hover:border-primary/40 hover:bg-black/30"
+                                  }`}
+                                >
+                                  {/* Ambient corner glow */}
+                                  <span aria-hidden className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full blur-2xl transition-opacity duration-300 ${active ? "bg-primary/25 opacity-100" : "bg-primary/10 opacity-0 group-hover:opacity-100"}`} />
+                                  {/* Selection check */}
+                                  <span className={`absolute top-3 right-3 z-10 flex h-5 w-5 items-center justify-center rounded-full border transition-all ${active ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40 text-transparent group-hover:border-primary/50"}`}>
+                                    <Check className="h-3 w-3" />
+                                  </span>
+                                  <div className="relative flex items-center gap-2.5 mb-2.5 pr-6">
+                                    <span className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-all ${active ? "bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-[0_0_16px_-4px_hsl(var(--primary))]" : "bg-white/[0.04] border border-white/10 text-primary"}`}>
+                                      <Crown className="h-4 w-4" />
+                                    </span>
+                                    <p className="font-bold text-sm tracking-wide text-foreground uppercase truncate">{p.productName || "Package"}</p>
+                                  </div>
+                                  {(p.peoplePerPackage ?? 0) > 0 && (
+                                    <div className="relative mb-2.5">
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 border border-primary/30 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+                                        <Users className="h-3 w-3" /> {p.peoplePerPackage === 1 ? "Made just for you 🎉" : `Bring your squad of ${p.peoplePerPackage} 🎉`}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {offers.length > 0 && (
+                                    <div className="relative flex flex-wrap gap-1.5 mb-3">
+                                      {offers.slice(0, 4).map((it: any, i: number) => (
+                                        <span key={i} className="inline-flex items-center rounded-full bg-white/[0.06] border border-white/10 px-2.5 py-0.5 text-[11px] font-medium text-white/75">{it.name}</span>
+                                      ))}
+                                      {offers.length > 4 && <span className="self-center text-[11px] text-muted-foreground">+{offers.length - 4} more</span>}
+                                    </div>
+                                  )}
+                                  {p.description && <p className="relative text-[11px] text-muted-foreground/70 italic line-clamp-1 mb-2.5">{p.description}</p>}
+                                  <div className="relative flex items-baseline gap-1.5">
+                                    <span className="font-serif text-2xl leading-none text-gradient-red">{formatINR(Number(p.price) / 100)}</span>
+                                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">/ package</span>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {fieldErrors.coverChargePlanId && <p className="text-xs text-destructive mt-1.5">{fieldErrors.coverChargePlanId}</p>}
+                        </div>
+                        <div>
+                          <Label className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">Number of packages</Label>
+                          <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-black/40 p-1">
+                            <button type="button" aria-label="Decrease packages" onClick={() => setCoverChargeQty((n) => Math.max(1, n - 1))}
+                              className="h-9 w-9 rounded-lg flex items-center justify-center text-xl font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors select-none">−</button>
+                            <span className="w-12 text-center font-bold text-lg tabular-nums">{coverChargeQty}</span>
+                            <button type="button" aria-label="Increase packages" onClick={() => setCoverChargeQty((n) => n + 1)}
+                              className="h-9 w-9 rounded-lg flex items-center justify-center text-xl font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors select-none">+</button>
+                          </div>
+                        </div>
+                        {selectedCoverChargePlan && (
+                          <div className="rounded-2xl border border-primary/25 bg-gradient-to-r from-primary/10 to-transparent px-4 py-3.5 flex items-center justify-between gap-4">
+                            <div className="min-w-0">
+                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total</p>
+                              <p className="text-xs text-white/60 mt-0.5 truncate">
+                                {formatINR(Number(selectedCoverChargePlan.price) / 100)} × {Math.max(1, coverChargeQty)} {Math.max(1, coverChargeQty) === 1 ? "package" : "packages"}
+                                {(selectedCoverChargePlan.peoplePerPackage ?? 0) > 0 ? ` · gets your crew of ${selectedCoverChargePlan.peoplePerPackage * Math.max(1, coverChargeQty)} in` : ""}
+                              </p>
+                            </div>
+                            <span className="font-serif text-2xl leading-none text-gradient-red shrink-0">{formatINR((Number(selectedCoverChargePlan.price) / 100) * Math.max(1, coverChargeQty))}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                     {pubMode === "event_booking" && (
@@ -1919,7 +2114,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                 </div>
 
                 {/* ── Section 3: Arrival Time (time-picker widget) ── */}
-                {isPub && (pubMode === "ticket" || pubMode === "event") && (
+                {isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && (
                   <div className="rounded-2xl glass-card p-5 sm:p-6 space-y-3">
                     <div className="flex items-center gap-2.5 mb-1">
                       <span className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
@@ -2066,13 +2261,13 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                   <dl className="text-sm divide-y divide-white/8">
                     <div className="flex items-center justify-between gap-4 py-2.5">
                       <dt className="text-muted-foreground">Booking Type</dt>
-                      <dd className="font-medium text-right">{!isPub ? "Event Booking" : pubMode === "ticket" ? t("events.buy_tickets") : pubMode === "event" ? ((event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking")) : "Events Booking"}</dd>
+                      <dd className="font-medium text-right">{!isPub ? "Event Booking" : pubMode === "ticket" ? t("events.buy_tickets") : pubMode === "event" ? ((event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking")) : pubMode === "cover_charge" ? "Cover Charges" : "Events Booking"}</dd>
                     </div>
                     <div className="flex items-center justify-between gap-4 py-2.5">
                       <dt className="text-muted-foreground">Date</dt>
                       <dd className="font-medium text-right">{date ? new Date(date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—"}</dd>
                     </div>
-                    {isPub && (pubMode === "ticket" || pubMode === "event") && arrivalTime && (
+                    {isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && arrivalTime && (
                       <div className="flex items-center justify-between gap-4 py-2.5">
                         <dt className="text-muted-foreground">{t("events.arrival_time")}</dt>
                         <dd className="font-medium text-right">{arrivalTime}</dd>
@@ -2080,7 +2275,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     )}
                     <div className="flex items-center justify-between gap-4 py-2.5">
                       <dt className="text-muted-foreground">{t("events.guests_field")}</dt>
-                      <dd className="font-medium text-right">{isPub && pubMode === "ticket" ? `${ticketWomen + ticketMen + ticketCouple} ticket${ticketWomen + ticketMen + ticketCouple === 1 ? "" : "s"}` : `${guests} guest${guests === 1 ? "" : "s"}`}</dd>
+                      <dd className="font-medium text-right">{isPub && pubMode === "ticket" ? `${ticketWomen + ticketMen + ticketCouple} ticket${ticketWomen + ticketMen + ticketCouple === 1 ? "" : "s"}` : isPub && pubMode === "cover_charge" ? `${coverChargeQty} package${coverChargeQty === 1 ? "" : "s"}` : `${guests} guest${guests === 1 ? "" : "s"}`}</dd>
                     </div>
                     {isPub && (
                       <>
@@ -2174,7 +2369,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       <Ticket className="h-4 w-4 text-primary shrink-0" />
                       <div className="min-w-0">
                         <p className="text-[11px] text-muted-foreground leading-tight">Booking Type</p>
-                        <p className="font-medium leading-tight truncate">{!isPub ? "Event Booking" : pubMode === "ticket" ? t("events.buy_tickets") : pubMode === "event" ? ((event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking")) : "Events Booking"}</p>
+                        <p className="font-medium leading-tight truncate">{!isPub ? "Event Booking" : pubMode === "ticket" ? t("events.buy_tickets") : pubMode === "event" ? ((event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking")) : pubMode === "cover_charge" ? "Cover Charges" : "Events Booking"}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -2197,7 +2392,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       <Users className="h-4 w-4 text-primary shrink-0" />
                       <div className="min-w-0">
                         <p className="text-[11px] text-muted-foreground leading-tight">{t("events.guests_field")}</p>
-                        <p className="font-medium leading-tight truncate">{isPub && pubMode === "ticket" ? (ticketWomen + ticketMen + ticketCouple > 0 ? `${ticketWomen + ticketMen + ticketCouple} ticket${ticketWomen + ticketMen + ticketCouple === 1 ? "" : "s"}` : "—") : `${guests} guest${guests === 1 ? "" : "s"}`}</p>
+                        <p className="font-medium leading-tight truncate">{isPub && pubMode === "ticket" ? (ticketWomen + ticketMen + ticketCouple > 0 ? `${ticketWomen + ticketMen + ticketCouple} ticket${ticketWomen + ticketMen + ticketCouple === 1 ? "" : "s"}` : "—") : isPub && pubMode === "cover_charge" ? `${coverChargeQty} package${coverChargeQty === 1 ? "" : "s"}` : `${guests} guest${guests === 1 ? "" : "s"}`}</p>
                       </div>
                     </div>
                   </div>

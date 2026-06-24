@@ -598,6 +598,7 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "announcement_id" integer`);
     await db.execute(sql`ALTER TABLE "vendor_commissions" ADD COLUMN IF NOT EXISTS "event_rate" numeric(8,2) NOT NULL DEFAULT '0'`);
     await db.execute(sql`ALTER TABLE "vendor_commissions" ADD COLUMN IF NOT EXISTS "event_commission_enabled" boolean NOT NULL DEFAULT true`);
+    await db.execute(sql`ALTER TABLE "vendor_commissions" ADD COLUMN IF NOT EXISTS "cover_charge_rate" numeric(8,2) NOT NULL DEFAULT '0'`);
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "price" numeric(10,2) NOT NULL DEFAULT '0'`);
     await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "event_commission_pct" numeric(5,2)`);
     // ── Food & Drink discount offers (vendor_offers) ───────────────────────
@@ -689,6 +690,7 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "free_entry_for_table_before_time" text`);
     // ── drink_plans.image_url ──────────────────────────────────────────────
     await db.execute(sql`ALTER TABLE "drink_plans" ADD COLUMN IF NOT EXISTS "image_url" text`);
+    await db.execute(sql`ALTER TABLE "drink_plans" ADD COLUMN IF NOT EXISTS "people_per_package" integer`);
     // ── announcements approval workflow ────────────────────────────────────
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "approval_status" varchar(20) NOT NULL DEFAULT 'pending'`);
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "rejection_reason" text NOT NULL DEFAULT ''`);
@@ -1151,13 +1153,14 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "vip_capacity" integer NOT NULL DEFAULT 0`);
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "date_night" boolean NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "disabled_genders" text[] NOT NULL DEFAULT '{}'`);
+    await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "hidden" boolean NOT NULL DEFAULT false`);
 
     // ── Razorpay payment gateway columns ──────────────────────────────────
     await db.execute(sql`ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "razorpay_order_id" varchar(100) NOT NULL DEFAULT ''`);
     await db.execute(sql`ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "razorpay_payment_id" varchar(100) NOT NULL DEFAULT ''`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "payments_razorpay_order_idx" ON "payments" ("razorpay_order_id") WHERE "razorpay_order_id" <> ''`);
 
-    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url + announcements.approval_status + razorpay columns + events.disabled_genders ensured");
+    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url + announcements.approval_status + razorpay columns + events.disabled_genders + events.hidden ensured");
   } catch (err) {
     logger.error({ err }, "Schema migration warning");
   }
@@ -1313,3 +1316,17 @@ function shutdown(signal: NodeJS.Signals) {
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
+
+// ── Keep the server alive on stray background errors ─────────────────────────
+// The many cron jobs + startup audit chain + email/push background tasks all run
+// detached from any request. On Node ≥15 a single unhandled promise rejection
+// (or an uncaught exception thrown off the event loop) terminates the whole
+// process — which is why the local API server appeared to "turn off by itself".
+// Log these loudly but DO NOT exit, so one failing background task can't take
+// the HTTP server down with it.
+process.on("unhandledRejection", (reason) => {
+  logger.error({ err: reason }, "Unhandled promise rejection — keeping server alive");
+});
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "Uncaught exception — keeping server alive");
+});
