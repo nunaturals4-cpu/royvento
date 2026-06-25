@@ -1,4 +1,4 @@
-import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable, emailMessagesTable, emailAttachmentsTable, emailThreadsTable, drinkPlansTable, vendorOffersTable, organizerEventsTable, bookingsTable } from "@workspace/db";
+import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable, emailMessagesTable, emailAttachmentsTable, emailThreadsTable, drinkPlansTable, vendorOffersTable, organizerEventsTable, bookingsTable, createYourPartyTable } from "@workspace/db";
 import { and, ne, sql, lt, gte, eq, isNotNull, inArray } from "drizzle-orm";
 
 const _istFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -274,6 +274,33 @@ export async function deletePastOrganizerEvents(): Promise<void> {
   }
 }
 
+// Auto-remove "Create Your Own Party" entries once their date is over (IST).
+// They're soft-removed (status → cancelled) rather than hard-deleted so the
+// host keeps their booking/payment history; the public list already excludes
+// cancelled and the detail endpoint 404s it, so the party disappears from the
+// app. Parties with no date set are left alone.
+export async function cancelPastParties(): Promise<void> {
+  try {
+    const today = todayIstDate();
+    const result = await db
+      .update(createYourPartyTable)
+      .set({ status: "cancelled", updatedAt: new Date() })
+      .where(
+        and(
+          isNotNull(createYourPartyTable.partyDate),
+          sql`${createYourPartyTable.partyDate} < ${today}`,
+          inArray(createYourPartyTable.status, ["published", "sales_stopped"]),
+        ),
+      )
+      .returning({ id: createYourPartyTable.id });
+
+    if (result.length === 0) return;
+    logger.info({ count: result.length }, "Cleanup: removed past private parties");
+  } catch (err) {
+    logger.error({ err }, "Cleanup: failed to remove past private parties");
+  }
+}
+
 // SAFETY GUARD: This cleanup job only touches events, announcements, and
 // notifications. Vendor/pub listings (vendorsTable), user accounts, bookings,
 // and all other business records are NEVER deleted by any function here.
@@ -399,6 +426,7 @@ export async function autoCheckoutStaleBookings(): Promise<void> {
 export async function runCleanup(): Promise<void> {
   await deletePastEvents();
   await deletePastOrganizerEvents();
+  await cancelPastParties();
   await deleteExpiredAnnouncements();
   await deleteExpiredDrinkPlans();
   await deleteExpiredVendorOffers();

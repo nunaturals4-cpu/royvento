@@ -22,6 +22,10 @@ import { createUserNotification } from "../lib/notify";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// Today's date (YYYY-MM-DD) in IST — the group/party date columns are plain
+// dates, and the audience is India, so "the date is over" is judged in IST.
+const _istFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
+
 function envDays(name: string, fallback: number): number {
   const n = Number(process.env[name]);
   return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -37,6 +41,47 @@ async function approvedMemberIds(groupId: number): Promise<number[]> {
     .from(soloGroupMembersTable)
     .where(and(eq(soloGroupMembersTable.groupId, groupId), eq(soloGroupMembersTable.status, "approved")));
   return rows.map((r) => r.userId);
+}
+
+// Shared soft-delete used by the date-expiry step below and by the owner-facing
+// "Delete group" route. Mirrors softDeleteExpiredGroups: marks the group deleted
+// (so every list/detail hides it), purges the temporary chat, snapshots it for
+// admin restore within the grace window, and optionally notifies members.
+export async function softDeleteSoloGroupById(
+  groupId: number,
+  reason: string,
+  opts: { notifyTitle?: string; notifyMessage?: string } = {},
+): Promise<boolean> {
+  const rows = await db.select().from(soloGroupsTable).where(eq(soloGroupsTable.id, groupId)).limit(1);
+  const g = rows[0];
+  if (!g || g.deletedAt) return false;
+  const memberIds = await approvedMemberIds(groupId);
+  const now = new Date();
+  await db
+    .update(soloGroupsTable)
+    .set({ deletedAt: now, deletedReason: reason, status: "closed" })
+    .where(eq(soloGroupsTable.id, groupId));
+  await db.delete(soloGroupMessagesTable).where(eq(soloGroupMessagesTable.groupId, groupId));
+  await db.insert(soloDeletedGroupsLogTable).values({
+    groupId,
+    name: g.name,
+    memberCount: memberIds.length,
+    reason,
+    deletedAt: now,
+    restorableUntil: new Date(now.getTime() + GRACE_DAYS * DAY_MS),
+  });
+  if (opts.notifyTitle && opts.notifyMessage) {
+    for (const userId of memberIds) {
+      createUserNotification({
+        userId,
+        title: opts.notifyTitle,
+        message: opts.notifyMessage,
+        url: "/solo-connect",
+        tag: `solo-group-${groupId}`,
+      }).catch(() => {});
+    }
+  }
+  return true;
 }
 
 // Step 1 — warn members of groups about to expire (3 days out), once each.
@@ -150,12 +195,37 @@ async function hardPurgeExpiredGroups(now: number): Promise<void> {
   logger.info({ count: purgeIds.length }, "Solo Connector: hard-purged expired groups past grace window");
 }
 
+// Date-based expiry — a group created with a specific date is auto-removed once
+// that date is over (judged in IST). Groups with no date are untouched (they
+// follow the inactivity lifecycle instead).
+async function softDeleteDatePassedGroups(): Promise<void> {
+  const today = _istFmt.format(new Date());
+  const groups = await db
+    .select({ id: soloGroupsTable.id, name: soloGroupsTable.name })
+    .from(soloGroupsTable)
+    .where(
+      and(
+        isNull(soloGroupsTable.deletedAt),
+        isNotNull(soloGroupsTable.groupDate),
+        lt(soloGroupsTable.groupDate, today),
+      ),
+    );
+  for (const g of groups) {
+    await softDeleteSoloGroupById(g.id, "event_over", {
+      notifyTitle: "Plan wrapped up",
+      notifyMessage: `"${g.name}" was closed automatically — its date has passed.`,
+    });
+  }
+  if (groups.length > 0) logger.info({ count: groups.length }, "Solo Connector: removed groups whose date has passed");
+}
+
 /** Run the full inactivity lifecycle. Safe to call repeatedly (idempotent). */
 export async function runSoloGroupExpiry(): Promise<void> {
   const now = Date.now();
   try {
     await warnExpiringGroups(now);
     await softDeleteExpiredGroups(now);
+    await softDeleteDatePassedGroups();
     await hardPurgeExpiredGroups(now);
   } catch (err) {
     logger.error({ err }, "Solo Connector group-expiry job failed");

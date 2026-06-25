@@ -991,6 +991,11 @@ function GroupCard({ g, onOpen }: { g: SoloGroup; onOpen: (id: number) => void }
             style={{ background: accent }}>
             {prettyActivity(g.activityType)}
           </span>
+          {g.visibility === "private" && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-white/20 bg-white/[0.08] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white/85">
+              <Lock className="h-2.5 w-2.5" /> Invite only
+            </span>
+          )}
           {g.status !== "open" && (
             <span className="inline-flex items-center gap-1 rounded-md border border-white/20 bg-white/[0.08] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white/85">
               <Lock className="h-2.5 w-2.5" /> {g.status}

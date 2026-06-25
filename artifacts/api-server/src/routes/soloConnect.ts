@@ -29,6 +29,7 @@ import {
   firebaseConfigured,
 } from "../lib/firebaseAuth";
 import { createUserNotification } from "../lib/notify";
+import { softDeleteSoloGroupById } from "../jobs/soloGroupExpiry";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 
 const router: IRouter = Router();
@@ -887,6 +888,7 @@ router.post("/solo-connect/groups", async (req, res) => {
 async function loadAccessibleGroup(
   groupId: number,
   callerCity: string,
+  callerState: string,
   res: Response,
 ): Promise<typeof soloGroupsTable.$inferSelect | null> {
   const rows = await db
@@ -899,8 +901,15 @@ async function loadAccessibleGroup(
     res.status(404).json({ error: "Group not found" });
     return null;
   }
-  if (callerCity && norm(g.city) !== norm(callerCity)) {
-    res.status(403).json({ error: "You can only access groups in your current city." });
+  // Location scope mirrors the browse list: groups are browsable state-wide when
+  // a state is known, otherwise same-city. A group is therefore accessible when
+  // it matches the caller's STATE or CITY. Passing neither (the public group
+  // profile / shared deep links) skips the gate. norm() is called null-safely
+  // because legacy rows may have a null city/state.
+  const cityOk = !!callerCity && norm(g.city ?? "") === norm(callerCity);
+  const stateOk = !!callerState && norm(g.state ?? "") === norm(callerState);
+  if ((callerCity || callerState) && !cityOk && !stateOk) {
+    res.status(403).json({ error: "You can only access groups in your current area." });
     return null;
   }
   return g;
@@ -916,8 +925,10 @@ router.get("/solo-connect/groups/:id", async (req, res) => {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
-  const callerCity = typeof req.query["city"] === "string" ? req.query["city"] : "";
-  const g = await loadAccessibleGroup(id, callerCity, res);
+  // The group profile is public — viewable logged-out and via shared deep links
+  // opened from any city/state — so viewing is not location-gated. Joining and
+  // chat remain scoped (enforced in their own handlers).
+  const g = await loadAccessibleGroup(id, "", "", res);
   if (!g) return;
 
   const members = await db
@@ -993,7 +1004,7 @@ router.post("/solo-connect/groups/:id/join", async (req, res) => {
     respondInvalid(res, parsed.error);
     return;
   }
-  const g = await loadAccessibleGroup(id, parsed.data.city, res);
+  const g = await loadAccessibleGroup(id, parsed.data.city, parsed.data.state ?? "", res);
   if (!g) return;
   if (g.status !== "open") {
     res.status(403).json({ error: "This group is locked or closed." });
@@ -1170,6 +1181,26 @@ function groupStateAction(next: "locked" | "closed") {
 
 router.post("/solo-connect/groups/:id/lock", groupStateAction("locked"));
 router.post("/solo-connect/groups/:id/close", groupStateAction("closed"));
+
+// Delete a group — group admin (owner) only. Soft-deletes so it disappears from
+// every list and its detail 404s, while staying restorable by a platform admin
+// within the grace window; the temporary chat is purged immediately.
+router.delete("/solo-connect/groups/:id", async (req, res) => {
+  const user = await requireApproved(req, res);
+  if (!user) return;
+  const id = parseInt(req.params["id"]!, 10);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const g = await requireGroupAdmin(id, user, res);
+  if (!g) return;
+  await softDeleteSoloGroupById(id, "owner", {
+    notifyTitle: "Group deleted",
+    notifyMessage: `"${g.name}" was deleted by the host.`,
+  });
+  res.json({ ok: true });
+});
 
 // Reset the invite link (group admin only) — revokes any previously-shared link.
 router.post("/solo-connect/groups/:id/reset-invite", async (req, res) => {

@@ -19,9 +19,10 @@ import {
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireGender } from "@/components/useRequireGender";
-import { apiPost } from "@/lib/api";
+import { apiPost, apiDelete } from "@/lib/api";
 import { uploadImage } from "@/lib/uploadImage";
-import { X, MapPin, Calendar, Users, Phone, Lock, ShieldAlert, Check, UserX, MessageCircle, Send, Flag, Ticket, Clock, User, ExternalLink, LogIn, Crown, ShieldCheck, ArrowRight, Share2, RefreshCw } from "lucide-react";
+import { useSelectedCity } from "@/components/LocationContext";
+import { X, MapPin, Calendar, Users, Phone, Lock, ShieldAlert, Check, UserX, MessageCircle, Send, Flag, Ticket, Clock, User, ExternalLink, LogIn, Crown, ShieldCheck, ArrowRight, Share2, RefreshCw, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 
 const GOLD = "#d4af37";
@@ -77,6 +78,7 @@ export function SoloGroupDetail({
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { selectedState } = useSelectedCity();
   const { data, isLoading } = useGetSoloGroup(groupId, { city });
 
   // Invite token carried in the host's share link (?invite=…). Required to join
@@ -96,7 +98,7 @@ export function SoloGroupDetail({
   // (reused silently if already set, otherwise collected first).
   function requestJoin() {
     ensureGender(() =>
-      join.mutate({ id: groupId, data: { city, inviteToken: inviteToken || undefined } }, {
+      join.mutate({ id: groupId, data: { city, state: selectedState ?? undefined, inviteToken: inviteToken || undefined } }, {
         onSuccess: () => { toast({ title: "Join request sent!" }); refresh(); },
         onError: (e) => toast({ title: e instanceof Error ? e.message : "Could not join", variant: "destructive" }),
       }),
@@ -108,6 +110,24 @@ export function SoloGroupDetail({
     // Also refetch THIS group's detail so membership / a freshly-reset invite
     // token update without needing to reopen the modal.
     qc.invalidateQueries({ queryKey: getGetSoloGroupQueryKey(groupId, { city }) });
+  }
+
+  // Host-only: permanently remove the group. It disappears from every list and
+  // its detail 404s after this; the modal closes once done.
+  const [deleting, setDeleting] = useState(false);
+  async function handleDelete() {
+    if (!confirm("Delete this group? This removes it for everyone and can't be undone.")) return;
+    setDeleting(true);
+    try {
+      await apiDelete(`/api/solo-connect/groups/${groupId}`);
+      toast({ title: "Group deleted" });
+      qc.invalidateQueries({ queryKey: ["/api/solo-connect/groups"] });
+      onClose();
+    } catch (e) {
+      toast({ title: e instanceof Error ? e.message : "Could not delete group", variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const group = data?.group;
@@ -152,8 +172,30 @@ export function SoloGroupDetail({
           <X className="h-4 w-4" />
         </button>
 
-        {isLoading || !group ? (
+        {isLoading ? (
           <div className="py-24 flex justify-center"><Spinner /></div>
+        ) : !group ? (
+          // Never leave the modal stuck on a spinner: if the detail request
+          // failed (group closed/removed, or a transient error) show a clear
+          // message + close action instead of an endless loader.
+          <div className="py-20 px-6 text-center">
+            <span className="inline-flex items-center justify-center h-14 w-14 rounded-2xl mb-4"
+              style={{ background: `${RED}1a`, border: `1px solid ${RED}44` }}>
+              <ShieldAlert className="h-6 w-6" style={{ color: "#fca5a5" }} />
+            </span>
+            <p className="font-serif text-xl mb-1.5" style={{ color: "#fff" }}>Couldn't load this group</p>
+            <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.6)" }}>
+              It may have been closed or is no longer available. Please try again.
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2.5 rounded-xl text-sm font-semibold transition-all"
+              style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.85)", border: "1px solid rgba(255,255,255,0.15)" }}
+            >
+              Close
+            </button>
+          </div>
         ) : (
           <>
           {group.activityType === "party" && group.coverImageUrl && (
@@ -339,6 +381,15 @@ export function SoloGroupDetail({
                   Close group
                 </button>
               </div>
+            )}
+
+            {/* Admin: delete the group entirely (available even once closed). */}
+            {isAdmin && (
+              <button type="button" onClick={handleDelete} disabled={deleting}
+                className="w-full mb-5 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 transition-all"
+                style={{ background: `${RED}1f`, color: "#fca5a5", border: `1px solid ${RED}55` }}>
+                <Trash2 className="h-3.5 w-3.5" /> {deleting ? "Deleting…" : "Delete group"}
+              </button>
             )}
 
             {/* Group chat — approved members + admins only */}

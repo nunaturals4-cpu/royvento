@@ -12,6 +12,12 @@ interface Props {
 
 const ANY = "__any__";
 
+// The Select dropdown portals to <body> at z-50, but this picker is often used
+// inside the hand-rolled party / solo-connect modals that sit at z-[9998]+.
+// Without bumping it, the opened dropdown renders *behind* the modal and looks
+// "not working" (invisible + unclickable). Float it above the modal layer.
+const CONTENT_Z = "z-[10050]";
+
 export function LocationSelect({ country, state, city, onChange, className, compact }: Props) {
   const states = country ? getStates(country) : [];
   const cities = country && state ? getCities(country, state) : [];
@@ -30,7 +36,7 @@ export function LocationSelect({ country, state, city, onChange, className, comp
         <SelectTrigger className="bg-card/60 border-white/10">
           <SelectValue placeholder="Country" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className={CONTENT_Z}>
           <SelectItem value={ANY}>Any country</SelectItem>
           {COUNTRY_NAMES.map((c) => (
             <SelectItem key={c} value={c}>{c}</SelectItem>
@@ -45,7 +51,7 @@ export function LocationSelect({ country, state, city, onChange, className, comp
         <SelectTrigger className="bg-card/60 border-white/10">
           <SelectValue placeholder={country ? "State" : "Pick country"} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className={CONTENT_Z}>
           <SelectItem value={ANY}>Any state</SelectItem>
           {states.map((s) => (
             <SelectItem key={s} value={s}>{s}</SelectItem>
@@ -60,7 +66,7 @@ export function LocationSelect({ country, state, city, onChange, className, comp
         <SelectTrigger className="bg-card/60 border-white/10">
           <SelectValue placeholder={state ? "City" : "Pick state"} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className={CONTENT_Z}>
           <SelectItem value={ANY}>Any city</SelectItem>
           {cities.map((c) => (
             <SelectItem key={c} value={c}>{c}</SelectItem>

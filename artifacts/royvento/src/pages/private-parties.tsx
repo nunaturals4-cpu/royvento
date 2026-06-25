@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { useGetMe, useGetSoloAccess, useListParties, type Party } from "@workspace/api-client-react";
 import { useSelectedCity } from "@/components/LocationContext";
+import { useToast } from "@/hooks/use-toast";
 import { SEO } from "@/components/SEO";
 import { Spinner } from "@/components/ui/spinner";
 import { CreatePartyModal } from "@/components/party/CreatePartyModal";
@@ -30,6 +31,28 @@ const HERO_IMAGE = "/images/house-party-hero.jpg";
 
 // Where login should return the visitor once authenticated.
 const LOGIN_NEXT = `/login?next=${encodeURIComponent("/private-parties")}`;
+
+const norm = (s: string) => (s ?? "").trim().toLowerCase();
+
+// Location scoping for the listing. A GPS-detected city is often a hyper-local
+// name (e.g. "Bidhannagar") while a party is tagged with the curated city the
+// host picked in the create wizard (e.g. "Kolkata"). An exact city match hid
+// those parties from the very person who created them, so we match leniently:
+//   • by city/locality — either string contains the other, OR
+//   • by the detected state as a fallback (e.g. both "West Bengal").
+// With no location signal at all, show everything.
+function locationMatches(party: Party, city: string, locality: string, state: string): boolean {
+  const pc = norm(party.city);
+  const ps = norm(party.state);
+  const c = norm(city);
+  const l = norm(locality);
+  const st = norm(state);
+  if (!c && !l && !st) return true;
+  const near = (a: string, b: string) => !!a && !!b && (a === b || a.includes(b) || b.includes(a));
+  if (near(pc, c) || near(pc, l)) return true;
+  if (st && ps && ps === st) return true;
+  return false;
+}
 
 export function PrivateParties() {
   const { data: me, isLoading: meLoading } = useGetMe({ query: { retry: false } as any });
@@ -190,7 +213,7 @@ function HeroSection({ canHost, loggedIn }: { canHost: boolean; loggedIn: boolea
 // Browse surface — needs a city to scope the listing, then renders only
 // "Create Your Own Party" entities for that city.
 function BrowseParties({ canHost, loggedIn }: { canHost: boolean; loggedIn: boolean }) {
-  const { selectedCity, detectLocation, detecting, locationError } = useSelectedCity();
+  const { selectedCity, selectedLocality, selectedState, detectLocation, detecting, locationError } = useSelectedCity();
 
   if (!selectedCity) {
     return (
@@ -224,14 +247,26 @@ function BrowseParties({ canHost, loggedIn }: { canHost: boolean; loggedIn: bool
     );
   }
 
-  return <PartyList city={selectedCity} canHost={canHost} loggedIn={loggedIn} />;
+  return (
+    <PartyList
+      city={selectedCity}
+      locality={selectedLocality}
+      state={selectedState}
+      canHost={canHost}
+      loggedIn={loggedIn}
+    />
+  );
 }
 
 // Discovery rail for standalone "Create Your Own Party" entities. Cards link to
 // the party profile page. Only parties are shown here — nothing else.
-function PartyList({ city, canHost, loggedIn }: { city: string; canHost: boolean; loggedIn: boolean }) {
+function PartyList({ city, locality, state, canHost, loggedIn }: { city: string; locality: string; state: string; canHost: boolean; loggedIn: boolean }) {
+  const { toast } = useToast();
+  // Fetch every live party (the endpoint caps at 200) and scope to the viewer's
+  // location on the client — this lets us match on city/locality/state together,
+  // which the server's city-only query couldn't do.
   const { data: parties = [], isLoading } = useListParties(
-    { city },
+    undefined,
     { query: { retry: false } as any },
   );
   const [showCreate, setShowCreate] = useState(false);
@@ -240,7 +275,17 @@ function PartyList({ city, canHost, loggedIn }: { city: string; canHost: boolean
   const [minP, setMinP] = useState("");
   const [maxP, setMaxP] = useState("");
 
-  const live = (parties as Party[]).filter((p) => p.status !== "cancelled");
+  const allLive = (parties as Party[]).filter((p) => p.status !== "cancelled");
+  // Surface every live party, but float the ones near the viewer to the top.
+  // Strict city-only scoping was hiding freshly-created parties whose curated
+  // city (e.g. "Kolkata") differs from the viewer's hyper-local detected area
+  // (e.g. the "Bidhannagar" locality) — and on desktop there's no GPS/state
+  // signal to bridge the two, so we rank by proximity instead of hard-filtering.
+  const live = [...allLive].sort(
+    (a, b) =>
+      (locationMatches(a, city, locality, state) ? 0 : 1) -
+      (locationMatches(b, city, locality, state) ? 0 : 1),
+  );
 
   const filtered = live.filter((p) => {
     if (tType !== "all" && p.ticketType !== tType) return false;
@@ -315,7 +360,7 @@ function PartyList({ city, canHost, loggedIn }: { city: string; canHost: boolean
                   backgroundClip: "text",
                 }}
               >
-                Private parties in {city}
+                Private parties near {city}
               </h3>
               <span
                 className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold"
@@ -402,7 +447,19 @@ function PartyList({ city, canHost, loggedIn }: { city: string; canHost: boolean
         <p className="text-sm text-center py-8 rounded-2xl" style={{ color: "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.1)" }}>No parties match your filters.</p>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filtered.map((p) => <PartyCard key={p.id} p={p} />)}
+          {filtered.map((p) => (
+            <PartyCard
+              key={p.id}
+              p={p}
+              onLocked={() =>
+                toast({
+                  title: "Private party — invite only",
+                  description: "Ask the host for their invite link to open this party.",
+                  variant: "destructive",
+                })
+              }
+            />
+          ))}
         </div>
       )}
 
@@ -446,24 +503,48 @@ function EmptyParties({ city, canHost, onHost }: { city: string; canHost: boolea
 }
 
 // Mirrors the homepage EventCard visual language so listings read consistently.
-function PartyCard({ p }: { p: Party }) {
+function PartyCard({ p, onLocked }: { p: Party; onLocked: () => void }) {
   const isPaid = p.ticketType === "paid";
   const loc = [p.venueName, p.city].filter(Boolean).join(", ");
-  return (
-    <Link href={`/party/${p.id}`}>
+  const isPrivate = p.visibility === "private";
+  // Private parties stay VISIBLE in the city list for discovery, but are shown
+  // locked to everyone except the host — opening/booking is gated behind the
+  // host's invite link (enforced server-side). The host sees theirs unlocked.
+  const locked = isPrivate && !p.isOrganizer;
+
+  const card = (
       <article className="group cursor-pointer overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111111] transition-all duration-300 hover:border-[#d4af37]/40 hover:shadow-[0_0_0_1px_rgba(212,175,55,0.18),0_8px_32px_rgba(0,0,0,0.6)]">
         <div className="relative aspect-video overflow-hidden bg-black/40">
           {p.coverImageUrl
-            ? <img src={p.coverImageUrl} alt={p.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.05]" />
+            ? <img src={p.coverImageUrl} alt={p.name} loading="lazy" className={`h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.05] ${locked ? "blur-[2px] scale-[1.03]" : ""}`} />
             : <div className="h-full w-full" style={{ background: `linear-gradient(135deg, ${GOLD}33, ${RED}22)` }} />}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30" />
           <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/5" />
+          {/* Always-on lock sign for private parties (host included). */}
+          {isPrivate && (
+            <span className="absolute top-2 right-2 z-20 flex items-center justify-center h-7 w-7 rounded-full"
+              style={{ background: "rgba(0,0,0,0.62)", border: `1px solid ${GOLD}66`, boxShadow: `0 0 14px ${GOLD}33` }}>
+              <Lock className="h-3.5 w-3.5" style={{ color: GOLD }} />
+            </span>
+          )}
+          {/* Locked overlay — "you can see it, but it's invite-only". */}
+          {locked && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 text-center px-3"
+              style={{ background: "rgba(8,6,10,0.5)", backdropFilter: "blur(1px)" }}>
+              <span className="flex items-center justify-center h-11 w-11 rounded-full"
+                style={{ background: `${GOLD}1f`, border: `1px solid ${GOLD}66`, boxShadow: `0 0 22px ${GOLD}30` }}>
+                <Lock className="h-5 w-5" style={{ color: GOLD }} />
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: GOLD }}>Invite only</span>
+              <span className="text-[10px] leading-tight" style={{ color: "rgba(255,255,255,0.6)" }}>Open the host's link to unlock</span>
+            </div>
+          )}
         </div>
         <div className="p-3.5">
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
             <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ background: GOLD, color: "#1a1205" }}>Party</span>
             {!isPaid && <span className="inline-flex items-center rounded-md bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Free Entry</span>}
-            {p.visibility === "private" && (
+            {isPrivate && (
               <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ borderColor: `${GOLD}55`, background: `${GOLD}1f`, color: GOLD }}>
                 <Lock className="h-2.5 w-2.5" /> Invite only
               </span>
@@ -480,6 +561,17 @@ function PartyCard({ p }: { p: Party }) {
           </div>
         </div>
       </article>
-    </Link>
   );
+
+  // Locked private party → don't navigate; surface a validation message instead.
+  // Invited guests reach it via the host's share link (which carries the token),
+  // not through this public list.
+  if (locked) {
+    return (
+      <button type="button" onClick={onLocked} className="block w-full text-left" aria-label={`${p.name} — private, invite only`}>
+        {card}
+      </button>
+    );
+  }
+  return <Link href={`/party/${p.id}`}>{card}</Link>;
 }

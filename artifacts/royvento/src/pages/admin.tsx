@@ -56,6 +56,7 @@ import {
   Percent, Save, Upload, ImageIcon, X, Check, Navigation, RefreshCw,
   Activity, Plus, Star, Sparkles, Menu, ArrowUpRight, ShieldCheck, BookOpen,
   Download, Users2, ArrowUpDown, ChevronRight, Gamepad2, Package, Lock, MapPin, MessageSquare,
+  PartyPopper,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -76,7 +77,7 @@ const ADMIN_TABS = [
   "events", "subscriptions", "coupons", "ads", "messages", "users", "blogs",
   "booking-report", "attendance", "live-occupancy", "crm-leads",
   "create-pub", "announcement-slider", "settlements", "reviews",
-  "event-organizers", "game-organizers", "solo-connect",
+  "event-organizers", "game-organizers", "solo-connect", "private-parties",
 ] as const;
 const DEFAULT_ADMIN_TAB = "analytics";
 const isValidAdminTab = (t: string | null | undefined): t is typeof ADMIN_TABS[number] =>
@@ -106,6 +107,7 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { value: "crm-leads",            label: "CRM & Leads",       icon: Crown,         group: "customers" },
   { value: "reviews",              label: "Reviews",           icon: Star,          group: "customers" },
   { value: "solo-connect",         label: "Solo Connect",      icon: ShieldCheck,   group: "customers" },
+  { value: "private-parties",      label: "Private Parties",   icon: PartyPopper,   group: "customers" },
   { value: "messages",             label: "Messages",          icon: Mail,          group: "customers" },
 { value: "subscriptions",        label: "Subscriptions",     icon: Trophy,        group: "growth" },
   { value: "coupons",              label: "Coupons",           icon: Gift,          group: "growth" },
@@ -335,6 +337,7 @@ export function AdminPanel() {
               <TabsContent value="event-organizers" className="mt-0"><EventOrganizersAdmin /></TabsContent>
               <TabsContent value="game-organizers" className="mt-0"><GameOrganizersAdmin /></TabsContent>
               <TabsContent value="solo-connect" className="mt-0"><SoloConnectAdmin /></TabsContent>
+              <TabsContent value="private-parties" className="mt-0"><PrivatePartiesAdmin /></TabsContent>
             </div>
           </main>
         </div>
@@ -7451,6 +7454,440 @@ function SoloConnectAdmin() {
       {subTab === "reports" && <SoloReportsPanel />}
       {subTab === "deleted" && <SoloDeletedGroupsPanel />}
       {subTab === "moderation" && <SoloModerationLogPanel />}
+    </div>
+  );
+}
+
+// ─── Private Parties (Create Your Own Party) admin monitor ───────────────────
+interface AdminParty {
+  id: number;
+  name: string;
+  slug: string;
+  city: string;
+  venueName: string;
+  visibility: "public" | "private";
+  joinType: string;
+  status: string;
+  partyDate: string | null;
+  startTime: string;
+  organizerUserId: number;
+  organizerName: string;
+  organizerEmail: string;
+  ticketType: "free" | "paid";
+  ticketPrice: string;
+  capacity: number;
+  guestsGoing: number;
+  seatsLeft: number | null;
+  confirmedBookings: number;
+  cancelledBookings: number;
+  checkedInCount: number;
+  revenue: string;
+  commission: string;
+  netEarnings: string;
+  coverImageUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AdminPartyBooking {
+  id: number; bookingCode: string; name: string; email: string; phone: string;
+  quantity: number; totalPrice: string; netAmount: string; status: string;
+  paymentStatus: string; checkedIn: boolean; checkedInAt: string | null; createdAt: string;
+}
+interface AdminPartyAttendee {
+  id: number; userId: number; name: string; gender: string; quantity: number; status: string; createdAt: string;
+}
+interface AdminPartyMessage {
+  id: number; userId: number; userName: string; isHost: boolean; body: string; createdAt: string;
+}
+interface AdminPartyDetail {
+  party: AdminParty & { description?: string; address?: string; inviteToken?: string };
+  stats: {
+    totalBookings: number; cancelledBookings: number; guestsGoing: number; checkedInCount: number;
+    revenue: string; commission: string; netEarnings: string; capacity: number; seatsLeft: number | null;
+  };
+  bookings: AdminPartyBooking[];
+  attendees: AdminPartyAttendee[];
+  messages: AdminPartyMessage[];
+}
+
+function partyStatusBadge(status: string): string {
+  switch (status) {
+    case "published": return "text-emerald-300 border-emerald-500/40 bg-emerald-500/10";
+    case "sales_stopped": return "text-amber-300 border-amber-500/40 bg-amber-500/10";
+    case "cancelled": return "text-red-300 border-red-500/40 bg-red-500/10";
+    default: return "text-muted-foreground border-white/10 bg-black/30";
+  }
+}
+
+function PrivatePartiesAdmin() {
+  const [parties, setParties] = useState<AdminParty[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [visFilter, setVisFilter] = useState("");
+  const [ticketFilter, setTicketFilter] = useState("");
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<AdminParty[]>("/api/admin/create-your-party")
+      .then(setParties)
+      .catch(() => toast({ title: "Could not load parties", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const filtered = parties.filter((p) => {
+    if (search) {
+      const q = search.toLowerCase();
+      if (
+        !p.name.toLowerCase().includes(q) &&
+        !p.organizerName.toLowerCase().includes(q) &&
+        !p.organizerEmail.toLowerCase().includes(q) &&
+        !p.city.toLowerCase().includes(q) &&
+        !(p.venueName ?? "").toLowerCase().includes(q)
+      ) return false;
+    }
+    if (statusFilter && p.status !== statusFilter) return false;
+    if (visFilter && p.visibility !== visFilter) return false;
+    if (ticketFilter && p.ticketType !== ticketFilter) return false;
+    return true;
+  });
+
+  const liveCount = parties.filter((p) => p.status === "published").length;
+  const privateCount = parties.filter((p) => p.visibility === "private").length;
+  const totalGuests = parties.reduce((s, p) => s + p.guestsGoing, 0);
+  const totalRevenue = parties.reduce((s, p) => s + Number(p.revenue), 0);
+
+  const setStatus = async (id: number, status: string, label: string) => {
+    try {
+      await apiPatch(`/api/create-your-party/${id}`, { status });
+      toast({ title: label });
+      setParties((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
+    } catch {
+      toast({ title: "Action failed", variant: "destructive" });
+    }
+  };
+
+  const cancelParty = async (id: number, name: string) => {
+    // The reason is sent to the host so they know why their party was removed.
+    const reason = window.prompt(
+      `Cancel party "${name}"?\n\nThis removes it from discovery and notifies the host + attendees. This cannot be undone.\n\nReason shown to the host (e.g. policy violation, duplicate, spam):`,
+      "",
+    );
+    if (reason === null) return; // host pressed Cancel on the prompt
+    try {
+      await apiPost(`/api/admin/create-your-party/${id}/cancel`, { reason: reason.trim() });
+      toast({ title: "Party cancelled", description: "The host has been notified with your reason." });
+      setParties((prev) => prev.map((p) => (p.id === id ? { ...p, status: "cancelled" } : p)));
+    } catch {
+      toast({ title: "Could not cancel party", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Stats */}
+      <div className="grid sm:grid-cols-4 gap-4">
+        {[
+          { label: "Total Parties", value: parties.length, sub: "all time" },
+          { label: "Live", value: liveCount, sub: "accepting bookings" },
+          { label: "Guests Going", value: totalGuests, sub: "confirmed across parties" },
+          { label: "Revenue", value: formatINR(totalRevenue), sub: "gross from paid parties" },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-2xl glass-card p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">{stat.label}</p>
+            <p className="font-serif text-2xl mt-1">{stat.value}</p>
+            <p className="text-xs text-muted-foreground">{stat.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search party, host or city…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-8 text-sm w-64"
+          />
+        </div>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-8 text-sm px-2 rounded-md bg-white/5 border border-white/15 text-foreground">
+          <option value="">All statuses</option>
+          <option value="published">Published</option>
+          <option value="sales_stopped">Sales stopped</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select value={visFilter} onChange={(e) => setVisFilter(e.target.value)} className="h-8 text-sm px-2 rounded-md bg-white/5 border border-white/15 text-foreground">
+          <option value="">All visibility</option>
+          <option value="public">Public</option>
+          <option value="private">Private</option>
+        </select>
+        <select value={ticketFilter} onChange={(e) => setTicketFilter(e.target.value)} className="h-8 text-sm px-2 rounded-md bg-white/5 border border-white/15 text-foreground">
+          <option value="">All tickets</option>
+          <option value="free">Free</option>
+          <option value="paid">Paid</option>
+        </select>
+        <button type="button" onClick={load} className="h-8 px-3 rounded-md bg-white/5 border border-white/15 text-xs text-white/70 hover:bg-white/10 flex items-center gap-1.5">
+          <RefreshCw className="h-3 w-3" /> Refresh
+        </button>
+        <span className="text-xs text-muted-foreground ml-auto">{filtered.length} / {parties.length} parties · {privateCount} private</span>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[62vh]">
+        {loading ? (
+          <p className="p-6 text-sm text-muted-foreground">Loading parties…</p>
+        ) : filtered.length === 0 ? (
+          <p className="p-6 text-muted-foreground">No parties found.</p>
+        ) : (
+          <table className="w-full text-sm min-w-[960px]">
+            <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="text-left p-3">Party</th>
+                <th className="text-left p-3">City / Venue</th>
+                <th className="text-left p-3">Host</th>
+                <th className="text-left p-3">Date</th>
+                <th className="text-left p-3">Guests</th>
+                <th className="text-left p-3">Revenue</th>
+                <th className="text-left p-3">Status</th>
+                <th className="text-right p-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p) => (
+                <tr key={p.id} className="border-t border-white/5 align-top hover:bg-white/[0.02] transition-colors">
+                  <td className="p-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="h-9 w-9 rounded-lg overflow-hidden shrink-0 bg-white/5 border border-white/10 flex items-center justify-center">
+                        {p.coverImageUrl
+                          ? <img src={p.coverImageUrl} alt="" className="h-full w-full object-cover" />
+                          : <PartyPopper className="h-4 w-4 text-muted-foreground" />}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-medium truncate max-w-[200px]">{p.name}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full border ${p.visibility === "private" ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : "border-white/15 bg-white/5 text-muted-foreground"}`}>
+                            {p.visibility === "private" && <Lock className="h-2.5 w-2.5" />}{p.visibility}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground capitalize">{p.ticketType === "paid" ? `₹${Number(p.ticketPrice).toLocaleString("en-IN")}` : "free"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    <p className="text-sm">{p.city || "—"}</p>
+                    {p.venueName && <p className="text-[11px] text-muted-foreground flex items-center gap-1"><MapPin className="h-2.5 w-2.5 shrink-0" />{p.venueName}</p>}
+                  </td>
+                  <td className="p-3">
+                    <p className="text-sm">{p.organizerName || "—"}</p>
+                    <p className="text-xs text-muted-foreground">{p.organizerEmail}</p>
+                  </td>
+                  <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
+                    {p.partyDate ? new Date(p.partyDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                    {p.startTime && <span className="block">{p.startTime}</span>}
+                  </td>
+                  <td className="p-3">
+                    <p className="text-sm font-medium">{p.guestsGoing}{p.capacity > 0 ? `/${p.capacity}` : ""}</p>
+                    {p.checkedInCount > 0 && <p className="text-[11px] text-emerald-300">{p.checkedInCount} checked in</p>}
+                    {p.cancelledBookings > 0 && <p className="text-[11px] text-muted-foreground">{p.cancelledBookings} cancelled</p>}
+                  </td>
+                  <td className="p-3 whitespace-nowrap">
+                    <p className="text-sm font-medium">{p.ticketType === "paid" ? formatINR(Number(p.revenue)) : "—"}</p>
+                    {p.ticketType === "paid" && Number(p.commission) > 0 && <p className="text-[11px] text-muted-foreground">{formatINR(Number(p.commission))} comm.</p>}
+                  </td>
+                  <td className="p-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${partyStatusBadge(p.status)}`}>
+                      {p.status === "sales_stopped" ? "sales stopped" : p.status}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <div className="flex gap-2 justify-end flex-wrap">
+                      <button type="button" onClick={() => setDetailId(p.id)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/5 border border-white/15 text-white/70 hover:bg-white/10">View</button>
+                      {p.status === "published" && (
+                        <button type="button" onClick={() => setStatus(p.id, "sales_stopped", "Sales stopped")} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25">Stop sales</button>
+                      )}
+                      {p.status === "sales_stopped" && (
+                        <button type="button" onClick={() => setStatus(p.id, "published", "Sales resumed")} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25">Resume</button>
+                      )}
+                      {p.status !== "cancelled" && (
+                        <button type="button" onClick={() => cancelParty(p.id, p.name)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25">Cancel</button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {detailId != null && <PartyDetailModal partyId={detailId} onClose={() => setDetailId(null)} />}
+    </div>
+  );
+}
+
+function PartyDetailModal({ partyId, onClose }: { partyId: number; onClose: () => void }) {
+  const [detail, setDetail] = useState<AdminPartyDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"bookings" | "attendees" | "chat">("bookings");
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setLoading(true);
+    apiGet<AdminPartyDetail>(`/api/admin/create-your-party/${partyId}/detail`)
+      .then(setDetail)
+      .catch(() => toast({ title: "Could not load party detail", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  }, [partyId]);
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-sm p-4 md:p-8" onClick={onClose}>
+      <div className="relative w-full max-w-3xl rounded-2xl border border-white/10 bg-[#0d0b10] shadow-2xl my-4" onClick={(e) => e.stopPropagation()}>
+        <button type="button" onClick={onClose} className="absolute top-3 right-3 h-8 w-8 rounded-lg flex items-center justify-center bg-white/5 text-white/60 hover:bg-white/10 z-10" aria-label="Close">
+          <X className="h-4 w-4" />
+        </button>
+
+        {loading || !detail ? (
+          <p className="p-8 text-sm text-muted-foreground">Loading party…</p>
+        ) : (
+          <div className="p-5 md:p-6 space-y-5">
+            {/* Header */}
+            <div className="flex items-start gap-3 pr-8">
+              <span className="h-12 w-12 rounded-xl overflow-hidden shrink-0 bg-white/5 border border-white/10 flex items-center justify-center">
+                {detail.party.coverImageUrl
+                  ? <img src={detail.party.coverImageUrl} alt="" className="h-full w-full object-cover" />
+                  : <PartyPopper className="h-5 w-5 text-muted-foreground" />}
+              </span>
+              <div className="min-w-0">
+                <h3 className="font-serif text-xl leading-tight">{detail.party.name}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {[detail.party.venueName, detail.party.city].filter(Boolean).join(", ")}
+                  {detail.party.partyDate ? ` · ${new Date(detail.party.partyDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+                </p>
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${partyStatusBadge(detail.party.status)}`}>
+                    {detail.party.status === "sales_stopped" ? "sales stopped" : detail.party.status}
+                  </span>
+                  <span className={`inline-flex items-center gap-0.5 text-[11px] px-2 py-0.5 rounded-full border ${detail.party.visibility === "private" ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : "border-white/15 bg-white/5 text-muted-foreground"}`}>
+                    {detail.party.visibility === "private" && <Lock className="h-2.5 w-2.5" />}{detail.party.visibility}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">Host: {detail.party.organizerName || detail.party.organizerEmail || "—"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: "Guests going", value: `${detail.stats.guestsGoing}${detail.stats.capacity > 0 ? `/${detail.stats.capacity}` : ""}` },
+                { label: "Checked in", value: detail.stats.checkedInCount },
+                { label: "Revenue", value: formatINR(Number(detail.stats.revenue)) },
+                { label: "Net to host", value: formatINR(Number(detail.stats.netEarnings)) },
+              ].map((s) => (
+                <div key={s.label} className="rounded-xl bg-white/[0.03] border border-white/10 p-3">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</p>
+                  <p className="text-lg font-semibold mt-0.5">{s.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Sub-tabs */}
+            <div className="flex gap-1 p-1 rounded-xl bg-white/5 w-fit">
+              {([
+                { id: "bookings", label: `Bookings (${detail.bookings.length})` },
+                { id: "attendees", label: `Attendees (${detail.attendees.length})` },
+                { id: "chat", label: `Chat (${detail.messages.length})` },
+              ] as const).map((t) => (
+                <button key={t.id} type="button" onClick={() => setTab(t.id)} className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${tab === t.id ? "bg-white/10 text-white shadow" : "text-muted-foreground hover:text-white"}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="max-h-[42vh] overflow-y-auto rounded-xl border border-white/10">
+              {tab === "bookings" && (
+                detail.bookings.length === 0 ? <p className="p-5 text-sm text-muted-foreground">No bookings yet.</p> : (
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-white/5 backdrop-blur text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <tr>
+                        <th className="text-left p-2.5">Guest</th>
+                        <th className="text-left p-2.5">Code</th>
+                        <th className="text-left p-2.5">Qty</th>
+                        <th className="text-left p-2.5">Paid</th>
+                        <th className="text-left p-2.5">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.bookings.map((b) => (
+                        <tr key={b.id} className="border-t border-white/5">
+                          <td className="p-2.5">
+                            <p className="font-medium">{b.name || "—"}</p>
+                            <p className="text-[11px] text-muted-foreground">{b.phone || b.email}</p>
+                          </td>
+                          <td className="p-2.5 font-mono text-xs">{b.bookingCode}</td>
+                          <td className="p-2.5">{b.quantity}</td>
+                          <td className="p-2.5">{Number(b.totalPrice) > 0 ? formatINR(Number(b.totalPrice)) : "Free"}</td>
+                          <td className="p-2.5">
+                            <span className="text-xs capitalize">{b.status.replace("_", " ")}</span>
+                            {b.checkedIn && <span className="block text-[10px] text-emerald-300">✓ checked in</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              )}
+
+              {tab === "attendees" && (
+                detail.attendees.length === 0 ? <p className="p-5 text-sm text-muted-foreground">No attendees yet.</p> : (
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-white/5 backdrop-blur text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <tr>
+                        <th className="text-left p-2.5">Name</th>
+                        <th className="text-left p-2.5">Gender</th>
+                        <th className="text-left p-2.5">Qty</th>
+                        <th className="text-left p-2.5">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.attendees.map((a) => (
+                        <tr key={a.id} className="border-t border-white/5">
+                          <td className="p-2.5 font-medium">{a.name || "—"}</td>
+                          <td className="p-2.5 capitalize">{a.gender || "—"}</td>
+                          <td className="p-2.5">{a.quantity}</td>
+                          <td className="p-2.5 capitalize text-xs">{a.status}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              )}
+
+              {tab === "chat" && (
+                detail.messages.length === 0 ? <p className="p-5 text-sm text-muted-foreground">No messages in this party's group chat.</p> : (
+                  <div className="p-3 space-y-2.5">
+                    {detail.messages.map((m) => (
+                      <div key={m.id} className="rounded-lg bg-white/[0.03] border border-white/10 p-2.5">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-xs font-medium">{m.userName || "User"}</span>
+                          {m.isHost && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300">HOST</span>}
+                          <span className="text-[10px] text-muted-foreground ml-auto">{new Date(m.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                        </div>
+                        <p className="text-sm text-white/80">{m.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

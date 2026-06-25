@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateParty } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { useSelectedCity } from "@/components/LocationContext";
 import { LocationSelect } from "@/components/LocationSelect";
 import { uploadImage } from "@/lib/uploadImage";
 import {
@@ -16,7 +15,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  Navigation,
   Pencil,
   PartyPopper,
   IndianRupee,
@@ -120,7 +118,6 @@ const STEPS = [
 export function CreatePartyWizard({ city, onClose }: { city: string; onClose: () => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const { detectLocation, detecting } = useSelectedCity();
   const create = useCreateParty();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -260,21 +257,6 @@ export function CreatePartyWizard({ city, onClose }: { city: string; onClose: ()
   const removeGalleryImage = (url: string) =>
     setForm((f) => ({ ...f, galleryImages: f.galleryImages.filter((u) => u !== url) }));
 
-  async function useCurrentLocation() {
-    if (!navigator.geolocation) {
-      toast({ title: "Location is not available on this device.", variant: "destructive" });
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        set("mapLocation", `https://www.google.com/maps?q=${latitude},${longitude}`);
-        toast({ title: "Map location captured." });
-      },
-      () => toast({ title: "Couldn't get your location. Paste a Google Maps link instead.", variant: "destructive" }),
-    );
-  }
-
   function publish() {
     // Final guard — re-run every step's validation before publishing.
     for (let i = 0; i < STEPS.length - 1; i++) {
@@ -353,7 +335,7 @@ export function CreatePartyWizard({ city, onClose }: { city: string; onClose: ()
           />
         )}
         {STEPS[step]!.key === "location" && (
-          <LocationStep form={form} set={set} onUseCurrent={useCurrentLocation} detecting={detecting} detectLocation={detectLocation} />
+          <LocationStep form={form} set={set} />
         )}
         {STEPS[step]!.key === "ticket" && <TicketStep form={form} set={set} />}
         {STEPS[step]!.key === "organizer" && <OrganizerStep form={form} set={set} />}
@@ -589,19 +571,7 @@ function PhotoStep({
   );
 }
 
-function LocationStep({
-  form,
-  set,
-  onUseCurrent,
-  detecting,
-  detectLocation,
-}: {
-  form: PartyForm;
-  set: SetFn;
-  onUseCurrent: () => void;
-  detecting: boolean;
-  detectLocation: () => Promise<boolean>;
-}) {
+function LocationStep({ form, set }: { form: PartyForm; set: SetFn }) {
   return (
     <div>
       <StepHeading icon={MapPin} title="Party location" hint="Where is your party happening?" />
@@ -616,16 +586,6 @@ function LocationStep({
           onChange={(n) => { set("country", n.country); set("state", n.state); set("city", n.city); }}
         />
         <input className={field} style={fieldStyle} placeholder="Pin code" inputMode="numeric" value={form.pinCode} onChange={(e) => set("pinCode", e.target.value)} />
-        <input className={field} style={fieldStyle} placeholder="Google Maps link or coordinates (optional)" value={form.mapLocation} onChange={(e) => set("mapLocation", e.target.value)} />
-        <button
-          type="button"
-          onClick={() => { void detectLocation(); onUseCurrent(); }}
-          disabled={detecting}
-          className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg transition-all"
-          style={{ background: `${PARTY}14`, color: PARTY, border: `1px solid ${PARTY}40`, opacity: detecting ? 0.6 : 1 }}
-        >
-          <Navigation className="h-3.5 w-3.5" /> Use my current location
-        </button>
       </div>
     </div>
   );

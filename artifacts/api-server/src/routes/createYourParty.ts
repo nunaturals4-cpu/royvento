@@ -228,7 +228,9 @@ router.get("/create-your-party/:id", async (req, res) => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
   const p = await loadParty(id);
-  if (!p) return res.status(404).json({ error: "Party not found" });
+  // A cancelled party (host-deleted or auto-removed once its date passed) is no
+  // longer available — treat it as gone so it can't be opened or booked.
+  if (!p || p.status === "cancelled") return res.status(404).json({ error: "Party not found" });
   const ticket = await loadTicket(id);
   const chat = viewer ? await canChat(p, viewer.id) : false;
   return res.json({ ...partyToPublic(p, ticket, viewer?.id ?? null), canChat: chat });
@@ -1113,6 +1115,219 @@ router.post("/create-your-party/:id/messages", requireAuth(), async (req, res) =
     createdAt: m!.createdAt.toISOString(),
     isMine: true,
   });
+});
+
+// ─── Admin: monitor & manage every private party ─────────────────────────────
+// A single batched overview the admin "Private Parties" tab reads — one query per
+// table rather than per-party, then aggregated in memory.
+const isConfirmedStatus = (s: string) => s === "confirmed" || s === "completed";
+
+router.get("/admin/create-your-party", requireAuth(["admin"]), async (_req, res) => {
+  const parties = await db
+    .select()
+    .from(createYourPartyTable)
+    .orderBy(desc(createYourPartyTable.createdAt));
+  if (parties.length === 0) return res.json([]);
+
+  const partyIds = parties.map((p) => p.id);
+  const organizerIds = [...new Set(parties.map((p) => p.organizerUserId))];
+
+  const [tickets, bookings, organizers] = await Promise.all([
+    db.select().from(createYourPartyTicketsTable).where(inArray(createYourPartyTicketsTable.partyId, partyIds)),
+    db.select().from(createYourPartyBookingsTable).where(inArray(createYourPartyBookingsTable.partyId, partyIds)),
+    db
+      .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+      .from(usersTable)
+      .where(inArray(usersTable.id, organizerIds)),
+  ]);
+
+  // Prefer the active ticket row per party (matches loadTicket's ordering).
+  const ticketByParty = new Map<number, TicketRow>();
+  for (const t of tickets) {
+    const cur = ticketByParty.get(t.partyId);
+    if (!cur || (t.active && !cur.active)) ticketByParty.set(t.partyId, t);
+  }
+  const organizerMap = new Map(organizers.map((o) => [o.id, o]));
+
+  type Agg = { confirmed: number; cancelled: number; guests: number; checkedIn: number; revenue: number; commission: number; net: number };
+  const aggByParty = new Map<number, Agg>();
+  for (const b of bookings) {
+    const a = aggByParty.get(b.partyId) ?? { confirmed: 0, cancelled: 0, guests: 0, checkedIn: 0, revenue: 0, commission: 0, net: 0 };
+    if (isConfirmedStatus(b.status)) {
+      a.confirmed++;
+      a.guests += b.quantity;
+      if (b.checkedIn) a.checkedIn++;
+      a.revenue += Number(b.totalPrice);
+      a.commission += Number(b.commissionAmount);
+      a.net += Number(b.netAmount);
+    } else if (b.status === "cancelled") {
+      a.cancelled++;
+    }
+    aggByParty.set(b.partyId, a);
+  }
+
+  res.json(
+    parties.map((p) => {
+      const t = ticketByParty.get(p.id) ?? null;
+      const a = aggByParty.get(p.id) ?? { confirmed: 0, cancelled: 0, guests: 0, checkedIn: 0, revenue: 0, commission: 0, net: 0 };
+      const capacity = p.capacity || t?.quantity || 0;
+      const org = organizerMap.get(p.organizerUserId);
+      return {
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        city: p.city,
+        venueName: p.venueName,
+        visibility: p.visibility,
+        joinType: p.joinType,
+        status: p.status,
+        partyDate: p.partyDate,
+        startTime: p.startTime,
+        organizerUserId: p.organizerUserId,
+        organizerName: p.organizerName || org?.name || "",
+        organizerEmail: org?.email ?? "",
+        ticketType: t?.type ?? "free",
+        ticketPrice: t?.price ?? "0",
+        capacity,
+        guestsGoing: a.guests,
+        seatsLeft: capacity > 0 ? Math.max(0, capacity - a.guests) : null,
+        confirmedBookings: a.confirmed,
+        cancelledBookings: a.cancelled,
+        checkedInCount: a.checkedIn,
+        revenue: String(round2(a.revenue)),
+        commission: String(round2(a.commission)),
+        netEarnings: String(round2(a.net)),
+        coverImageUrl: p.coverImageUrl,
+        createdAt: p.createdAt.toISOString(),
+        updatedAt: p.updatedAt.toISOString(),
+      };
+    }),
+  );
+  return;
+});
+
+// Full drill-down for one party — every booking, attendee and chat message.
+router.get("/admin/create-your-party/:id/detail", requireAuth(["admin"]), async (req, res) => {
+  const id = parseInt(String(req.params["id"]), 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  const party = await loadParty(id);
+  if (!party) return res.status(404).json({ error: "Party not found" });
+  const ticket = await loadTicket(id);
+
+  const [bookings, attendees, messages, organizer] = await Promise.all([
+    db.select().from(createYourPartyBookingsTable).where(eq(createYourPartyBookingsTable.partyId, id)).orderBy(desc(createYourPartyBookingsTable.id)),
+    db.select().from(createYourPartyAttendeesTable).where(eq(createYourPartyAttendeesTable.partyId, id)).orderBy(desc(createYourPartyAttendeesTable.id)),
+    db
+      .select({
+        id: createYourPartyMessagesTable.id,
+        userId: createYourPartyMessagesTable.userId,
+        userName: usersTable.name,
+        body: createYourPartyMessagesTable.body,
+        createdAt: createYourPartyMessagesTable.createdAt,
+      })
+      .from(createYourPartyMessagesTable)
+      .leftJoin(usersTable, eq(usersTable.id, createYourPartyMessagesTable.userId))
+      .where(eq(createYourPartyMessagesTable.partyId, id))
+      .orderBy(createYourPartyMessagesTable.id),
+    db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email }).from(usersTable).where(eq(usersTable.id, party.organizerUserId)).limit(1),
+  ]);
+
+  const confirmed = bookings.filter((b) => isConfirmedStatus(b.status));
+  const cancelled = bookings.filter((b) => b.status === "cancelled");
+  const sum = (rows: typeof confirmed, pick: (b: (typeof confirmed)[number]) => string) =>
+    round2(rows.reduce((acc, b) => acc + Number(pick(b)), 0));
+  const guestsGoing = confirmed.reduce((acc, b) => acc + b.quantity, 0);
+  const capacity = party.capacity || ticket?.quantity || 0;
+
+  const toRow = (b: (typeof bookings)[number]) => ({
+    id: b.id,
+    bookingCode: b.bookingCode,
+    name: b.name,
+    email: b.email,
+    phone: b.phone,
+    quantity: b.quantity,
+    totalPrice: b.totalPrice,
+    netAmount: b.netAmount,
+    status: b.status,
+    paymentStatus: b.paymentStatus,
+    checkedIn: b.checkedIn,
+    checkedInAt: b.checkedInAt ? b.checkedInAt.toISOString() : null,
+    createdAt: b.createdAt.toISOString(),
+  });
+
+  res.json({
+    party: {
+      ...partyToPublic(party, ticket, null),
+      organizerName: party.organizerName || organizer[0]?.name || "",
+      organizerEmail: organizer[0]?.email ?? "",
+    },
+    stats: {
+      totalBookings: confirmed.length,
+      cancelledBookings: cancelled.length,
+      guestsGoing,
+      checkedInCount: confirmed.filter((b) => b.checkedIn).length,
+      revenue: String(sum(confirmed, (b) => b.totalPrice)),
+      commission: String(sum(confirmed, (b) => b.commissionAmount)),
+      netEarnings: String(sum(confirmed, (b) => b.netAmount)),
+      capacity,
+      seatsLeft: capacity > 0 ? Math.max(0, capacity - guestsGoing) : null,
+    },
+    bookings: bookings.map(toRow),
+    attendees: attendees.map((a) => ({
+      id: a.id,
+      userId: a.userId,
+      name: a.name,
+      gender: a.gender,
+      quantity: a.quantity,
+      status: a.status,
+      createdAt: a.createdAt.toISOString(),
+    })),
+    messages: messages.map((m) => ({
+      id: m.id,
+      userId: m.userId,
+      userName: m.userName ?? "",
+      isHost: m.userId === party.organizerUserId,
+      body: m.body,
+      createdAt: m.createdAt.toISOString(),
+    })),
+  });
+  return;
+});
+
+// Admin removes (cancels) a party and tells the host WHY. The reason is shown to
+// the organizer in their notification so they understand the moderation action.
+const AdminCancelBody = z.object({ reason: z.string().max(500).optional() });
+
+router.post("/admin/create-your-party/:id/cancel", requireAuth(["admin"]), async (req, res) => {
+  const id = parseInt(String(req.params["id"]), 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  const party = await loadParty(id);
+  if (!party) return res.status(404).json({ error: "Party not found" });
+
+  const parsed = AdminCancelBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const reason = (parsed.data.reason ?? "").trim();
+
+  await db
+    .update(createYourPartyTable)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(eq(createYourPartyTable.id, id));
+
+  // Tell the host their party was removed by the platform, with the reason.
+  await createUserNotification({
+    userId: party.organizerUserId,
+    title: "Your party was removed by Royvento",
+    message: reason
+      ? `"${party.name}" was removed by the Royvento team. Reason: ${reason}`
+      : `"${party.name}" was removed by the Royvento team. Please contact support for details.`,
+    url: "/dashboard/parties",
+    tag: `party-admin-cancel-${id}`,
+  });
+
+  // Attendees are told it's cancelled (the moderation reason stays host-only).
+  await notifyAttendees(id, "Party cancelled", `"${party.name}" has been cancelled.`);
+
+  return res.json({ ok: true });
 });
 
 // Fan out an in-app notification to every confirmed attendee of a party.
