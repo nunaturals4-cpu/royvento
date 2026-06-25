@@ -319,6 +319,7 @@ export const ListPartiesResponseItem = zod.object({
   "rules": zod.string(),
   "category": zod.string(),
   "visibility": zod.enum(['public', 'private']),
+  "inviteToken": zod.string().optional(),
   "venueName": zod.string(),
   "address": zod.string(),
   "city": zod.string(),
@@ -394,6 +395,7 @@ export const CreatePartyResponse = zod.object({
   "rules": zod.string(),
   "category": zod.string(),
   "visibility": zod.enum(['public', 'private']),
+  "inviteToken": zod.string().optional(),
   "venueName": zod.string(),
   "address": zod.string(),
   "city": zod.string(),
@@ -438,6 +440,7 @@ export const ListMyPartiesResponseItem = zod.object({
   "rules": zod.string(),
   "category": zod.string(),
   "visibility": zod.enum(['public', 'private']),
+  "inviteToken": zod.string().optional(),
   "venueName": zod.string(),
   "address": zod.string(),
   "city": zod.string(),
@@ -487,6 +490,7 @@ export const GetPartyResponse = zod.object({
   "rules": zod.string(),
   "category": zod.string(),
   "visibility": zod.enum(['public', 'private']),
+  "inviteToken": zod.string().optional(),
   "venueName": zod.string(),
   "address": zod.string(),
   "city": zod.string(),
@@ -563,6 +567,7 @@ export const UpdatePartyResponse = zod.object({
   "rules": zod.string(),
   "category": zod.string(),
   "visibility": zod.enum(['public', 'private']),
+  "inviteToken": zod.string().optional(),
   "venueName": zod.string(),
   "address": zod.string(),
   "city": zod.string(),
@@ -615,7 +620,8 @@ export const BookPartyParams = zod.object({
 export const BookPartyBody = zod.object({
   "quantity": zod.number().optional(),
   "name": zod.string().optional(),
-  "phone": zod.string().optional()
+  "phone": zod.string().optional(),
+  "inviteToken": zod.string().optional()
 }).strict()
 
 export const BookPartyResponse = zod.object({
@@ -626,6 +632,18 @@ export const BookPartyResponse = zod.object({
   "razorpayOrderId": zod.string().optional(),
   "razorpayKeyId": zod.string().optional(),
   "amountPaise": zod.number().optional()
+})
+
+
+/**
+ * @summary Reset a party's invite link (host only) — revokes old share links
+ */
+export const ResetPartyInviteParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const ResetPartyInviteResponse = zod.object({
+  "inviteToken": zod.string()
 })
 
 
@@ -728,6 +746,7 @@ export const GetPartyDashboardResponse = zod.object({
   "rules": zod.string(),
   "category": zod.string(),
   "visibility": zod.enum(['public', 'private']),
+  "inviteToken": zod.string().optional(),
   "venueName": zod.string(),
   "address": zod.string(),
   "city": zod.string(),
@@ -884,6 +903,7 @@ export const ListSoloGroupsResponseItem = zod.object({
   "city": zod.string(),
   "genderType": zod.enum(['male', 'female', 'mixed']),
   "visibility": zod.enum(['public', 'private']),
+  "inviteToken": zod.string().optional(),
   "status": zod.enum(['open', 'locked', 'closed']),
   "reputationScore": zod.string(),
   "ratingCount": zod.number(),
@@ -957,6 +977,7 @@ export const CreateSoloGroupResponse = zod.object({
   "city": zod.string(),
   "genderType": zod.enum(['male', 'female', 'mixed']),
   "visibility": zod.enum(['public', 'private']),
+  "inviteToken": zod.string().optional(),
   "status": zod.enum(['open', 'locked', 'closed']),
   "reputationScore": zod.string(),
   "ratingCount": zod.number(),
@@ -1011,6 +1032,7 @@ export const GetSoloGroupResponse = zod.object({
   "city": zod.string(),
   "genderType": zod.enum(['male', 'female', 'mixed']),
   "visibility": zod.enum(['public', 'private']),
+  "inviteToken": zod.string().optional(),
   "status": zod.enum(['open', 'locked', 'closed']),
   "reputationScore": zod.string(),
   "ratingCount": zod.number(),
@@ -1056,7 +1078,8 @@ export const JoinSoloGroupParams = zod.object({
 export const JoinSoloGroupBody = zod.object({
   "country": zod.string().optional(),
   "state": zod.string().optional(),
-  "city": zod.string()
+  "city": zod.string(),
+  "inviteToken": zod.string().optional()
 }).strict()
 
 export const JoinSoloGroupResponse = zod.object({
@@ -1139,6 +1162,18 @@ export const CloseSoloGroupParams = zod.object({
 export const CloseSoloGroupResponse = zod.object({
   "ok": zod.boolean(),
   "status": zod.string().optional()
+})
+
+
+/**
+ * @summary Reset a group's invite link (group admin) — revokes old share links
+ */
+export const ResetSoloGroupInviteParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const ResetSoloGroupInviteResponse = zod.object({
+  "inviteToken": zod.string()
 })
 
 

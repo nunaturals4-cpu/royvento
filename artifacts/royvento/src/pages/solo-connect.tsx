@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useGetSoloAccess, useGetMe, useListSoloGroups, type SoloGroup } from "@workspace/api-client-react";
 import { useSelectedCity } from "@/components/LocationContext";
@@ -776,6 +776,14 @@ function BrowseExperience({ gate, gender, activity }: { gate: BookingGate; gende
   const [showCreate, setShowCreate] = useState(false);
   const [openGroupId, setOpenGroupId] = useState<number | null>(null);
   const canAct = gate === null;
+
+  // Deep-link support: a shared group link (/solo-connect?group=<id>&invite=<token>)
+  // auto-opens that group's detail. The invite token is read from the URL inside
+  // SoloGroupDetail, so it survives the modal open here.
+  useEffect(() => {
+    const gid = Number(new URLSearchParams(window.location.search).get("group"));
+    if (Number.isInteger(gid) && gid > 0) setOpenGroupId(gid);
+  }, []);
 
   // Location gate — a city is required before any group is shown (applies to
   // guests too: they pick/detect a city, then browse it).

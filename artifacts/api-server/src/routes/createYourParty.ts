@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Response } from "express";
+import { randomBytes } from "crypto";
 import {
   db,
   usersTable,
@@ -43,6 +44,12 @@ function genBookingCode(): string {
   let out = "";
   for (let i = 0; i < 8; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
   return out;
+}
+
+// Unguessable token embedded in a host's share link. Booking a PRIVATE party
+// requires presenting this exact token (?invite=…). 32 hex chars.
+function genInviteToken(): string {
+  return randomBytes(16).toString("hex");
 }
 
 // Gender gate: a male_only / female_only party only admits the matching gender;
@@ -152,6 +159,9 @@ function partyToPublic(p: PartyRow, ticket: TicketRow | null, viewerId: number |
     rules: p.rules,
     category: p.category,
     visibility: p.visibility,
+    // The invite token is the join gate for private parties — only ever
+    // revealed to the organizer (who builds the share link). "" for everyone else.
+    inviteToken: viewerId != null && viewerId === p.organizerUserId ? p.inviteToken : "",
     venueName: p.venueName,
     address: p.address,
     city: p.city,
@@ -185,15 +195,13 @@ function partyToPublic(p: PartyRow, ticket: TicketRow | null, viewerId: number |
 router.get("/create-your-party", async (req, res) => {
   const viewer = await loadUserFromRequest(req);
   const city = typeof req.query["city"] === "string" ? req.query["city"] : "";
+  // Both public AND private parties are listed (private stays VISIBLE for
+  // discovery) — the booking endpoint enforces the invite gate, and the client
+  // badges private rows + locks their Book button.
   const rows = await db
     .select()
     .from(createYourPartyTable)
-    .where(
-      and(
-        eq(createYourPartyTable.visibility, "public"),
-        ne(createYourPartyTable.status, "cancelled"),
-      ),
-    )
+    .where(ne(createYourPartyTable.status, "cancelled"))
     .orderBy(desc(createYourPartyTable.createdAt))
     .limit(200);
   const filtered = city ? rows.filter((r) => norm(r.city) === norm(city)) : rows;
@@ -292,6 +300,7 @@ router.post("/create-your-party", requireAuth(), async (req, res) => {
       rules: d.rules ?? "",
       category: d.category ?? "party",
       visibility: d.visibility ?? "public",
+      inviteToken: genInviteToken(),
       venueName: d.venueName ?? "",
       address: d.address ?? "",
       city: d.city,
@@ -418,11 +427,29 @@ router.delete("/create-your-party/:id", requireAuth(), async (req, res) => {
   return res.json({ ok: true });
 });
 
+// ─── Reset the invite link (organizer/admin only) — revokes old share links ───
+router.post("/create-your-party/:id/reset-invite", requireAuth(), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const id = parseInt(String(req.params.id), 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  const party = await loadParty(id);
+  if (!party) return res.status(404).json({ error: "Party not found" });
+  if (party.organizerUserId !== user.id && user.role !== "admin") {
+    return res.status(403).json({ error: "Only the party host can reset the invite link." });
+  }
+  const inviteToken = genInviteToken();
+  await db.update(createYourPartyTable).set({ inviteToken, updatedAt: new Date() }).where(eq(createYourPartyTable.id, id));
+  return res.json({ inviteToken });
+});
+
 // ─── Book a party. Free → confirmed instantly. Paid → Razorpay (online only). ─
 const BookBody = z.object({
   quantity: z.number().int().min(1).max(10).optional(),
   name: z.string().max(255).optional(),
   phone: z.string().max(50).optional(),
+  // Invite token from the host's share link — required to book a PRIVATE party.
+  inviteToken: z.string().max(64).optional(),
 });
 
 router.post("/create-your-party/:id/book", requireAuth(), async (req, res) => {
@@ -437,6 +464,20 @@ router.post("/create-your-party/:id/book", requireAuth(), async (req, res) => {
   const parsed = BookBody.safeParse(req.body);
   if (!parsed.success) return respondInvalid(res, parsed.error);
   const quantity = parsed.data.quantity ?? 1;
+
+  // Invite gate — a PRIVATE party only admits people who opened the host's
+  // share link (carrying the matching invite token). The organizer always
+  // bypasses. Public parties have no gate.
+  if (
+    party.visibility === "private" &&
+    party.organizerUserId !== user.id &&
+    (parsed.data.inviteToken ?? "") !== party.inviteToken
+  ) {
+    return res.status(403).json({
+      error: "This is a private party — open the host's invite link to book a spot.",
+      code: "invite_required",
+    });
+  }
 
   // Every attendee — any role — must have a binary gender on file before booking
   // any party (mixed included). Already-set gender is reused; otherwise the client

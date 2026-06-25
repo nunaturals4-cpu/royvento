@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetSoloGroup,
   useJoinSoloGroup,
+  useResetSoloGroupInvite,
   useLeaveSoloGroup,
   useApproveSoloMember,
   useRejectSoloMember,
@@ -13,12 +14,14 @@ import {
   useListSoloMessages,
   useSendSoloMessage,
   getListSoloMessagesQueryKey,
+  getGetSoloGroupQueryKey,
+  type SoloGroup,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireGender } from "@/components/useRequireGender";
 import { apiPost } from "@/lib/api";
 import { uploadImage } from "@/lib/uploadImage";
-import { X, MapPin, Calendar, Users, Phone, Lock, ShieldAlert, Check, UserX, MessageCircle, Send, Flag, Ticket, Clock, User, ExternalLink, LogIn, Crown, ShieldCheck, ArrowRight } from "lucide-react";
+import { X, MapPin, Calendar, Users, Phone, Lock, ShieldAlert, Check, UserX, MessageCircle, Send, Flag, Ticket, Clock, User, ExternalLink, LogIn, Crown, ShieldCheck, ArrowRight, Share2, RefreshCw } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 
 const GOLD = "#d4af37";
@@ -76,6 +79,10 @@ export function SoloGroupDetail({
   const { toast } = useToast();
   const { data, isLoading } = useGetSoloGroup(groupId, { city });
 
+  // Invite token carried in the host's share link (?invite=…). Required to join
+  // a private group for everyone except the admin.
+  const inviteToken = new URLSearchParams(window.location.search).get("invite") ?? "";
+
   const join = useJoinSoloGroup();
   const leave = useLeaveSoloGroup();
   const approve = useApproveSoloMember();
@@ -89,7 +96,7 @@ export function SoloGroupDetail({
   // (reused silently if already set, otherwise collected first).
   function requestJoin() {
     ensureGender(() =>
-      join.mutate({ id: groupId, data: { city } }, {
+      join.mutate({ id: groupId, data: { city, inviteToken: inviteToken || undefined } }, {
         onSuccess: () => { toast({ title: "Join request sent!" }); refresh(); },
         onError: (e) => toast({ title: e instanceof Error ? e.message : "Could not join", variant: "destructive" }),
       }),
@@ -98,6 +105,9 @@ export function SoloGroupDetail({
 
   function refresh() {
     qc.invalidateQueries({ queryKey: ["/api/solo-connect/groups"] });
+    // Also refetch THIS group's detail so membership / a freshly-reset invite
+    // token update without needing to reopen the modal.
+    qc.invalidateQueries({ queryKey: getGetSoloGroupQueryKey(groupId, { city }) });
   }
 
   const group = data?.group;
@@ -107,6 +117,9 @@ export function SoloGroupDetail({
   const isAdmin = group?.isAdmin ?? false;
   const myStatus = group?.myMembershipStatus ?? null;
   const joined = myStatus === "approved" || isAdmin;
+  // Private group + viewer isn't the admin/member and arrived without an invite
+  // token → joining is locked behind the host's invite link.
+  const needsInvite = group?.visibility === "private" && !isAdmin && !joined && !inviteToken;
 
   // Member the current user is reporting (null = modal closed).
   const [reportTarget, setReportTarget] = useState<{ id: number; name: string } | null>(null);
@@ -203,6 +216,10 @@ export function SoloGroupDetail({
               <p className="text-sm mb-5" style={{ color: "rgba(255,255,255,0.7)" }}>{group.description}</p>
             )}
 
+            {/* Share — everyone can share the group; the admin's link carries the
+                invite token that unlocks a private group. */}
+            <ShareGroup group={group} onReset={refresh} />
+
             {/* Membership actions */}
             <div className="mb-5">
               {gate ? (
@@ -238,12 +255,24 @@ export function SoloGroupDetail({
                 <div className="text-center py-3 rounded-xl text-sm" style={{ background: `${GOLD}14`, color: GOLD }}>Request pending approval</div>
               )}
               {(!myStatus || ["left", "rejected", "removed"].includes(myStatus)) && group.status === "open" && (
-                <button type="button"
-                  onClick={requestJoin}
-                  disabled={join.isPending}
-                  className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110" style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 10px 28px ${RED}4d` }}>
-                  {join.isPending ? "Requesting…" : "Request to join"}
-                </button>
+                needsInvite ? (
+                  <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}40` }}>
+                    <span className="flex items-center justify-center h-10 w-10 rounded-xl shrink-0" style={{ background: `${GOLD}1f`, border: `1px solid ${GOLD}55` }}>
+                      <Lock className="h-4.5 w-4.5" style={{ color: GOLD }} />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: "#fff" }}>Private group — invite only</p>
+                      <p className="text-[12px] mt-0.5 leading-snug" style={{ color: "rgba(255,255,255,0.6)" }}>Open the host's invite link to request to join.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button"
+                    onClick={requestJoin}
+                    disabled={join.isPending}
+                    className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110" style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 10px 28px ${RED}4d` }}>
+                    {join.isPending ? "Requesting…" : "Request to join"}
+                  </button>
+                )
               )}
               </>
               )}
@@ -356,6 +385,71 @@ export function SoloGroupDetail({
         />
       )}
       {genderModal}
+    </div>
+  );
+}
+
+// Share the group. Everyone can copy/share the plain link; the admin additionally
+// gets the invite-token link (which unlocks a PRIVATE group) plus a Reset action
+// that revokes previously-shared invite links.
+function ShareGroup({ group, onReset }: { group: SoloGroup; onReset: () => void }) {
+  const { toast } = useToast();
+  const reset = useResetSoloGroupInvite();
+  const isPrivate = group.visibility === "private";
+  // Only the admin receives a non-empty inviteToken from the API, so only the
+  // admin can build an invite link. Everyone else shares the plain group URL.
+  const base = `${window.location.origin}/solo-connect?group=${group.id}`;
+  const shareUrl = group.isAdmin && isPrivate && group.inviteToken
+    ? `${base}&invite=${group.inviteToken}`
+    : base;
+
+  async function doShare() {
+    const text = isPrivate ? `You're invited to "${group.name}" on Royvento` : `Join "${group.name}" on Royvento`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: group.name, text, url: shareUrl });
+      } catch {
+        /* user dismissed the share sheet */
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: "Link copied!",
+        description: isPrivate && group.isAdmin ? "Anyone with this link can join your private group." : "Share it with your friends.",
+      });
+    } catch {
+      toast({ title: "Could not copy the link", description: shareUrl, variant: "destructive" });
+    }
+  }
+
+  function doReset() {
+    if (!confirm("Reset the invite link? Anyone using the old link will no longer be able to join.")) return;
+    reset.mutate(
+      { id: group.id },
+      {
+        onSuccess: () => { toast({ title: "Invite link reset", description: "Old links no longer work — share the new one." }); onReset(); },
+        onError: (e) => toast({ title: e instanceof Error ? e.message : "Could not reset link", variant: "destructive" }),
+      },
+    );
+  }
+
+  return (
+    <div className="mb-5 flex flex-wrap gap-2">
+      <button type="button" onClick={doShare}
+        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
+        style={{ background: "rgba(255,255,255,0.05)", color: "#fff", border: "1px solid rgba(255,255,255,0.14)" }}>
+        <Share2 className="h-4 w-4" style={{ color: GOLD }} />
+        {isPrivate && group.isAdmin ? "Share invite link" : "Share group"}
+      </button>
+      {group.isAdmin && isPrivate && (
+        <button type="button" onClick={doReset} disabled={reset.isPending}
+          className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-[12px] font-medium transition-all hover:bg-white/[0.04]"
+          style={{ color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.1)" }}>
+          <RefreshCw className={`h-3.5 w-3.5 ${reset.isPending ? "animate-spin" : ""}`} /> Reset link
+        </button>
+      )}
     </div>
   );
 }

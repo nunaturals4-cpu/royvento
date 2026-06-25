@@ -108,6 +108,7 @@ export * from './importGooglePubResponse';
 export * from './importGooglePubResponseEvent';
 export * from './importGooglePubResponsePlace';
 export * from './importGooglePubResponsePlaceOpeningHours';
+export * from './inviteLink';
 export * from './listAdminSettlementRequestsParams';
 export * from './listAdminSettlementRequestsStatus';
 export * from './listEventReviewsParams';

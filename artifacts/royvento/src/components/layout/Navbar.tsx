@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
 import { Logo } from "@/components/Logo";
-import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Globe, Palette, Check, Gift } from "lucide-react";
+import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Globe, Palette, Check, Gift, Receipt } from "lucide-react";
 import { apiGet, apiPatch } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CityPickerModal } from "@/components/CityPickerModal";
@@ -88,10 +88,7 @@ export function Navbar() {
   });
 
   const markAllReadMutation = useMutation({
-    mutationFn: async () => {
-      const unread = notifs.filter((n) => !n.isRead);
-      await Promise.all(unread.map((n) => apiPatch(`/api/notifications/${n.id}/read`, {})));
-    },
+    mutationFn: () => apiPatch("/api/notifications/read-all", {}),
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ["notifications"] });
       qc.setQueryData<Notification[]>(["notifications"], (prev) =>
@@ -353,6 +350,12 @@ export function Navbar() {
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link href="/blogs" className="cursor-pointer w-full">{t("nav.blogs", "Blogs")}</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/split-expense" className="cursor-pointer w-full flex items-center gap-2">
+                        <Receipt className="h-3.5 w-3.5 text-muted-foreground" />
+                        {t("nav.split_expense", "Split Expense")}
+                      </Link>
                     </DropdownMenuItem>
                     {user.role === "user" && (
                       <>

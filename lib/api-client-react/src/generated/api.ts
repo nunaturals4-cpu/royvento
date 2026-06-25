@@ -69,6 +69,7 @@ import type {
   HealthStatus,
   ImportGooglePubBody,
   ImportGooglePubResponse,
+  InviteLink,
   ListAdminSettlementRequestsParams,
   ListEventReviewsParams,
   ListEventsParams,
@@ -1732,6 +1733,76 @@ export const useBookParty = <TError = ErrorType<unknown>,
       return useMutation(getBookPartyMutationOptions(options));
     }
 
+export const getResetPartyInviteUrl = (id: number,) => {
+
+
+
+
+  return `/api/create-your-party/${id}/reset-invite`
+}
+
+/**
+ * @summary Reset a party's invite link (host only) — revokes old share links
+ */
+export const resetPartyInvite = async (id: number, options?: RequestInit): Promise<InviteLink> => {
+
+  return customFetch<InviteLink>(getResetPartyInviteUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getResetPartyInviteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetPartyInvite>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetPartyInvite>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['resetPartyInvite'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetPartyInvite>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  resetPartyInvite(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetPartyInviteMutationResult = NonNullable<Awaited<ReturnType<typeof resetPartyInvite>>>
+
+    export type ResetPartyInviteMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reset a party's invite link (host only) — revokes old share links
+ */
+export const useResetPartyInvite = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetPartyInvite>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetPartyInvite>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getResetPartyInviteMutationOptions(options));
+    }
+
 export const getListPartyMessagesUrl = (id: number,) => {
 
 
@@ -3136,6 +3207,76 @@ export const useCloseSoloGroup = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCloseSoloGroupMutationOptions(options));
+    }
+
+export const getResetSoloGroupInviteUrl = (id: number,) => {
+
+
+
+
+  return `/api/solo-connect/groups/${id}/reset-invite`
+}
+
+/**
+ * @summary Reset a group's invite link (group admin) — revokes old share links
+ */
+export const resetSoloGroupInvite = async (id: number, options?: RequestInit): Promise<InviteLink> => {
+
+  return customFetch<InviteLink>(getResetSoloGroupInviteUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getResetSoloGroupInviteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetSoloGroupInvite>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetSoloGroupInvite>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['resetSoloGroupInvite'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetSoloGroupInvite>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  resetSoloGroupInvite(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetSoloGroupInviteMutationResult = NonNullable<Awaited<ReturnType<typeof resetSoloGroupInvite>>>
+
+    export type ResetSoloGroupInviteMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reset a group's invite link (group admin) — revokes old share links
+ */
+export const useResetSoloGroupInvite = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetSoloGroupInvite>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetSoloGroupInvite>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getResetSoloGroupInviteMutationOptions(options));
     }
 
 export const getListSoloMessagesUrl = (id: number,) => {

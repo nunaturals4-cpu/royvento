@@ -357,6 +357,10 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "ticket_type" varchar(10) NOT NULL DEFAULT ''`);
     await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "ticket_price" numeric(10,2) NOT NULL DEFAULT '0'`);
     await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "capacity" integer`);
+    // Share-link invite token. Backfill existing rows so their hosts can still
+    // generate a working invite link after the upgrade.
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "invite_token" varchar(40) NOT NULL DEFAULT ''`);
+    await db.execute(sql`UPDATE "solo_groups" SET "invite_token" = replace(gen_random_uuid()::text, '-', '') WHERE "invite_token" = ''`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_groups_city_status_idx" ON "solo_groups" ("city", "status")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_groups_activity_idx" ON "solo_groups" ("last_activity_at")`);
     await db.execute(sql`
@@ -444,6 +448,10 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "create_your_party" ADD COLUMN IF NOT EXISTS "smoking" varchar(4) NOT NULL DEFAULT ''`);
     await db.execute(sql`ALTER TABLE "create_your_party" ADD COLUMN IF NOT EXISTS "couple_friendly" varchar(4) NOT NULL DEFAULT ''`);
     await db.execute(sql`ALTER TABLE "create_your_party" ADD COLUMN IF NOT EXISTS "lgbtq_friendly" varchar(4) NOT NULL DEFAULT ''`);
+    // Share-link invite token (private parties). Backfill existing rows so their
+    // hosts can still generate a working invite link after the upgrade.
+    await db.execute(sql`ALTER TABLE "create_your_party" ADD COLUMN IF NOT EXISTS "invite_token" varchar(40) NOT NULL DEFAULT ''`);
+    await db.execute(sql`UPDATE "create_your_party" SET "invite_token" = replace(gen_random_uuid()::text, '-', '') WHERE "invite_token" = ''`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_organizer_idx" ON "create_your_party" ("organizer_user_id")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_city_status_idx" ON "create_your_party" ("city", "status")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "cyp_slug_idx" ON "create_your_party" ("slug")`);

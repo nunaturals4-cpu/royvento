@@ -48,10 +48,7 @@ export function Notifications() {
   });
 
   const markAllRead = useMutation({
-    mutationFn: async () => {
-      const unread = (data ?? []).filter((n) => !n.isRead);
-      await Promise.all(unread.map((n) => apiPatch(`/api/notifications/${n.id}/read`, {})));
-    },
+    mutationFn: () => apiPatch("/api/notifications/read-all", {}),
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ["notifications"] });
       qc.setQueryData<Notification[]>(["notifications"], (prev) =>

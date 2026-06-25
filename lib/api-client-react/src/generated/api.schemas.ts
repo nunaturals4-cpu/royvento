@@ -396,6 +396,7 @@ export interface Party {
   rules: string;
   category: string;
   visibility: PartyVisibility;
+  inviteToken?: string;
   venueName: string;
   address: string;
   city: string;
@@ -667,6 +668,7 @@ export interface PartyBookBody {
   quantity?: number;
   name?: string;
   phone?: string;
+  inviteToken?: string;
 }
 
 export interface PartyBookResult {
@@ -830,6 +832,7 @@ export interface SoloGroup {
   city: string;
   genderType: SoloGroupGenderType;
   visibility: SoloGroupVisibility;
+  inviteToken?: string;
   status: SoloGroupStatus;
   reputationScore: string;
   ratingCount: number;
@@ -957,6 +960,11 @@ export interface SoloJoinBody {
   country?: string;
   state?: string;
   city: string;
+  inviteToken?: string;
+}
+
+export interface InviteLink {
+  inviteToken: string;
 }
 
 export interface SoloActionResult {

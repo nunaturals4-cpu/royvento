@@ -1916,8 +1916,13 @@ export const soloGroupsTable = pgTable(
     // male | female | mixed — a non-gating label (default mixed). Both genders
     // may join any group; this only describes the intended vibe.
     genderType: varchar("gender_type", { length: 10 }).notNull().default("mixed"),
-    // public | private
+    // public | private. A private group stays VISIBLE in the browse list but
+    // only people who open the host's invite link (carrying invite_token) may
+    // request to join.
     visibility: varchar("visibility", { length: 10 }).notNull().default("public"),
+    // Secret token embedded in the host's share link. Joining a private group
+    // requires ?invite=<this>. Exposed to the group admin only.
+    inviteToken: varchar("invite_token", { length: 40 }).notNull().default(""),
     // open | locked | closed
     status: varchar("status", { length: 10 }).notNull().default("open"),
     reputationScore: numeric("reputation_score", { precision: 4, scale: 2 }).notNull().default("0"),
@@ -2098,8 +2103,13 @@ export const createYourPartyTable = pgTable(
     description: text("description").notNull().default(""),
     rules: text("rules").notNull().default(""),
     category: varchar("category", { length: 80 }).notNull().default(""),
-    // public | private
+    // public | private. A private party stays VISIBLE in the browse list but
+    // only people who open the host's invite link (carrying invite_token) may
+    // book a spot.
     visibility: varchar("visibility", { length: 10 }).notNull().default("public"),
+    // Secret token embedded in the host's share link. Booking a private party
+    // requires ?invite=<this>. Exposed to the organizer only.
+    inviteToken: varchar("invite_token", { length: 40 }).notNull().default(""),
     venueName: varchar("venue_name", { length: 255 }).notNull().default(""),
     address: text("address").notNull().default(""),
     city: varchar("city", { length: 100 }).notNull().default(""),

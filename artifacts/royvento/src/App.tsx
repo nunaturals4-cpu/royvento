@@ -65,6 +65,7 @@ const Blogs = lazy(() => import("@/pages/blogs").then((m) => ({ default: m.Blogs
 const BlogDetail = lazy(() => import("@/pages/blog-detail").then((m) => ({ default: m.BlogDetail })));
 const SoloConnect = lazy(() => import("@/pages/solo-connect").then((m) => ({ default: m.SoloConnect })));
 const PrivateParties = lazy(() => import("@/pages/private-parties").then((m) => ({ default: m.PrivateParties })));
+const SplitExpense = lazy(() => import("@/pages/split-expense").then((m) => ({ default: m.SplitExpense })));
 
 function PageFallback() {
   return (
@@ -244,6 +245,9 @@ function Router() {
           </Route>
           <Route path="/solo-connect">
             {() => <SoloConnect />}
+          </Route>
+          <Route path="/split-expense">
+            {() => <RequireAuth><SplitExpense /></RequireAuth>}
           </Route>
           <Route path="/admin">
             {() => <RequireAuth role="admin"><AdminPanel /></RequireAuth>}

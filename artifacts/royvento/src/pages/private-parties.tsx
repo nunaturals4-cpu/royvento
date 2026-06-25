@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Ticket,
   Sparkles,
+  Lock,
 } from "lucide-react";
 
 // Solo Connect palette — gold premium accents + red call-to-action buttons.
@@ -462,6 +463,11 @@ function PartyCard({ p }: { p: Party }) {
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
             <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ background: GOLD, color: "#1a1205" }}>Party</span>
             {!isPaid && <span className="inline-flex items-center rounded-md bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Free Entry</span>}
+            {p.visibility === "private" && (
+              <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ borderColor: `${GOLD}55`, background: `${GOLD}1f`, color: GOLD }}>
+                <Lock className="h-2.5 w-2.5" /> Invite only
+              </span>
+            )}
             <span className="inline-flex items-center rounded-md border border-white/20 bg-white/[0.08] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white/85">{joinBadge(p.joinType)}</span>
           </div>
           <h3 className="text-[15px] font-bold leading-tight text-white line-clamp-1 transition-colors duration-200 group-hover:text-[#d4af37]">{p.name}</h3>

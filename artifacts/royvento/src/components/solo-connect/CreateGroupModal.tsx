@@ -196,6 +196,8 @@ export function CreateGroupModal({
   const [maxMembers, setMaxMembers] = useState(8);
   // Non-gating vibe label — anyone can join any group regardless.
   const [genderType, setGenderType] = useState<GenderType>("mixed");
+  // public → anyone can request to join; private → invite-link only (still listed).
+  const [visibility, setVisibility] = useState<"public" | "private">("public");
 
   // Country / state / city — prefilled from the detected location, editable so
   // the group's location is explicit. State drives state-based discovery.
@@ -234,7 +236,7 @@ export function CreateGroupModal({
           startTime: startTime || undefined,
           description: description.trim(),
           maxMembers,
-          visibility: "public",
+          visibility,
           genderType,
           city: groupCity.trim(),
           state: groupState.trim() || undefined,
@@ -389,6 +391,31 @@ export function CreateGroupModal({
           <div>
             <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Max members: <span style={{ color: GOLD }}>{maxMembers}</span></p>
             <input type="range" min={3} max={15} value={maxMembers} onChange={(e) => setMaxMembers(Number(e.target.value))} className="w-full" style={{ accentColor: RED }} />
+          </div>
+
+          {/* Public vs Private (invite-only). Both stay listed for discovery. */}
+          <div>
+            <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Visibility</p>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { value: "public", label: "Public", sub: "Anyone can request to join" },
+                { value: "private", label: "Private", sub: "Invite link only" },
+              ] as const).map((o) => {
+                const active = visibility === o.value;
+                return (
+                  <button key={o.value} type="button" onClick={() => setVisibility(o.value)}
+                    className="text-left p-3 rounded-xl transition-all"
+                    style={{
+                      background: active ? `${GOLD}1f` : "rgba(255,255,255,0.04)",
+                      border: `1.5px solid ${active ? GOLD : "rgba(255,255,255,0.08)"}`,
+                      boxShadow: active ? `0 0 18px ${GOLD}33` : "none",
+                    }}>
+                    <p className="text-sm font-semibold" style={{ color: active ? "#fff" : "rgba(255,255,255,0.72)" }}>{o.label}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: active ? GOLD : "rgba(255,255,255,0.4)" }}>{o.sub}</p>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex gap-3 pt-1">

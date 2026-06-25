@@ -240,6 +240,11 @@ export function EditPartyModal({ party, onClose, onSaved }: { party: Party; onCl
                 );
               })}
             </div>
+            <p className="text-[11px] mt-1.5" style={{ color: "rgba(255,255,255,0.45)" }}>
+              {f.visibility === "private"
+                ? "Stays listed, but only people with your invite link can book."
+                : "Listed for everyone — anyone can book."}
+            </p>
           </div>
 
           {/* Location */}

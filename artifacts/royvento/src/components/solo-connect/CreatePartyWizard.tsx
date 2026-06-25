@@ -25,6 +25,7 @@ import {
   Plus,
   X,
   SlidersHorizontal,
+  Lock,
 } from "lucide-react";
 
 // Who-Can-Join options with display badges (gender-gated server-side).
@@ -85,6 +86,7 @@ interface PartyForm {
   capacity: string;
   organizerName: string;
   joinType: JoinType | "";
+  visibility: "public" | "private";
   groupDate: string;
   startTime: string;
   endTime: string;
@@ -142,6 +144,7 @@ export function CreatePartyWizard({ city, onClose }: { city: string; onClose: ()
     capacity: "",
     organizerName: "",
     joinType: "",
+    visibility: "public",
     groupDate: "",
     startTime: "",
     endTime: "",
@@ -287,7 +290,7 @@ export function CreatePartyWizard({ city, onClose }: { city: string; onClose: ()
         data: {
           name: form.name.trim(),
           category: "party",
-          visibility: "public",
+          visibility: form.visibility,
           coverImageUrl: form.coverImageUrl,
           galleryImages: form.galleryImages,
           description: form.description.trim(),
@@ -718,6 +721,36 @@ function AudienceStep({ form, set }: { form: PartyForm; set: SetFn }) {
           );
         })}
       </div>
+
+      {/* Public vs Private (invite-only) — both stay visible in the city list. */}
+      <p className="text-xs mt-5 mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Visibility</p>
+      <div className="grid grid-cols-2 gap-2.5">
+        {([
+          { value: "public", label: "Public", sub: "Anyone can book", icon: Users },
+          { value: "private", label: "Private", sub: "Invite link only", icon: Lock },
+        ] as const).map((o) => {
+          const active = form.visibility === o.value;
+          const Icon = o.icon;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => set("visibility", o.value)}
+              className="text-left p-4 rounded-2xl transition-all"
+              style={{
+                background: active ? `${PARTY}1f` : "rgba(255,255,255,0.04)",
+                border: active ? `1.5px solid ${PARTY}` : "1.5px solid rgba(255,255,255,0.08)",
+                boxShadow: active ? `0 0 18px ${PARTY}33` : "none",
+              }}
+            >
+              <span className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: active ? "#fff" : "rgba(255,255,255,0.75)" }}>
+                <Icon className="h-4 w-4" style={{ color: active ? PARTY : "rgba(255,255,255,0.5)" }} /> {o.label}
+              </span>
+              <p className="text-[11px] mt-0.5" style={{ color: active ? PARTY : "rgba(255,255,255,0.4)" }}>{o.sub}</p>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -849,6 +882,7 @@ function ReviewStep({ form, goto }: { form: PartyForm; goto: (s: number) => void
       { label: "Party name", value: form.name, step: 0 },
       { label: "Organizer", value: `Hosted by: ${form.organizerName}`, step: 3 },
       { label: "Who can join", value: joinBadge(form.joinType || "mixed"), step: 4 },
+      { label: "Visibility", value: form.visibility === "private" ? "🔒 Private · invite link only" : "🌐 Public · anyone can book", step: 4 },
       { label: "Location", value: `${form.venueName}, ${form.address}, ${form.city} ${form.pinCode}`, step: 1 },
       { label: "Date & time", value: `${form.groupDate} · ${form.startTime}–${form.endTime}`, step: 5 },
       {

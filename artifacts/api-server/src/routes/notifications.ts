@@ -28,6 +28,30 @@ router.get("/notifications", requireAuth(), async (req, res) => {
   );
 });
 
+// Mark every unread notification for the current user as read in a single
+// atomic UPDATE. Defined before the "/:id/read" route so the literal path is
+// never shadowed by the param route, and so the client only fires one request
+// (the previous per-id fan-out reverted its optimistic update if any single
+// request failed, making "Mark all read" appear to do nothing).
+router.patch("/notifications/read-all", requireAuth(), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const updated = await db
+    .update(notificationsTable)
+    .set({ isRead: true })
+    .where(
+      and(
+        eq(notificationsTable.userId, user.id),
+        eq(notificationsTable.isRead, false),
+      ),
+    )
+    .returning({ id: notificationsTable.id });
+  res.json({ ok: true, count: updated.length });
+});
+
 router.patch("/notifications/:id/read", requireAuth(), async (req, res) => {
   const id = Number(req.params["id"]);
   if (!Number.isFinite(id)) {

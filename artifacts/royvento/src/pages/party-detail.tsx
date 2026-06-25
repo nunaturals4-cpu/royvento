@@ -5,6 +5,7 @@ import {
   useGetParty,
   useBookParty,
   useCancelParty,
+  useResetPartyInvite,
   useGetMe,
   useGetSoloAccess,
   getGetPartyQueryKey,
@@ -47,6 +48,8 @@ import {
   Lock,
   Send,
   SlidersHorizontal,
+  Share2,
+  RefreshCw,
 } from "lucide-react";
 
 const GOLD = "#d4af37";
@@ -84,6 +87,10 @@ export function PartyDetail() {
   const cancel = useCancelParty();
   const { ensureGender, modal: genderModal } = useRequireGender();
 
+  // Invite token carried in the host's share link (?invite=…). Required to book
+  // a private party for everyone except the organizer.
+  const inviteToken = new URLSearchParams(window.location.search).get("invite") ?? "";
+
   const refresh = () => qc.invalidateQueries({ queryKey: getGetPartyQueryKey(id) });
 
   if (isLoading) {
@@ -102,6 +109,9 @@ export function PartyDetail() {
   const isPaid = party.ticketType === "paid";
   const cancelled = party.status === "cancelled";
   const salesStopped = party.status === "sales_stopped";
+  // Private party + viewer isn't the host, hasn't already joined, and arrived
+  // without an invite token → booking is locked behind the host's invite link.
+  const needsInvite = party.visibility === "private" && !party.isOrganizer && !party.canChat && !inviteToken;
   const seatsLeft = party.seatsLeft;
   const soldOut = seatsLeft != null && seatsLeft <= 0;
   const booked = seatsLeft != null && party.capacity > 0 ? party.capacity - seatsLeft : 0;
@@ -109,7 +119,8 @@ export function PartyDetail() {
 
   function handleBook() {
     if (!loggedIn) {
-      setLocation(`/login?next=${encodeURIComponent(`/party/${id}`)}`);
+      // Preserve ?invite=… across login so a private invite survives the round-trip.
+      setLocation(`/login?next=${encodeURIComponent(`/party/${id}${window.location.search}`)}`);
       return;
     }
     // Require a binary gender first (reused silently if already set).
@@ -118,7 +129,7 @@ export function PartyDetail() {
 
   function doBook() {
     book.mutate(
-      { id, data: { quantity: 1 } },
+      { id, data: { quantity: 1, inviteToken: inviteToken || undefined } },
       {
         onSuccess: async (res) => {
           // Paid party → open Razorpay checkout, then verify server-side.
@@ -375,6 +386,20 @@ export function PartyDetail() {
                   <div className="text-center py-3.5 rounded-2xl text-sm font-medium" style={{ background: `${RED}14`, color: "#fca5a5", border: `1px solid ${RED}33` }}>
                     This party has been cancelled.
                   </div>
+                ) : needsInvite ? (
+                  <div className="flex flex-col items-center text-center gap-3 p-5 rounded-2xl"
+                    style={{ background: `linear-gradient(180deg, ${PARTY}0f, rgba(14,12,16,0.9))`, border: `1px solid ${PARTY}44` }}>
+                    <span className="flex items-center justify-center h-12 w-12 rounded-2xl"
+                      style={{ background: `${PARTY}18`, border: `1px solid ${PARTY}55`, boxShadow: `0 0 22px ${PARTY}22` }}>
+                      <Lock className="h-5 w-5" style={{ color: PARTY }} />
+                    </span>
+                    <div>
+                      <p className="font-serif text-lg" style={{ color: "#fff" }}>Private party — invite only</p>
+                      <p className="text-[13px] mt-1 leading-snug" style={{ color: "rgba(255,255,255,0.58)" }}>
+                        This party is private. Open the host's invite link to book your spot.
+                      </p>
+                    </div>
+                  </div>
                 ) : !loggedIn ? (
                   // Logged-out visitor — show book button; handleBook will redirect to login.
                   <button type="button" onClick={handleBook}
@@ -451,6 +476,10 @@ export function PartyDetail() {
                     </div>
                   </>
                 )}
+
+                {/* Share — everyone can share the party; the host's link carries
+                    the invite token that unlocks a private party. */}
+                {!cancelled && <ShareParty party={party} onReset={refresh} />}
               </div>
             </div>
           </div>
@@ -462,6 +491,72 @@ export function PartyDetail() {
       )}
       {genderModal}
     </>
+  );
+}
+
+// Share the party. Everyone can copy/share the plain profile link; the host
+// additionally gets the invite-token link (which unlocks a PRIVATE party) plus a
+// Reset action that revokes previously-shared invite links.
+function ShareParty({ party, onReset }: { party: Party; onReset: () => void }) {
+  const { toast } = useToast();
+  const reset = useResetPartyInvite();
+  const isPrivate = party.visibility === "private";
+  // Only the host receives a non-empty inviteToken from the API, so only the host
+  // can build an invite link. Everyone else shares the plain profile URL.
+  const base = `${window.location.origin}/party/${party.id}`;
+  const shareUrl = party.isOrganizer && isPrivate && party.inviteToken
+    ? `${base}?invite=${party.inviteToken}`
+    : base;
+
+  async function doShare() {
+    const text = isPrivate ? `You're invited to ${party.name} on Royvento` : `Check out ${party.name} on Royvento`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: party.name, text, url: shareUrl });
+      } catch {
+        /* user dismissed the share sheet */
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: "Link copied!",
+        description: isPrivate && party.isOrganizer ? "Anyone with this link can book your private party." : "Share it with your friends.",
+      });
+    } catch {
+      toast({ title: "Could not copy the link", description: shareUrl, variant: "destructive" });
+    }
+  }
+
+  function doReset() {
+    if (!confirm("Reset the invite link? Anyone using the old link will no longer be able to book.")) return;
+    reset.mutate(
+      { id: party.id },
+      {
+        onSuccess: () => { toast({ title: "Invite link reset", description: "Old links no longer work — share the new one." }); onReset(); },
+        onError: (e) => toast({ title: e instanceof Error ? e.message : "Could not reset link", variant: "destructive" }),
+      },
+    );
+  }
+
+  return (
+    <div className="mt-3 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+      <button type="button" onClick={doShare}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all hover:bg-white/[0.06]"
+        style={{ background: "rgba(255,255,255,0.04)", color: "#fff", border: "1px solid rgba(255,255,255,0.14)" }}>
+        <Share2 className="h-4 w-4" style={{ color: PARTY }} />
+        {isPrivate && party.isOrganizer ? "Share invite link" : "Share party"}
+      </button>
+      {party.isOrganizer && isPrivate && (
+        <button type="button" onClick={doReset} disabled={reset.isPending}
+          className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[12px] font-medium transition-all hover:bg-white/[0.04]"
+          style={{ color: "rgba(255,255,255,0.55)" }}>
+          {reset.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          Reset invite link
+        </button>
+      )}
+    </div>
   );
 }
 

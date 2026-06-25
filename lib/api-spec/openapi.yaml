@@ -374,6 +374,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/PartyBookResult"
 
+  /create-your-party/{id}/reset-invite:
+    post:
+      operationId: resetPartyInvite
+      tags: [create-your-party]
+      summary: Reset a party's invite link (host only) — revokes old share links
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: New invite token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteLink"
+
   /create-your-party/{id}/messages:
     get:
       operationId: listPartyMessages
@@ -690,6 +705,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SoloActionResult"
+
+  /solo-connect/groups/{id}/reset-invite:
+    post:
+      operationId: resetSoloGroupInvite
+      tags: [solo-connect]
+      summary: Reset a group's invite link (group admin) — revokes old share links
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: New invite token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteLink"
 
   /solo-connect/groups/{id}/messages:
     get:
@@ -3433,6 +3463,7 @@ components:
         rules: { type: string }
         category: { type: string }
         visibility: { type: string, enum: [public, private] }
+        inviteToken: { type: string }
         venueName: { type: string }
         address: { type: string }
         city: { type: string }
@@ -3548,6 +3579,7 @@ components:
         quantity: { type: integer }
         name: { type: string }
         phone: { type: string }
+        inviteToken: { type: string }
 
     PartyBookResult:
       type: object
@@ -3682,6 +3714,7 @@ components:
         visibility:
           type: string
           enum: [public, private]
+        inviteToken: { type: string }
         status:
           type: string
           enum: [open, locked, closed]
@@ -3780,7 +3813,14 @@ components:
         country: { type: string }
         state: { type: string }
         city: { type: string }
+        inviteToken: { type: string }
       required: [city]
+
+    InviteLink:
+      type: object
+      properties:
+        inviteToken: { type: string }
+      required: [inviteToken]
 
     SoloActionResult:
       type: object

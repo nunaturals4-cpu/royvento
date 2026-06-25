@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
+import { randomBytes } from "crypto";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import {
   db,
@@ -34,6 +35,12 @@ const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 
 const norm = (s: string) => s.trim().toLowerCase();
+
+// Unguessable token embedded in a host's share link. Joining a PRIVATE group
+// requires presenting this exact token (?invite=…). 32 hex chars.
+function genInviteToken(): string {
+  return randomBytes(16).toString("hex");
+}
 
 // The consent text version the user acknowledges at onboarding. Bump when the
 // legal copy (Terms / Community Guidelines / risk disclaimer) materially changes.
@@ -661,6 +668,9 @@ function groupToPublic(
     // Non-gating vibe label now (male | female | mixed).
     genderType: g.genderType,
     visibility: g.visibility,
+    // Join gate for private groups — only ever revealed to the group admin
+    // (who builds the share link). "" for everyone else.
+    inviteToken: isAdmin ? g.inviteToken : "",
     status: g.status,
     reputationScore: g.reputationScore,
     ratingCount: g.ratingCount,
@@ -842,6 +852,7 @@ router.post("/solo-connect/groups", async (req, res) => {
       state: d.state ?? "",
       city: d.city,
       genderType: d.genderType ?? "mixed",
+      inviteToken: genInviteToken(),
       lastActivityAt: new Date(),
       // Party-specific fields (empty/zero for other activity types).
       coverImageUrl: isParty ? (d.coverImageUrl ?? "") : "",
@@ -956,6 +967,8 @@ const JoinBody = z.object({
   country: z.string().optional(),
   state: z.string().optional(),
   city: z.string().min(1),
+  // Invite token from the host's share link — required to join a PRIVATE group.
+  inviteToken: z.string().max(64).optional(),
 });
 
 // Request to join. Location is validated on EVERY call (group.city === body.city)
@@ -984,6 +997,20 @@ router.post("/solo-connect/groups/:id/join", async (req, res) => {
   if (!g) return;
   if (g.status !== "open") {
     res.status(403).json({ error: "This group is locked or closed." });
+    return;
+  }
+  // Invite gate — a PRIVATE group only admits people who opened the host's
+  // share link (carrying the matching invite token). The admin bypasses;
+  // public groups have no gate.
+  if (
+    g.visibility === "private" &&
+    g.adminUserId !== user.id &&
+    (parsed.data.inviteToken ?? "") !== g.inviteToken
+  ) {
+    res.status(403).json({
+      error: "This is a private group — open the host's invite link to join.",
+      code: "invite_required",
+    });
     return;
   }
   const existing = await db
@@ -1143,6 +1170,22 @@ function groupStateAction(next: "locked" | "closed") {
 
 router.post("/solo-connect/groups/:id/lock", groupStateAction("locked"));
 router.post("/solo-connect/groups/:id/close", groupStateAction("closed"));
+
+// Reset the invite link (group admin only) — revokes any previously-shared link.
+router.post("/solo-connect/groups/:id/reset-invite", async (req, res) => {
+  const user = await requireApproved(req, res);
+  if (!user) return;
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const g = await requireGroupAdmin(id, user, res);
+  if (!g) return;
+  const inviteToken = genInviteToken();
+  await db.update(soloGroupsTable).set({ inviteToken }).where(eq(soloGroupsTable.id, id));
+  res.json({ inviteToken });
+});
 
 // ─── Group chat (temporary; purged daily at 3 AM) ────────────────────────────
 

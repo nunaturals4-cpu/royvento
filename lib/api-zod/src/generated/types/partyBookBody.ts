@@ -10,4 +10,5 @@ export interface PartyBookBody {
   quantity?: number;
   name?: string;
   phone?: string;
+  inviteToken?: string;
 }

@@ -21,6 +21,7 @@ export interface Party {
   rules: string;
   category: string;
   visibility: PartyVisibility;
+  inviteToken?: string;
   venueName: string;
   address: string;
   city: string;

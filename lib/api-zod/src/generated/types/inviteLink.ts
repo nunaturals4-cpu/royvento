@@ -6,9 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface SoloJoinBody {
-  country?: string;
-  state?: string;
-  city: string;
-  inviteToken?: string;
+export interface InviteLink {
+  inviteToken: string;
 }
