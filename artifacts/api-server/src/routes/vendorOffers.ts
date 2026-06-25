@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, vendorOffersTable, vendorsTable, bookingsTable } from "@workspace/db";
+import { db, vendorOffersTable, vendorsTable, bookingsTable, eventsTable } from "@workspace/db";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
@@ -56,6 +56,31 @@ const OfferBody = z.object({
     .nullable()
     .optional(),
 });
+
+// Resolve the venue's effective cover photo for offers that carry no deal image
+// of their own. Order: vendor cover → vendor banner → the pub's listing image.
+// The third fallback matters for partner-created pubs, whose photo lives only on
+// the pub event (vendors.cover_image_url / banner_image stay empty).
+async function resolveVenueCover(vendorId: number): Promise<string | null> {
+  const [v] = await db
+    .select({ cover: vendorsTable.coverImageUrl, banner: vendorsTable.bannerImage })
+    .from(vendorsTable)
+    .where(eq(vendorsTable.id, vendorId))
+    .limit(1);
+  if (v?.cover) return v.cover;
+  if (v?.banner) return v.banner;
+  const [pe] = await db
+    .select({ img: eventsTable.imageUrl })
+    .from(eventsTable)
+    .where(and(
+      eq(eventsTable.vendorId, vendorId),
+      eq(eventsTable.type, "pub"),
+      eq(eventsTable.approvalStatus, "approved"),
+    ))
+    .orderBy(desc(eventsTable.createdAt))
+    .limit(1);
+  return pe?.img || null;
+}
 
 async function vendorIdForUser(userId: number): Promise<number | null> {
   const rows = await db
@@ -252,7 +277,17 @@ router.get("/vendors/all-drink-deals", async (_req, res) => {
         vendorName: vendorsTable.businessName,
         vendorLocation: vendorsTable.location,
         vendorCity: vendorsTable.city,
-        vendorCoverImage: vendorsTable.bannerImage,
+        // Cover fallback for offers without a deal image: vendor cover → banner →
+        // the pub's listing image (partner pubs keep their photo on the event).
+        vendorCoverImage: sql<string>`COALESCE(
+          NULLIF(${vendorsTable.coverImageUrl}, ''),
+          NULLIF(${vendorsTable.bannerImage}, ''),
+          (SELECT e.image_url FROM events e
+             WHERE e.vendor_id = ${vendorsTable.id} AND e.type = 'pub' AND e.approval_status = 'approved'
+               AND COALESCE(e.image_url, '') <> ''
+             ORDER BY e.created_at DESC LIMIT 1),
+          ''
+        )`,
       })
       .from(vendorOffersTable)
       .innerJoin(vendorsTable, eq(vendorOffersTable.vendorId, vendorsTable.id))
@@ -297,7 +332,10 @@ router.get("/vendors/:vendorId/offers", async (req, res) => {
       if (o.endsAt && now > new Date(o.endsAt)) return false;
       return true;
     });
-    return res.json(live);
+    // Attach the venue's effective cover so cards can fall back to the pub photo
+    // when an offer has no deal image of its own. Resolved once per request.
+    const venueCoverImage = live.length > 0 ? await resolveVenueCover(vendorId) : null;
+    return res.json(live.map((o) => ({ ...o, venueCoverImage })));
   } catch (err) {
     // For the public endpoint, fall back silently to "no offers" if the table
     // is missing — keeps the customer-facing pub page rendering correctly even

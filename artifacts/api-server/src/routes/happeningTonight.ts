@@ -69,7 +69,7 @@ function computeBucket(startMin: number | null, endMin: number | null, nowMin: n
 export interface TonightItem {
   key: string;
   id: number;
-  kind: "pub" | "dj" | "event" | "game" | "happyhour";
+  kind: "pub" | "dj" | "event" | "game" | "happyhour" | "offer";
   title: string;
   subtitle: string;
   city: string;
@@ -309,7 +309,19 @@ router.get("/happening-tonight", async (req, res) => {
       SELECT vo.id, vo.title, vo.category, vo.description, vo.days, vo.time_from AS "timeFrom",
         vo.time_to AS "timeTo", vo.starts_at AS "startsAt", vo.ends_at AS "endsAt", vo.active,
         vo.discount_type AS "discountType", vo.discount_value AS "discountValue",
-        v.id AS "vendorId", v.business_name AS "vendorName", v.city, v.state, v.cover_image_url AS "imageUrl",
+        v.id AS "vendorId", v.business_name AS "vendorName", v.city, v.state,
+        -- The offer's own deal image, then the venue cover/banner, then the pub's
+        -- listing image. Partner pubs keep their photo on the pub event, so the
+        -- last fallback is what makes the card show a cover instead of a blank.
+        COALESCE(
+          NULLIF(vo.image_url, ''),
+          NULLIF(v.cover_image_url, ''),
+          NULLIF(v.banner_image, ''),
+          (SELECT e.image_url FROM events e
+             WHERE e.vendor_id = v.id AND e.type = 'pub' AND e.approval_status = 'approved'
+               AND COALESCE(e.image_url, '') <> ''
+             ORDER BY e.created_at DESC LIMIT 1)
+        ) AS "imageUrl",
         (SELECT COALESCE(AVG(rating), 0) FROM reviews WHERE vendor_id = v.id) AS "rating",
         (SELECT id FROM events WHERE vendor_id = v.id AND type = 'pub' ORDER BY id DESC LIMIT 1) AS "pubEventId"
       FROM vendor_offers vo JOIN vendors v ON v.id = vo.vendor_id
@@ -327,17 +339,16 @@ router.get("/happening-tonight", async (req, res) => {
       };
       if (!isOfferActiveAt(offer as Pick<VendorOffer, "active" | "startsAt" | "endsAt" | "days" | "timeFrom" | "timeTo">, now)) continue;
       const pubEventId = r["pubEventId"] != null ? Number(r["pubEventId"]) : null;
-      const isDrink = r["category"] === "drink";
       push({
         key: `offer-${r["id"]}`,
         id: Number(r["id"]),
-        kind: "happyhour",
+        kind: "offer",
         title: String(r["title"] ?? ""),
         subtitle: String(r["vendorName"] ?? ""),
         city: String(r["city"] ?? ""),
         state: String(r["state"] ?? ""),
         imageUrl: String(r["imageUrl"] ?? ""),
-        href: pubEventId ? `/events/${pubEventId}?to=happyhours` : "/pub-offers",
+        href: pubEventId ? `/events/${pubEventId}?to=offers` : "/pub-offers",
         startTime: String(r["timeFrom"] ?? ""),
         endTime: String(r["timeTo"] ?? ""),
         dealLabel: String(r["title"] ?? ""),
@@ -346,7 +357,82 @@ router.get("/happening-tonight", async (req, res) => {
         startMin: null,
         endMin: null,
         forceBucket: "now", // an active offer is, by definition, live now
-        extraFilters: isDrink ? ["happy", "deals"] : ["deals"],
+        // "Food & Drink Offers" filter — vendor_offers only (food + drink discounts).
+        extraFilters: ["offers", "deals"],
+      });
+    }
+
+    // ── Happy Hours (drink plans: Free Drinks / Included with Ticket / Cover
+    // Charges). These are distinct from vendor_offers and power the "Happy Hours"
+    // filter. Only surfaced when live right now (day + time window). ──────────
+    const PLAN_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const todayName = PLAN_DAY_NAMES[now.getDay()] ?? "Sun";
+    const planRows = (await db.execute(sql`
+      SELECT dp.id, dp.type, dp.product_name AS "productName", dp.days,
+        dp.time_from AS "timeFrom", dp.time_to AS "timeTo",
+        v.id AS "vendorId", v.business_name AS "vendorName", v.city, v.state,
+        COALESCE(
+          NULLIF(dp.image_url, ''),
+          NULLIF(v.cover_image_url, ''),
+          NULLIF(v.banner_image, ''),
+          (SELECT e.image_url FROM events e
+             WHERE e.vendor_id = v.id AND e.type = 'pub' AND e.approval_status = 'approved'
+               AND COALESCE(e.image_url, '') <> ''
+             ORDER BY e.created_at DESC LIMIT 1)
+        ) AS "imageUrl",
+        (SELECT COALESCE(AVG(rating), 0) FROM reviews WHERE vendor_id = v.id) AS "rating",
+        (SELECT id FROM events WHERE vendor_id = v.id AND type = 'pub' ORDER BY id DESC LIMIT 1) AS "pubEventId"
+      FROM drink_plans dp JOIN vendors v ON v.id = dp.vendor_id
+      WHERE v.status = 'approved' AND v.hidden = false
+        AND (dp.valid_from IS NULL OR dp.valid_from <= ${today})
+        AND (dp.valid_until IS NULL OR dp.valid_until >= ${today})
+      LIMIT 300
+    `)).rows as Record<string, unknown>[];
+    const planLabel = (type: string, productName: string): string => {
+      if (type === "welcome") return productName || "Free Welcome Drink";
+      if (type === "unlimited") return productName || "Free Unlimited Drinks";
+      if (type === "ticket") return "Included with Ticket";
+      if (type === "cover_charge") return productName || "Cover Charge";
+      return productName || "Drinks Deal";
+    };
+    for (const r of planRows) {
+      const days = ((r["days"] as string[] | null) ?? []).map((d) => d.slice(0, 3).toLowerCase());
+      // Empty days = every day; otherwise today must be listed.
+      if (days.length > 0 && !days.includes(todayName.toLowerCase())) continue;
+      const startMin = parseHHMM(r["timeFrom"] as string);
+      const endMin = parseHHMM(r["timeTo"] as string);
+      // Live-now check: when a time window is set it must include now (overnight
+      // supported); no time window = all-day, always live.
+      if (startMin !== null && endMin !== null) {
+        const live = startMin <= endMin
+          ? nowMin >= startMin && nowMin <= endMin
+          : nowMin >= startMin || nowMin <= endMin;
+        if (!live) continue;
+      } else if (startMin !== null && nowMin < startMin) {
+        continue;
+      }
+      const pubEventId = r["pubEventId"] != null ? Number(r["pubEventId"]) : null;
+      const label = planLabel(String(r["type"] ?? ""), String(r["productName"] ?? ""));
+      push({
+        key: `plan-${r["id"]}`,
+        id: Number(r["id"]),
+        kind: "happyhour",
+        title: label,
+        subtitle: String(r["vendorName"] ?? ""),
+        city: String(r["city"] ?? ""),
+        state: String(r["state"] ?? ""),
+        imageUrl: String(r["imageUrl"] ?? ""),
+        href: pubEventId ? `/events/${pubEventId}?to=happyhours` : "/pub-offers",
+        startTime: String(r["timeFrom"] ?? ""),
+        endTime: String(r["timeTo"] ?? ""),
+        dealLabel: label,
+        rating: Number(r["rating"] ?? 0),
+        todayBookings: 0,
+        startMin: null,
+        endMin: null,
+        forceBucket: "now",
+        // "Happy Hours" filter — drink plans only.
+        extraFilters: ["happy", "deals"],
       });
     }
   } catch (err) {

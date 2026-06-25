@@ -21,8 +21,6 @@ import {
   Store,
   Music,
   Mic2,
-  Gamepad2,
-  Drama,
   Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -183,13 +181,12 @@ function useUserLocation() {
 // Presentational category tiles — each links to an existing route (no new
 // backend / functionality). Mirrors the reference design's "Popular Categories".
 const CATEGORIES = [
-  { label: "Pubs & Bars",    sub: "Find nearby pubs",        icon: GlassWater, href: "/pubs",       img: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=600&q=70" },
-  { label: "Nightclubs",     sub: "Dance the night away",    icon: Music,      href: "/pubs",       img: "https://images.unsplash.com/photo-1493676304819-0d7a8d026dcf?w=600&q=70" },
-  { label: "Date Night",     sub: "Romantic spots for two",  icon: Heart,      href: "/pubs?when=weekend", img: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=70" },
-  { label: "Games & Sports", sub: "Play & compete",          icon: Gamepad2,   href: "/games",      img: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&q=70" },
-  { label: "Live Events",    sub: "Concerts & gigs",         icon: Mic2,       href: "/events",     img: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=70" },
-  { label: "Ladies Nights",  sub: "Special offers & events", icon: Sparkles,   href: "/pub-offers", img: "https://images.unsplash.com/photo-1545128485-c400e7702796?w=600&q=70" },
-  { label: "Standup Shows",  sub: "Laugh out loud",          icon: Drama,      href: "/events",     img: "https://images.unsplash.com/photo-1585699324551-f6c309eedeca?w=600&q=70" },
+  { label: "Pubs & Bars",    sub: "Find nearby pubs",        icon: GlassWater,  href: "/pubs?category=Pub",       img: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=600&q=70" },
+  { label: "Nightclubs",     sub: "Dance the night away",    icon: Music,       href: "/pubs?category=Club",      img: "https://images.unsplash.com/photo-1493676304819-0d7a8d026dcf?w=600&q=70" },
+  { label: "Date Night",     sub: "Romantic spots for two",  icon: Heart,       href: "/pubs?category=DateNight", img: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=70" },
+  { label: "Live Events",    sub: "Concerts & gigs",         icon: Mic2,        href: "/events",                  img: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=70" },
+  { label: "Private Party",  sub: "Host your own party",     icon: PartyPopper, href: "/private-parties",         img: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&q=70" },
+  { label: "Solo Groups",    sub: "Meet new people",         icon: Users,       href: "/solo-connect",            img: "https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600&q=70" },
 ] as const;
 
 export function Home() {

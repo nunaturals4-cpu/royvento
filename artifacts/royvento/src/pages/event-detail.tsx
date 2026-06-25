@@ -2633,6 +2633,8 @@ interface VendorOfferDto {
   timeFrom: string;
   timeTo: string;
   imageUrl?: string | null;
+  /** Server-resolved venue cover (vendor cover → banner → pub listing image). */
+  venueCoverImage?: string | null;
 }
 
 const OFFER_DAY_LABEL: Record<string, string> = {
@@ -2769,8 +2771,9 @@ function PremiumOfferCard({
   const category = offer.category === "drink" ? "DRINK DEAL" : "FOOD DEAL";
   const badge = offerDiscountBadge(offer);
   const daysLabel = offerDaysLabel(offer.days);
-  // Offer's own deal image, falling back to the venue cover photo.
-  const dealImage = offer.imageUrl || coverFallback || null;
+  // Offer's own deal image, then the server-resolved venue cover (handles
+  // partner pubs whose photo lives on the pub event), then the page fallback.
+  const dealImage = offer.imageUrl || offer.venueCoverImage || coverFallback || null;
 
   if (featured) {
     const gradient = accent === "amber"

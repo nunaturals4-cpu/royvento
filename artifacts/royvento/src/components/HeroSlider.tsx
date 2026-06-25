@@ -4,7 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   GlassWater,
-  Gamepad2,
+  PartyPopper,
   Mic2,
   Gift,
   ArrowRight,
@@ -26,8 +26,8 @@ interface HeroSlide {
 }
 
 // One slide per Royvento pillar — the complete ecosystem the homepage must
-// communicate at a glance: nightlife, live events, gaming and rewards. Each
-// slide carries its own strong call-to-action into the matching section.
+// communicate at a glance: nightlife, live events, private parties and rewards.
+// Each slide carries its own strong call-to-action into the matching section.
 const SLIDES: HeroSlide[] = [
   {
     eyebrow: "Nightlife",
@@ -48,13 +48,13 @@ const SLIDES: HeroSlide[] = [
     img: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1600&q=75",
   },
   {
-    eyebrow: "Play",
-    title: "Games & Entertainment",
-    sub: "Arcades, VR arenas, bowling and gaming lounges — level up your night out with friends.",
-    cta: "Browse Games",
-    icon: Gamepad2,
-    href: "/games",
-    img: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1600&q=75",
+    eyebrow: "Celebrate",
+    title: "Host Your Private Party",
+    sub: "Birthdays, reunions and house parties — create your own ticketed party and invite the crowd you want.",
+    cta: "Create a Party",
+    icon: PartyPopper,
+    href: "/private-parties",
+    img: "/images/house-party-hero.jpg",
   },
   {
     eyebrow: "Rewards",
@@ -71,8 +71,8 @@ const AUTOPLAY_MS = 5000;
 
 /**
  * Full-width premium hero carousel for the homepage. Cycles through every
- * Royvento pillar — Pubs & Clubs, Events, Games and Rewards — each as an
- * immersive full-bleed poster with a strong call-to-action. Auto-plays,
+ * Royvento pillar — Pubs & Clubs, Events, Private Parties and Rewards — each as
+ * an immersive full-bleed poster with a strong call-to-action. Auto-plays,
  * pauses on hover, and offers manual control via arrows + dots.
  *
  * Shares the autoplay pattern of AnnouncementSlider (used on the Events page)

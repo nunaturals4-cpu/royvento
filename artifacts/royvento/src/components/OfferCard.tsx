@@ -18,6 +18,8 @@ export interface VendorOffer {
   endsAt: string | null;
   active: boolean;
   imageUrl?: string | null;
+  /** Server-resolved venue cover (vendor cover → banner → pub listing image). */
+  venueCoverImage?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -74,8 +76,10 @@ export function OfferCard({
 }) {
   const Icon = offer.category === "drink" ? Wine : Utensils;
   const badge = formatBadge(offer);
-  // Prefer the offer's own deal image; fall back to the venue cover photo.
-  const dealImage = offer.imageUrl || coverImage || null;
+  // Prefer the offer's own deal image; fall back to the server-resolved venue
+  // cover (covers partner pubs whose photo lives on the pub event), then any
+  // cover passed by the parent.
+  const dealImage = offer.imageUrl || offer.venueCoverImage || coverImage || null;
   const showCover = variant === "customer" && !!dealImage;
 
   return (

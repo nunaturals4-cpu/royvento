@@ -244,7 +244,13 @@ export function Pubs() {
   const [hasDrinkDeal, setHasDrinkDeal] = useState(false);
   const [freeEntry, setFreeEntry]   = useState(false);
   const [crowdLevel, setCrowdLevel] = useState<CrowdFilter>("");
-  const [venueTab, setVenueTab]     = useState<VenueTab>("All");
+  // ?category= deep-links a Popular Category from the homepage straight to its
+  // section here: a PUB_CATEGORY_SECTIONS value (Pub/Club/Lounge/Rooftop/Other)
+  // selects that venue tab; "DateNight" flips the date-night filter instead.
+  const [venueTab, setVenueTab]     = useState<VenueTab>(() => {
+    const c = new URLSearchParams(searchStr).get("category");
+    return PUB_CATEGORY_SECTIONS.some((s) => s.value === c) ? (c as VenueTab) : "All";
+  });
   const [dateNight, setDateNight]   = useState(() => new URLSearchParams(searchStr).get("category") === "DateNight");
   const [pubs, setPubs]             = useState<PublicEvent[]>([]);
   const [loading, setLoading]       = useState(true);
