@@ -1205,6 +1205,22 @@ const server = app.listen(port, (err) => {
 
     logger.info({ port }, "Server listening");
 
+    // ─── Keep-alive / header timeouts (production hardening behind a proxy) ──
+    //
+    // Node's default keepAliveTimeout is 5s. Under sustained concurrent load
+    // behind a load balancer (Railway / Cloudflare), the proxy keeps upstream
+    // connections warm and may reuse one in the split second after Node has
+    // closed it — the client then sees an intermittent 502/ECONNRESET. Keeping
+    // the origin's keep-alive window LONGER than the proxy's idle timeout
+    // removes that race entirely. headersTimeout must exceed keepAliveTimeout.
+    // Both are env-overridable; no behavioural / UI change.
+    const timeoutMs = (v: string | undefined, fallback: number) => {
+      const n = v ? Number(v) : NaN;
+      return Number.isFinite(n) && n > 0 ? n : fallback;
+    };
+    server.keepAliveTimeout = timeoutMs(process.env["KEEP_ALIVE_TIMEOUT_MS"], 65_000);
+    server.headersTimeout = timeoutMs(process.env["HEADERS_TIMEOUT_MS"], 70_000);
+
     ensureAdminAccount()
     .then(() => applyPendingSchemaChanges())
     .then(() => auditPasswordHashes())
