@@ -1,8 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import type { VendorOffer } from "@workspace/db";
-import { isOfferActiveAt } from "../lib/offerActive";
 
 // ── Happening Tonight ───────────────────────────────────────────────────────
 // Real-time discovery: aggregates every "tonight-relevant" source (pub/club
@@ -346,15 +344,22 @@ router.get("/happening-tonight", async (req, res) => {
       LIMIT 200
     `)).rows as Record<string, unknown>[];
     for (const r of offerRows) {
-      const offer = {
-        active: Boolean(r["active"]),
-        startsAt: r["startsAt"] as Date | null,
-        endsAt: r["endsAt"] as Date | null,
-        days: (r["days"] as string[] | null) ?? [],
-        timeFrom: String(r["timeFrom"] ?? ""),
-        timeTo: String(r["timeTo"] ?? ""),
-      };
-      if (!isOfferActiveAt(offer as Pick<VendorOffer, "active" | "startsAt" | "endsAt" | "days" | "timeFrom" | "timeTo">, now)) continue;
+      // Surface a discount when it's scheduled for today and its closing time
+      // hasn't passed — the same "today's offer, hide once it's over" rule used
+      // for pub cards — instead of only during its exact live window. This keeps
+      // time-windowed offers (e.g. evening food discounts) visible across the
+      // day, so food & drink discounts surface alike rather than only the
+      // always-on ones (which had been making the feed look "drinks only").
+      if (!r["active"]) continue;
+      const startsAt = r["startsAt"] as Date | null;
+      const endsAt = r["endsAt"] as Date | null;
+      if (startsAt && now < new Date(startsAt)) continue;
+      if (endsAt && now > new Date(endsAt)) continue;
+      const offerDays = ((r["days"] as string[] | null) ?? []).map((d) => d.slice(0, 3).toLowerCase());
+      if (offerDays.length > 0 && !offerDays.includes(todayKey)) continue;
+      if (!timeNotOver(r["timeFrom"] as string, r["timeTo"] as string, nowMin)) continue;
+      const oStart = parseHHMM(r["timeFrom"] as string);
+      const oEnd = parseHHMM(r["timeTo"] as string);
       const pubEventId = r["pubEventId"] != null ? Number(r["pubEventId"]) : null;
       push({
         key: `offer-${r["id"]}`,
@@ -371,9 +376,12 @@ router.get("/happening-tonight", async (req, res) => {
         dealLabel: String(r["title"] ?? ""),
         rating: Number(r["rating"] ?? 0),
         todayBookings: 0,
-        startMin: null,
-        endMin: null,
-        forceBucket: "now", // an active offer is, by definition, live now
+        startMin: oStart,
+        endMin: oEnd,
+        // All-day offers (no time window) are live whenever the venue is open;
+        // timed offers use the standard now/soon window logic and otherwise show
+        // as an upcoming deal for today rather than a false "Live Now".
+        forceBucket: oStart === null ? "now" : undefined,
         // "Food & Drink Offers" filter — vendor_offers only (food + drink discounts).
         extraFilters: ["offers", "deals"],
       });
