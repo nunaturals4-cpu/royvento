@@ -8288,6 +8288,7 @@ interface VenuePayload {
   danceFloor?: string;
   danceFloorPhotos?: string[];
   menuUrls?: string[];
+  barMenuUrls?: string[];
   // Happening Tonight visibility
   startTime?: string;
   endTime?: string;
@@ -8309,7 +8310,7 @@ interface VenueFormInitial {
   dayPricing?: Record<string, { women: number; men: number; couple: number } | null> | null;
   galleryImages?: string[]; galleryVideos?: string[]; pubEventTypes?: string[];
   freeEntryRules?: { enabled?: boolean; genders?: string[]; days?: string[]; beforeTime?: string } | null;
-  danceFloor?: string; danceFloorPhotos?: string[]; menuUrls?: string[];
+  danceFloor?: string; danceFloorPhotos?: string[]; menuUrls?: string[]; barMenuUrls?: string[];
   startTime?: string; endTime?: string; happeningTonight?: boolean; startingSoon?: boolean;
   lastMinuteDeal?: boolean; dealLabel?: string;
   freeEntryForTable?: boolean; freeEntryForTableDays?: string[]; freeEntryForTableBeforeTime?: string | null;
@@ -8373,6 +8374,8 @@ function VenueForm({
   const [danceFloorUploading, setDanceFloorUploading] = useState(0);
   const [menuUrls, setMenuUrls] = useState<string[]>(initial?.menuUrls ?? []);
   const [menuUploading, setMenuUploading] = useState(0);
+  const [barMenuUrls, setBarMenuUrls] = useState<string[]>(initial?.barMenuUrls ?? []);
+  const [barMenuUploading, setBarMenuUploading] = useState(0);
   const [tonightVis, setTonightVis] = useState<TonightVisibilityValue>({
     startTime: initial?.startTime ?? defaultTonightVisibility.startTime,
     endTime: initial?.endTime ?? defaultTonightVisibility.endTime,
@@ -8396,7 +8399,7 @@ function VenueForm({
     setGalleryImages([]);
     setPubEventTypes([]);
     setFreeEntryEnabled(false); setFreeEntryGenders([]); setFreeEntryDays([]); setFreeEntryBeforeTime("");
-    setDanceFloor(""); setDanceFloorPhotos([]); setMenuUrls([]);
+    setDanceFloor(""); setDanceFloorPhotos([]); setMenuUrls([]); setBarMenuUrls([]);
     setTonightVis(defaultTonightVisibility);
     setFreeEntryForTable(false); setFreeEntryForTableDays([]); setFreeEntryForTableBeforeTime("");
     setSubmitError("");
@@ -8448,6 +8451,24 @@ function VenueForm({
       finally { remaining--; setMenuUploading(remaining); }
     }
     if (urls.length > 0) setMenuUrls((prev) => [...prev, ...urls]);
+  }
+
+  async function handleBarMenuUpload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const cap = 6;
+    const toUpload = Array.from(files).slice(0, cap - barMenuUrls.length);
+    if (toUpload.length === 0) { toast({ title: `Maximum ${cap} bar menu images allowed` }); return; }
+    setBarMenuUploading(toUpload.length);
+    let remaining = toUpload.length;
+    const urls: string[] = [];
+    for (const file of toUpload) {
+      const v = validateImageFile(file);
+      if (v) { toast({ title: v, variant: "destructive" }); remaining--; setBarMenuUploading(remaining); continue; }
+      try { urls.push(await uploadImage(file)); }
+      catch { toast({ title: "Bar menu upload failed", variant: "destructive" }); }
+      finally { remaining--; setBarMenuUploading(remaining); }
+    }
+    if (urls.length > 0) setBarMenuUrls((prev) => [...prev, ...urls]);
   }
 
   async function handleDanceFloorUpload(files: FileList | null) {
@@ -8524,6 +8545,7 @@ function VenueForm({
         danceFloor: danceFloor || undefined,
         danceFloorPhotos: danceFloorPhotos.length > 0 ? danceFloorPhotos : undefined,
         menuUrls: menuUrls.length > 0 ? menuUrls : undefined,
+        barMenuUrls: barMenuUrls.length > 0 ? barMenuUrls : undefined,
         startTime: tonightVis.startTime,
         endTime: tonightVis.endTime,
         happeningTonight: tonightVis.happeningTonight,
@@ -8902,7 +8924,7 @@ function VenueForm({
             </div>
 
             <div className="space-y-1.5">
-              <Label>Pub Menu (images)</Label>
+              <Label>Food Menu (images)</Label>
               {menuUrls.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {menuUrls.map((src, i) => (
@@ -8922,9 +8944,37 @@ function VenueForm({
                   menuUploading > 0 && "opacity-50 pointer-events-none",
                 )}>
                   <Upload className="h-4 w-4" />
-                  {menuUploading > 0 ? `Uploading ${menuUploading}...` : `Add menu images (${menuUrls.length}/6)`}
+                  {menuUploading > 0 ? `Uploading ${menuUploading}...` : `Add food menu images (${menuUrls.length}/6)`}
                   <input type="file" accept="image/*" multiple className="hidden"
                     onChange={(e) => handleMenuUpload(e.target.files)} />
+                </label>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Bar Menu (images)</Label>
+              {barMenuUrls.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {barMenuUrls.map((src, i) => (
+                    <div key={i} className="relative w-20 h-16 rounded-lg overflow-hidden border border-white/10">
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <button type="button" onClick={() => setBarMenuUrls((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-black/70 flex items-center justify-center text-white">
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {barMenuUrls.length < 6 && (
+                <label className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/20 text-sm text-muted-foreground cursor-pointer hover:border-white/40 transition-colors w-fit",
+                  barMenuUploading > 0 && "opacity-50 pointer-events-none",
+                )}>
+                  <Upload className="h-4 w-4" />
+                  {barMenuUploading > 0 ? `Uploading ${barMenuUploading}...` : `Add bar menu images (${barMenuUrls.length}/6)`}
+                  <input type="file" accept="image/*" multiple className="hidden"
+                    onChange={(e) => handleBarMenuUpload(e.target.files)} />
                 </label>
               )}
             </div>

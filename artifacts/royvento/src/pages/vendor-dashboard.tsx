@@ -880,7 +880,11 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
       ? vendor.menuUrls
       : vendor.menuUrl ? [vendor.menuUrl] : []
   );
+  const [venueBarMenuUrls, setVenueBarMenuUrls] = useState<string[]>(
+    Array.isArray(vendor.barMenuUrls) ? vendor.barMenuUrls : []
+  );
   const [uploadingVenueMenu, setUploadingVenueMenu] = useState(false);
+  const [uploadingVenueBarMenu, setUploadingVenueBarMenu] = useState(false);
   const [savingVenue, setSavingVenue] = useState(false);
   const [venueDayHoursErrors, setVenueDayHoursErrors] = useState<Record<string, string>>(() => {
     const initial = parseDayHours(vendor.dayHours);
@@ -1051,6 +1055,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
         danceFloorPhotos: venueDanceFloorPhotos,
         menuUrl: venueMenuUrls[0] ?? "",
         menuUrls: venueMenuUrls,
+        barMenuUrls: venueBarMenuUrls,
       });
       toast({ title: "Venue details saved" });
       onVenueSaved?.();
@@ -1696,40 +1701,80 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
           <p className="text-xs text-muted-foreground mt-3">Toggle each day on or off. If closing time is earlier than opening time it is treated as an overnight schedule (e.g. 10 pm – 2 am).</p>
         </div>
 
-        {/* Pub menu */}
-        <div>
-          <Label className="flex items-center gap-1.5 mb-2">
-            <Upload className="h-3.5 w-3.5 text-primary" />
-            Pub menu <span className="text-muted-foreground font-normal text-xs">(PDF or image, up to 5 files)</span>
-          </Label>
-          <div className="space-y-2">
-            {venueMenuUrls.length > 0 && (
-              <div className="space-y-1.5">
-                {venueMenuUrls.map((url, idx) => (
-                  <div key={idx} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex-1 truncate">Menu {idx + 1}</a>
-                    <button type="button" onClick={() => setVenueMenuUrls((prev) => prev.filter((_, i) => i !== idx))} className="text-xs text-muted-foreground hover:text-destructive shrink-0">Remove</button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {venueMenuUrls.length < 5 && (
-              <label className={`flex items-center gap-2 cursor-pointer rounded-xl border border-dashed px-4 py-3 transition-colors ${uploadingVenueMenu ? "opacity-50 pointer-events-none border-white/10" : "border-white/20 hover:border-primary/40 hover:bg-primary/5"}`}>
-                <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-muted-foreground text-xs">{uploadingVenueMenu ? "Uploading…" : `Add menu file (${venueMenuUrls.length}/5)`}</span>
-                <input type="file" accept="application/pdf,image/*" className="hidden" onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setUploadingVenueMenu(true);
-                  try {
-                    const url = await uploadVenueMenuFile(file);
-                    setVenueMenuUrls((prev) => [...prev, url]);
-                    toast({ title: "Menu uploaded" });
-                  } catch { toast({ title: "Menu upload failed", variant: "destructive" }); }
-                  finally { setUploadingVenueMenu(false); e.target.value = ""; }
-                }} />
-              </label>
-            )}
+        {/* Pub menu — Food menu + Bar menu */}
+        <div className="space-y-4">
+          {/* Food menu */}
+          <div>
+            <Label className="flex items-center gap-1.5 mb-2">
+              <Upload className="h-3.5 w-3.5 text-primary" />
+              Food menu <span className="text-muted-foreground font-normal text-xs">(PDF or image, up to 5 files)</span>
+            </Label>
+            <div className="space-y-2">
+              {venueMenuUrls.length > 0 && (
+                <div className="space-y-1.5">
+                  {venueMenuUrls.map((url, idx) => (
+                    <div key={idx} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex-1 truncate">Food menu {idx + 1}</a>
+                      <button type="button" onClick={() => setVenueMenuUrls((prev) => prev.filter((_, i) => i !== idx))} className="text-xs text-muted-foreground hover:text-destructive shrink-0">Remove</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {venueMenuUrls.length < 5 && (
+                <label className={`flex items-center gap-2 cursor-pointer rounded-xl border border-dashed px-4 py-3 transition-colors ${uploadingVenueMenu ? "opacity-50 pointer-events-none border-white/10" : "border-white/20 hover:border-primary/40 hover:bg-primary/5"}`}>
+                  <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground text-xs">{uploadingVenueMenu ? "Uploading…" : `Add food menu file (${venueMenuUrls.length}/5)`}</span>
+                  <input type="file" accept="application/pdf,image/*" className="hidden" onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadingVenueMenu(true);
+                    try {
+                      const url = await uploadVenueMenuFile(file);
+                      setVenueMenuUrls((prev) => [...prev, url]);
+                      toast({ title: "Food menu uploaded" });
+                    } catch { toast({ title: "Menu upload failed", variant: "destructive" }); }
+                    finally { setUploadingVenueMenu(false); e.target.value = ""; }
+                  }} />
+                </label>
+              )}
+            </div>
+          </div>
+
+          {/* Bar menu */}
+          <div>
+            <Label className="flex items-center gap-1.5 mb-2">
+              <Upload className="h-3.5 w-3.5 text-primary" />
+              Bar menu <span className="text-muted-foreground font-normal text-xs">(PDF or image, up to 5 files)</span>
+            </Label>
+            <div className="space-y-2">
+              {venueBarMenuUrls.length > 0 && (
+                <div className="space-y-1.5">
+                  {venueBarMenuUrls.map((url, idx) => (
+                    <div key={idx} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex-1 truncate">Bar menu {idx + 1}</a>
+                      <button type="button" onClick={() => setVenueBarMenuUrls((prev) => prev.filter((_, i) => i !== idx))} className="text-xs text-muted-foreground hover:text-destructive shrink-0">Remove</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {venueBarMenuUrls.length < 5 && (
+                <label className={`flex items-center gap-2 cursor-pointer rounded-xl border border-dashed px-4 py-3 transition-colors ${uploadingVenueBarMenu ? "opacity-50 pointer-events-none border-white/10" : "border-white/20 hover:border-primary/40 hover:bg-primary/5"}`}>
+                  <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground text-xs">{uploadingVenueBarMenu ? "Uploading…" : `Add bar menu file (${venueBarMenuUrls.length}/5)`}</span>
+                  <input type="file" accept="application/pdf,image/*" className="hidden" onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadingVenueBarMenu(true);
+                    try {
+                      const url = await uploadVenueMenuFile(file);
+                      setVenueBarMenuUrls((prev) => [...prev, url]);
+                      toast({ title: "Bar menu uploaded" });
+                    } catch { toast({ title: "Menu upload failed", variant: "destructive" }); }
+                    finally { setUploadingVenueBarMenu(false); e.target.value = ""; }
+                  }} />
+                </label>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1814,7 +1859,11 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
       ? vendor.menuUrls
       : vendor?.menuUrl ? [vendor.menuUrl] : []
   );
+  const [venueBarMenuUrls, setVenueBarMenuUrls] = useState<string[]>(
+    Array.isArray(vendor?.barMenuUrls) ? vendor.barMenuUrls : []
+  );
   const [uploadingVenueMenu, setUploadingVenueMenu] = useState(false);
+  const [uploadingVenueBarMenu, setUploadingVenueBarMenu] = useState(false);
   const [savingVenue, setSavingVenue] = useState(false);
 
   const uploadVenueMenuFile = async (file: File): Promise<string> => {
@@ -1854,6 +1903,7 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
         danceFloorPhotos: venueDanceFloorPhotos,
         menuUrl: venueMenuUrls[0] ?? "",
         menuUrls: venueMenuUrls,
+        barMenuUrls: venueBarMenuUrls,
       });
       toast({ title: "Venue details saved" });
       onVenueSaved?.();
@@ -2328,40 +2378,80 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
               </div>
             )}
 
-            {/* Pub menu */}
-            <div>
-              <Label className="flex items-center gap-1.5 mb-2">
-                <Upload className="h-3.5 w-3.5 text-primary" />
-                Pub menu <span className="text-muted-foreground font-normal text-xs">(PDF or image, up to 5 files)</span>
-              </Label>
-              <div className="space-y-2">
-                {venueMenuUrls.length > 0 && (
-                  <div className="space-y-1.5">
-                    {venueMenuUrls.map((url, idx) => (
-                      <div key={idx} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
-                        <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex-1 truncate">Menu {idx + 1}</a>
-                        <button type="button" onClick={() => setVenueMenuUrls((prev) => prev.filter((_, i) => i !== idx))} className="text-xs text-muted-foreground hover:text-destructive shrink-0">Remove</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {venueMenuUrls.length < 5 && (
-                  <label className={`flex items-center gap-2 cursor-pointer rounded-xl border border-dashed px-4 py-3 transition-colors ${uploadingVenueMenu ? "opacity-50 pointer-events-none border-white/10" : "border-white/20 hover:border-primary/40 hover:bg-primary/5"}`}>
-                    <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="text-muted-foreground text-xs">{uploadingVenueMenu ? "Uploading…" : `Add menu file (${venueMenuUrls.length}/5)`}</span>
-                    <input type="file" accept="application/pdf,image/*" className="hidden" onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      setUploadingVenueMenu(true);
-                      try {
-                        const url = await uploadVenueMenuFile(file);
-                        setVenueMenuUrls((prev) => [...prev, url]);
-                        toast({ title: "Menu uploaded" });
-                      } catch { toast({ title: "Menu upload failed", variant: "destructive" }); }
-                      finally { setUploadingVenueMenu(false); e.target.value = ""; }
-                    }} />
-                  </label>
-                )}
+            {/* Pub menu — Food menu + Bar menu */}
+            <div className="space-y-4">
+              {/* Food menu */}
+              <div>
+                <Label className="flex items-center gap-1.5 mb-2">
+                  <Upload className="h-3.5 w-3.5 text-primary" />
+                  Food menu <span className="text-muted-foreground font-normal text-xs">(PDF or image, up to 5 files)</span>
+                </Label>
+                <div className="space-y-2">
+                  {venueMenuUrls.length > 0 && (
+                    <div className="space-y-1.5">
+                      {venueMenuUrls.map((url, idx) => (
+                        <div key={idx} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                          <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex-1 truncate">Food menu {idx + 1}</a>
+                          <button type="button" onClick={() => setVenueMenuUrls((prev) => prev.filter((_, i) => i !== idx))} className="text-xs text-muted-foreground hover:text-destructive shrink-0">Remove</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {venueMenuUrls.length < 5 && (
+                    <label className={`flex items-center gap-2 cursor-pointer rounded-xl border border-dashed px-4 py-3 transition-colors ${uploadingVenueMenu ? "opacity-50 pointer-events-none border-white/10" : "border-white/20 hover:border-primary/40 hover:bg-primary/5"}`}>
+                      <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground text-xs">{uploadingVenueMenu ? "Uploading…" : `Add food menu file (${venueMenuUrls.length}/5)`}</span>
+                      <input type="file" accept="application/pdf,image/*" className="hidden" onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingVenueMenu(true);
+                        try {
+                          const url = await uploadVenueMenuFile(file);
+                          setVenueMenuUrls((prev) => [...prev, url]);
+                          toast({ title: "Food menu uploaded" });
+                        } catch { toast({ title: "Menu upload failed", variant: "destructive" }); }
+                        finally { setUploadingVenueMenu(false); e.target.value = ""; }
+                      }} />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Bar menu */}
+              <div>
+                <Label className="flex items-center gap-1.5 mb-2">
+                  <Upload className="h-3.5 w-3.5 text-primary" />
+                  Bar menu <span className="text-muted-foreground font-normal text-xs">(PDF or image, up to 5 files)</span>
+                </Label>
+                <div className="space-y-2">
+                  {venueBarMenuUrls.length > 0 && (
+                    <div className="space-y-1.5">
+                      {venueBarMenuUrls.map((url, idx) => (
+                        <div key={idx} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                          <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex-1 truncate">Bar menu {idx + 1}</a>
+                          <button type="button" onClick={() => setVenueBarMenuUrls((prev) => prev.filter((_, i) => i !== idx))} className="text-xs text-muted-foreground hover:text-destructive shrink-0">Remove</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {venueBarMenuUrls.length < 5 && (
+                    <label className={`flex items-center gap-2 cursor-pointer rounded-xl border border-dashed px-4 py-3 transition-colors ${uploadingVenueBarMenu ? "opacity-50 pointer-events-none border-white/10" : "border-white/20 hover:border-primary/40 hover:bg-primary/5"}`}>
+                      <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground text-xs">{uploadingVenueBarMenu ? "Uploading…" : `Add bar menu file (${venueBarMenuUrls.length}/5)`}</span>
+                      <input type="file" accept="application/pdf,image/*" className="hidden" onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingVenueBarMenu(true);
+                        try {
+                          const url = await uploadVenueMenuFile(file);
+                          setVenueBarMenuUrls((prev) => [...prev, url]);
+                          toast({ title: "Bar menu uploaded" });
+                        } catch { toast({ title: "Menu upload failed", variant: "destructive" }); }
+                        finally { setUploadingVenueBarMenu(false); e.target.value = ""; }
+                      }} />
+                    </label>
+                  )}
+                </div>
               </div>
             </div>
 

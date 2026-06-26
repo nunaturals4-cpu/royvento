@@ -1018,7 +1018,7 @@ router.post("/admin/create-pub", requireAuth(["admin"]), async (req, res) => {
     galleryImages, galleryVideo,
     pubEventTypes, dayPricing,
     freeEntryEnabled, freeEntryGenders, freeEntryDays, freeEntryBeforeTime,
-    danceFloor, danceFloorPhotos, menuUrl, menuUrls,
+    danceFloor, danceFloorPhotos, menuUrl, menuUrls, barMenuUrls,
   } = req.body as {
     email: string;
     title: string;
@@ -1045,6 +1045,7 @@ router.post("/admin/create-pub", requireAuth(["admin"]), async (req, res) => {
     danceFloorPhotos?: string[];
     menuUrl?: string;
     menuUrls?: string[];
+    barMenuUrls?: string[];
   };
 
   if (!email || !title) {
@@ -1140,7 +1141,8 @@ router.post("/admin/create-pub", requireAuth(["admin"]), async (req, res) => {
 
   // Update vendor profile with dance floor and menu data if provided
   const menus = (menuUrls && menuUrls.length > 0) ? menuUrls : (menuUrl ? [menuUrl] : []);
-  if (danceFloor !== undefined || (danceFloorPhotos && danceFloorPhotos.length > 0) || menus.length > 0) {
+  const barMenus = (barMenuUrls && barMenuUrls.length > 0) ? barMenuUrls : [];
+  if (danceFloor !== undefined || (danceFloorPhotos && danceFloorPhotos.length > 0) || menus.length > 0 || barMenus.length > 0) {
     const vendorUpdates: Record<string, unknown> = {};
     if (danceFloor !== undefined) vendorUpdates["danceFloor"] = danceFloor || null;
     if (danceFloorPhotos && danceFloorPhotos.length > 0) {
@@ -1149,6 +1151,9 @@ router.post("/admin/create-pub", requireAuth(["admin"]), async (req, res) => {
     if (menus.length > 0) {
       vendorUpdates["menuUrl"] = menus[0];
       vendorUpdates["menuUrls"] = menus;
+    }
+    if (barMenus.length > 0) {
+      vendorUpdates["barMenuUrls"] = barMenus;
     }
     await db.update(vendorsTable).set(vendorUpdates).where(eq(vendorsTable.id, vendor.id));
   }
@@ -1173,7 +1178,7 @@ router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
     capacity, imageUrl, pubMode, priceWomen, priceMen, priceCouple,
     galleryImages, galleryVideo, pubEventTypes, dayPricing,
     freeEntryEnabled, freeEntryGenders, freeEntryDays, freeEntryBeforeTime,
-    danceFloor, danceFloorPhotos, menuUrl, menuUrls,
+    danceFloor, danceFloorPhotos, menuUrl, menuUrls, barMenuUrls,
     startTime, endTime, happeningTonight, startingSoon, lastMinuteDeal, dealLabel,
     freeEntryForTable, freeEntryForTableDays, freeEntryForTableBeforeTime,
   } = req.body as {
@@ -1202,6 +1207,7 @@ router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
     danceFloorPhotos?: string[];
     menuUrl?: string;
     menuUrls?: string[];
+    barMenuUrls?: string[];
     startTime?: string;
     endTime?: string;
     happeningTonight?: boolean;
@@ -1239,6 +1245,7 @@ router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
   const existingPrefixes = (await db.select({ p: vendorsTable.ticketPrefix }).from(vendorsTable)).map((r) => r.p).filter(Boolean);
   const ticketPrefix = await generateUniqueTicketPrefix(title, existingPrefixes);
   const menus = (menuUrls && menuUrls.length > 0) ? menuUrls : (menuUrl ? [menuUrl] : []);
+  const barMenus = (barMenuUrls && barMenuUrls.length > 0) ? barMenuUrls : [];
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -1263,6 +1270,7 @@ router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
           danceFloorPhotos: (danceFloorPhotos && danceFloorPhotos.length > 0) ? danceFloorPhotos : null,
           menuUrl: menus[0] ?? "",
           menuUrls: menus,
+          barMenuUrls: barMenus,
         })
         .returning();
 
@@ -1665,6 +1673,7 @@ router.get("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
     danceFloor: vendor.danceFloor ?? "",
     danceFloorPhotos: vendor.danceFloorPhotos ?? [],
     menuUrls: vendor.menuUrls ?? [],
+    barMenuUrls: (vendor as { barMenuUrls?: string[] | null }).barMenuUrls ?? [],
     // Happening Tonight visibility + free-entry-for-table (pub-event fields)
     startTime: pub?.startTime ?? "",
     endTime: pub?.endTime ?? "",
@@ -1687,7 +1696,7 @@ router.patch("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
     capacity, imageUrl, pubMode, priceWomen, priceMen, priceCouple,
     galleryImages, galleryVideo, pubEventTypes, dayPricing,
     freeEntryEnabled, freeEntryGenders, freeEntryDays, freeEntryBeforeTime,
-    danceFloor, danceFloorPhotos, menuUrls,
+    danceFloor, danceFloorPhotos, menuUrls, barMenuUrls,
     startTime, endTime, happeningTonight, startingSoon, lastMinuteDeal, dealLabel,
     freeEntryForTable, freeEntryForTableDays, freeEntryForTableBeforeTime,
   } = req.body as Record<string, unknown>;
@@ -1700,6 +1709,7 @@ router.patch("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
   const cat = typeof category === "string" && VENUE_CATEGORIES.includes(category as typeof VENUE_CATEGORIES[number]) ? category : vendor.category;
 
   const menus = Array.isArray(menuUrls) ? (menuUrls as string[]) : (vendor.menuUrls ?? []);
+  const barMenus = Array.isArray(barMenuUrls) ? (barMenuUrls as string[]) : ((vendor as { barMenuUrls?: string[] | null }).barMenuUrls ?? []);
   const freeEntryRules =
     freeEntryEnabled &&
     Array.isArray(freeEntryGenders) && (freeEntryGenders as string[]).length > 0 &&
@@ -1727,6 +1737,7 @@ router.patch("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
         danceFloorPhotos: Array.isArray(danceFloorPhotos) ? (danceFloorPhotos as string[]) : vendor.danceFloorPhotos,
         menuUrl: menus[0] ?? "",
         menuUrls: menus,
+        barMenuUrls: barMenus,
       }).where(eq(vendorsTable.id, id));
 
       const [pub] = await tx

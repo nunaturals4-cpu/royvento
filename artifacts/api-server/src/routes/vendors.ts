@@ -68,6 +68,7 @@ interface VendorRow {
   danceFloorPhotos?: string[] | null;
   menuUrl?: string | null;
   menuUrls?: string[] | null;
+  barMenuUrls?: string[] | null;
   crowdLevel?: string | null;
   onlineBalance?: string | null;
   status: string;
@@ -135,6 +136,7 @@ async function serializeVendor(v: VendorRow) {
     danceFloorPhotos: v.danceFloorPhotos ?? null,
     menuUrl: v.menuUrl ?? "",
     menuUrls: v.menuUrls ?? [],
+    barMenuUrls: (v as { barMenuUrls?: string[] | null }).barMenuUrls ?? [],
     crowdLevel: v.crowdLevel ?? null,
   };
 }
@@ -200,6 +202,7 @@ async function serializeVendorList(rows: VendorRow[]) {
       danceFloorPhotos: v.danceFloorPhotos ?? null,
       menuUrl: v.menuUrl ?? "",
       menuUrls: v.menuUrls ?? [],
+      barMenuUrls: (v as { barMenuUrls?: string[] | null }).barMenuUrls ?? [],
       crowdLevel: v.crowdLevel ?? null,
     };
   });

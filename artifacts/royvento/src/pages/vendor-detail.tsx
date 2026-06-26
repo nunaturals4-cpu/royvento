@@ -201,6 +201,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
   const pubEventTypes: string[] = pubEvent?.pubEventTypes ?? [];
   const danceFloor = vendor.danceFloor;
   const menuImages: string[] = ((vendor as unknown as { menuUrls?: string[] }).menuUrls ?? []).filter(Boolean);
+  const barMenuImages: string[] = ((vendor as unknown as { barMenuUrls?: string[] }).barMenuUrls ?? []).filter(Boolean);
   const maxCapacity = (vendor as Vendor & { maxCapacity?: number; maxGuests?: number }).maxCapacity
     ?? (vendor as Vendor & { maxCapacity?: number; maxGuests?: number }).maxGuests;
 
@@ -963,19 +964,34 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
             {menuImages.length > 0 && (
               <section>
                 <h2 className="font-serif text-2xl mb-5 flex items-center gap-2">
-                  <Utensils className="h-5 w-5 text-primary" />Menu
+                  <Utensils className="h-5 w-5 text-primary" />Food Menu
                 </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {menuImages.map((url, i) => (
                     <button key={i} type="button" onClick={() => setLightbox(url)} className="group overflow-hidden rounded-xl bg-muted hover:ring-2 hover:ring-primary/50 transition-all focus:outline-none focus:ring-2 focus:ring-primary">
-                      <img src={url} alt={`Menu page ${i + 1}`} className="w-full aspect-[3/4] object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                      <img src={url} alt={`Food menu page ${i + 1}`} className="w-full aspect-[3/4] object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
                     </button>
                   ))}
                 </div>
               </section>
             )}
 
-            {vendor.portfolioImages.length === 0 && (vendor.danceFloorPhotos ?? []).length === 0 && menuImages.length === 0 && (
+            {barMenuImages.length > 0 && (
+              <section>
+                <h2 className="font-serif text-2xl mb-5 flex items-center gap-2">
+                  <Utensils className="h-5 w-5 text-primary" />Bar Menu
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {barMenuImages.map((url, i) => (
+                    <button key={i} type="button" onClick={() => setLightbox(url)} className="group overflow-hidden rounded-xl bg-muted hover:ring-2 hover:ring-primary/50 transition-all focus:outline-none focus:ring-2 focus:ring-primary">
+                      <img src={url} alt={`Bar menu page ${i + 1}`} className="w-full aspect-[3/4] object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {vendor.portfolioImages.length === 0 && (vendor.danceFloorPhotos ?? []).length === 0 && menuImages.length === 0 && barMenuImages.length === 0 && (
               <div className="text-center py-16">
                 <Camera className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
                 <p className="text-muted-foreground">No photos available for this venue yet.</p>

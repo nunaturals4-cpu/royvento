@@ -602,6 +602,7 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "venue_assignment_log_vendor_idx" ON "venue_assignment_log" ("vendor_id")`);
     await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "base_fee" integer DEFAULT 0`);
     await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "hidden" boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "bar_menu_urls" text[] NOT NULL DEFAULT '{}'`);
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "capacity" integer`);
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true`);
     await db.execute(sql`

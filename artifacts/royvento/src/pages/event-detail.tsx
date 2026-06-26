@@ -1382,12 +1382,13 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
 
           {/* Photos teaser → links to Photos tab */}
           {isPub && (() => {
-            const hasPhotos = ((ev as any).galleryImages?.length > 0) || ((ev.vendor as any)?.danceFloorPhotos?.filter(Boolean).length > 0) || ((ev.vendor as any)?.menuUrls?.filter(Boolean).length > 0);
+            const hasPhotos = ((ev as any).galleryImages?.length > 0) || ((ev.vendor as any)?.danceFloorPhotos?.filter(Boolean).length > 0) || ((ev.vendor as any)?.menuUrls?.filter(Boolean).length > 0) || ((ev.vendor as any)?.barMenuUrls?.filter(Boolean).length > 0);
             if (!hasPhotos) return null;
             const preview: string[] = [
               ...((ev as any).galleryImages ?? []),
               ...((ev.vendor as any)?.danceFloorPhotos ?? []).filter(Boolean),
               ...((ev.vendor as any)?.menuUrls ?? []).filter(Boolean),
+              ...((ev.vendor as any)?.barMenuUrls ?? []).filter(Boolean),
             ].slice(0, 4);
             return (
               <section>
@@ -1766,23 +1767,30 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               );
             })()}
             {isPub && (() => {
-              const menu: string[] = ((ev.vendor as any)?.menuUrls ?? []).filter(Boolean);
-              if (!menu.length) return null;
-              return (
+              const foodMenu: string[] = ((ev.vendor as any)?.menuUrls ?? []).filter(Boolean);
+              const barMenu: string[] = ((ev.vendor as any)?.barMenuUrls ?? []).filter(Boolean);
+              if (!foodMenu.length && !barMenu.length) return null;
+              const MenuGrid = ({ title, urls }: { title: string; urls: string[] }) => (
                 <section>
-                  <h2 className="font-serif text-3xl mb-6 accent-underline inline-block">Menu</h2>
+                  <h2 className="font-serif text-3xl mb-6 accent-underline inline-block">{title}</h2>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-6">
-                    {menu.map((url: string, i: number) => (
+                    {urls.map((url: string, i: number) => (
                       <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/8 hover:border-primary/40 transition-all">
-                        <img src={url} alt={`Menu page ${i + 1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                        <img src={url} alt={`${title} page ${i + 1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3"><span className="text-xs font-medium text-white flex items-center gap-1"><ExternalLink className="h-3 w-3" /> View</span></div>
                       </a>
                     ))}
                   </div>
                 </section>
               );
+              return (
+                <>
+                  {foodMenu.length > 0 && <MenuGrid title="Food Menu" urls={foodMenu} />}
+                  {barMenu.length > 0 && <MenuGrid title="Bar Menu" urls={barMenu} />}
+                </>
+              );
             })()}
-            {!(ev as any).galleryImages?.length && !((ev.vendor as any)?.danceFloorPhotos?.filter(Boolean).length) && !((ev.vendor as any)?.menuUrls?.filter(Boolean).length) && (
+            {!(ev as any).galleryImages?.length && !((ev.vendor as any)?.danceFloorPhotos?.filter(Boolean).length) && !((ev.vendor as any)?.menuUrls?.filter(Boolean).length) && !((ev.vendor as any)?.barMenuUrls?.filter(Boolean).length) && (
               <div className="text-center py-20 text-muted-foreground"><ImagePlus className="h-12 w-12 mx-auto mb-4 opacity-20" /><p>No photos available yet.</p></div>
             )}
           </div>

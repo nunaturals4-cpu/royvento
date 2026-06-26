@@ -88,7 +88,10 @@ export const vendorsTable = pgTable(
     danceFloor: varchar("dance_floor", { length: 20 }),
     danceFloorPhotos: text("dance_floor_photos").array(),
     menuUrl: text("menu_url").notNull().default(""),
+    // Food menu images/PDFs (legacy "pub menu" — existing uploads live here).
     menuUrls: text("menu_urls").array().notNull().default([]),
+    // Bar / drinks menu images/PDFs (shown as its own sub-section).
+    barMenuUrls: text("bar_menu_urls").array().notNull().default([]),
     crowdLevel: varchar("crowd_level", { length: 20 }),
     onlineBalance: numeric("online_balance", { precision: 14, scale: 2 }).notNull().default("0"),
     commissionOwed: numeric("commission_owed", { precision: 14, scale: 2 }).notNull().default("0"),

@@ -66,6 +66,23 @@ function computeBucket(startMin: number | null, endMin: number | null, nowMin: n
   return null;
 }
 
+/**
+ * "Is this offer's time window still open (or yet to open) today?" Used to gate
+ * pub/club cards: an offer whose closing time has already passed no longer keeps
+ * the venue in Happening Tonight. Open-ended / all-day windows never expire;
+ * overnight windows (e.g. 22:00 → 02:00) are only "over" in the dead zone
+ * between close and reopen.
+ */
+function timeNotOver(timeFrom: string | null | undefined, timeTo: string | null | undefined, nowMin: number): boolean {
+  const to = parseHHMM(timeTo ?? null);
+  if (to === null) return true; // all-day / open-ended
+  const from = parseHHMM(timeFrom ?? null);
+  if (from !== null && from > to) {
+    return !(nowMin > to && nowMin < from); // overnight window
+  }
+  return nowMin <= to;
+}
+
 export interface TonightItem {
   key: string;
   id: number;
@@ -147,9 +164,39 @@ router.get("/happening-tonight", async (req, res) => {
   };
 
   try {
+    // ── Which pub/club vendors have a live-tonight Food & Drink offer? ────────
+    // A pub/club only earns a Happening Tonight card when its Food & Drink tab
+    // is non-empty for today: at least one offer scheduled for today whose time
+    // hasn't already passed — a cover charge, free / welcome / unlimited drink,
+    // an included-with-ticket plan (drink_plans) or a food/drink discount
+    // (vendor_offers). Venues with an empty tab, or whose offers already ended
+    // today, are dropped from the pub/club source below.
+    const DAY3 = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+    const todayKey = DAY3[now.getDay()] ?? "sun";
+    const offerVendorRows = (await db.execute(sql`
+      SELECT vendor_id AS "vendorId", days, time_from AS "timeFrom", time_to AS "timeTo"
+      FROM drink_plans
+      WHERE (valid_from IS NULL OR valid_from <= ${today})
+        AND (valid_until IS NULL OR valid_until >= ${today})
+      UNION ALL
+      SELECT vendor_id AS "vendorId", days, time_from AS "timeFrom", time_to AS "timeTo"
+      FROM vendor_offers
+      WHERE active = true
+        AND (starts_at IS NULL OR starts_at <= now())
+        AND (ends_at IS NULL OR ends_at >= now())
+    `)).rows as Record<string, unknown>[];
+    const offerVendorIds = new Set<number>();
+    for (const r of offerVendorRows) {
+      const days = ((r["days"] as string[] | null) ?? []).map((d) => d.slice(0, 3).toLowerCase());
+      // Empty days = every day; otherwise today must be listed.
+      if (days.length > 0 && !days.includes(todayKey)) continue;
+      if (!timeNotOver(r["timeFrom"] as string, r["timeTo"] as string, nowMin)) continue;
+      offerVendorIds.add(Number(r["vendorId"]));
+    }
+
     // ── Pub/club events ──────────────────────────────────────────────────────
     const pubRows = (await db.execute(sql`
-      SELECT e.id, e.title, e.type, e.city, e.state,
+      SELECT e.id, e.title, e.type, e.city, e.state, v.id AS "vendorId",
         e.start_time AS "startTime", e.end_time AS "endTime",
         e.last_minute_deal AS "lastMinuteDeal", e.deal_label AS "dealLabel",
         e.starting_soon AS "startingSoon",
@@ -166,6 +213,9 @@ router.get("/happening-tonight", async (req, res) => {
       const startMin = parseHHMM(r["startTime"] as string);
       const endMin = parseHHMM(r["endTime"] as string);
       const isPub = r["type"] === "pub";
+      // Pubs/clubs need a live-tonight Food & Drink offer to qualify; other
+      // event types (ticketed events) are unaffected by this gate.
+      if (isPub && !offerVendorIds.has(Number(r["vendorId"]))) continue;
       push({
         key: `pub-${r["id"]}`,
         id: Number(r["id"]),
@@ -267,42 +317,9 @@ router.get("/happening-tonight", async (req, res) => {
       });
     }
 
-    // ── Gaming / VR / bowling venues ─────────────────────────────────────────
-    const gameRows = (await db.execute(sql`
-      SELECT g.id, g.name AS "title", g.slug, go.city, go.state, go.slug AS "orgSlug",
-        g.start_time AS "startTime", g.end_time AS "endTime",
-        g.last_minute_deal AS "lastMinuteDeal", g.deal_label AS "dealLabel",
-        g.starting_soon AS "startingSoon",
-        g.category, go.name AS "orgName",
-        COALESCE(NULLIF(g.cover_image_url, ''), go.cover_image_url) AS "imageUrl",
-        (SELECT COALESCE(AVG(rating), 0) FROM game_reviews WHERE game_organizer_id = g.game_organizer_id) AS "rating",
-        (SELECT COUNT(*) FROM bookings b WHERE b.game_id = g.id AND b.booking_date = ${today}) AS "todayBookings"
-      FROM games g JOIN game_organizers go ON go.id = g.game_organizer_id
-      WHERE g.approval_status = 'approved' AND g.active = true AND g.happening_tonight = true
-      LIMIT 100
-    `)).rows as Record<string, unknown>[];
-    for (const r of gameRows) {
-      push({
-        key: `game-${r["id"]}`,
-        id: Number(r["id"]),
-        kind: "game",
-        title: String(r["title"] ?? ""),
-        subtitle: String(r["orgName"] ?? r["category"] ?? "Gaming"),
-        city: String(r["city"] ?? ""),
-        state: String(r["state"] ?? ""),
-        imageUrl: String(r["imageUrl"] ?? ""),
-        href: `/game-organizers/${r["orgSlug"]}`,
-        startTime: String(r["startTime"] ?? ""),
-        endTime: String(r["endTime"] ?? ""),
-        dealLabel: String(r["dealLabel"] ?? ""),
-        rating: Number(r["rating"] ?? 0),
-        todayBookings: Number(r["todayBookings"] ?? 0),
-        startMin: parseHHMM(r["startTime"] as string),
-        endMin: parseHHMM(r["endTime"] as string),
-        allowSoon: Boolean(r["startingSoon"]),
-        extraFilters: ["games"],
-      });
-    }
+    // ── Gaming / VR / bowling venues are intentionally excluded from Happening
+    // Tonight — this feed is for nightlife (pubs/clubs/bars), DJ nights and live
+    // events only. (Games still surface in their own discovery sections.)
 
     // ── Happy hours (active vendor offers) ───────────────────────────────────
     const offerRows = (await db.execute(sql`

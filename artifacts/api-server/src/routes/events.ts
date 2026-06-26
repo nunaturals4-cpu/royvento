@@ -380,6 +380,7 @@ router.get("/events/:eventId", async (req, res) => {
           danceFloorPhotos: (v as unknown as { danceFloorPhotos?: string[] | null }).danceFloorPhotos ?? [],
           menuUrl: (v as unknown as { menuUrl?: string | null }).menuUrl ?? "",
           menuUrls: (v as unknown as { menuUrls?: string[] | null }).menuUrls ?? [],
+          barMenuUrls: (v as unknown as { barMenuUrls?: string[] | null }).barMenuUrls ?? [],
           baseFeePercent: v.baseFeePercent ?? "3.50",
           baseFeeEnabled: v.baseFeeEnabled ?? true,
           createdAt: v.createdAt.toISOString(),

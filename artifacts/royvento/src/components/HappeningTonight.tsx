@@ -153,7 +153,11 @@ export function HappeningTonight() {
   }, [data]);
 
   const filtered = useMemo(() => {
-    if (activeFilter === "all") return allItems;
+    // "All Tonight": a pub / club / bar venue card only qualifies when an offer
+    // is actually shown on the card (a deal label). The venue's own offer and
+    // happy-hour cards always carry a label, so they still surface; bare venue
+    // cards with nothing on them are hidden. Other experiences are unaffected.
+    if (activeFilter === "all") return allItems.filter((i) => i.kind !== "pub" || !!i.dealLabel);
     // "Date Night" has no backend tag — derive it from couple-friendly kinds
     // (pubs, happy hours, DJ nights and live events) so it works without an API change.
     if (activeFilter === "date") {
