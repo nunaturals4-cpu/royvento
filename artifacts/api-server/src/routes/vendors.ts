@@ -456,10 +456,13 @@ router.get("/vendors/drink-offers", async (_req, res) => {
   res.json(result);
 });
 
-router.get("/vendors/:vendorId", async (req, res) => {
+router.get("/vendors/:vendorId", async (req, res, next) => {
   const id = Number(req.params["vendorId"]);
   if (!Number.isFinite(id)) {
-    res.status(400).json({ error: "Invalid id" });
+    // Not a numeric vendor id (e.g. "all-drink-deals") — fall through so the
+    // literal /vendors/* routes in later-mounted routers can handle it instead
+    // of this param route swallowing them with a 400.
+    next();
     return;
   }
   const rows = await db

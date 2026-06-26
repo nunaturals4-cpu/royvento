@@ -3,18 +3,21 @@ import { useState, useCallback, useEffect } from "react";
 import { SEO } from "@/components/SEO";
 import {
   ArrowRight, Bell, ChevronLeft,
-  Clock, GlassWater, Tag, Percent, RotateCcw, Gift,
+  Clock, GlassWater, Tag, Percent, RotateCcw, Gift, Utensils, Heart, MapPin,
+  type LucideIcon,
 } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react";
 import type { VendorDrinkOffer } from "@workspace/api-client-react";
 import { FreeDrinkSection, TicketSection, CoverChargeSection, splitVendorsByPlanType } from "@/components/DrinkDealCards";
+import { CarouselRow } from "@/components/CarouselRow";
 import { useToast } from "@/hooks/use-toast";
 
 interface AllDrinkDeal {
   id: number;
   vendorId: number;
+  category: "food" | "drink";
   vendorName: string;
   vendorLocation: string;
   vendorCity: string;
@@ -40,6 +43,164 @@ const DAYS_OF_WEEK = [
   { key: "Sat", label: "Saturday"  },
   { key: "Sun", label: "Sunday"    },
 ] as const;
+
+/* ─── Food & Drink Discount card (mirrors the Cover Charges card design from
+   DrinkDealCards, but renders vendor_offer discount data and takes its own
+   colour accent). Each discount category gets a distinct colour. ──────────── */
+const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const DAY_LETTER: Record<string, string> = {
+  Mon: "M", Tue: "T", Wed: "W", Thu: "T", Fri: "F", Sat: "S", Sun: "S",
+};
+
+type DiscountAccent = "darkyellow" | "primary";
+const DISCOUNT_ACCENT: Record<DiscountAccent, {
+  badge: string; text: string; pill: string; headerBox: string; hoverBorder: string; tag: string;
+}> = {
+  // Food Discounts — dark yellow
+  darkyellow: {
+    badge: "bg-yellow-600 text-black",
+    text: "text-yellow-500",
+    pill: "bg-yellow-600 text-black",
+    headerBox: "border-yellow-600/40 bg-yellow-600/10 text-yellow-500",
+    hoverBorder: "group-hover:border-yellow-600/40",
+    tag: "text-yellow-500",
+  },
+  // Drink Discounts — same as Free Drinks / Cover Charges (primary red)
+  primary: {
+    badge: "bg-primary text-primary-foreground",
+    text: "text-primary",
+    pill: "bg-primary text-primary-foreground",
+    headerBox: "border-primary/30 bg-primary/10 text-primary",
+    hoverBorder: "group-hover:border-primary/30",
+    tag: "text-primary",
+  },
+};
+
+function DiscountDayPills({ activeDays, accentPill }: { activeDays: string[]; accentPill: string }) {
+  // Days are stored as 3-letter lowercase abbreviations (empty = every day).
+  const activeSet = new Set((activeDays ?? []).map((d) => d.slice(0, 3).toLowerCase()));
+  const isAll = activeSet.size === 0;
+  return (
+    <div className="flex items-center gap-[5px]">
+      {ALL_DAYS.map((day) => {
+        const active = isAll || activeSet.has(day.slice(0, 3).toLowerCase());
+        return (
+          <span
+            key={day}
+            className={`flex h-[22px] w-[22px] items-center justify-center rounded-full text-[9px] font-bold leading-none select-none ${
+              active ? accentPill : "bg-white/[0.08] text-white/25"
+            }`}
+          >
+            {DAY_LETTER[day]}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function discountBadge(deal: AllDrinkDeal): { text: string; Icon: LucideIcon } {
+  if (deal.discountType === "percent") return { text: `${deal.discountValue}% OFF`, Icon: Percent };
+  if (deal.discountType === "fixed") return { text: `₹${deal.discountValue} FLAT`, Icon: Tag };
+  if (deal.discountType === "bogo") return { text: "BUY 1 GET 1", Icon: RotateCcw };
+  return { text: deal.freeItemName ? `FREE ${deal.freeItemName.toUpperCase()}` : "FREE ITEM", Icon: Gift };
+}
+
+function DiscountCard({ deal, accent }: { deal: AllDrinkDeal; accent: DiscountAccent }) {
+  const a = DISCOUNT_ACCENT[accent];
+  const { text: badgeText, Icon: BadgeIcon } = discountBadge(deal);
+  // Prefer the offer's own deal image; fall back to the venue cover.
+  const dealImg = deal.imageUrl || deal.vendorCoverImage;
+  const timeLabel = deal.timeFrom && deal.timeTo
+    ? `${deal.timeFrom} – ${deal.timeTo}`
+    : deal.timeFrom || "";
+
+  return (
+    <Link href={`/vendors/${deal.vendorId}`} className="group block">
+      <div className={`overflow-hidden rounded-2xl border border-white/[0.07] bg-[#111] transition-all duration-300 group-hover:-translate-y-1 ${a.hoverBorder} group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.55)]`}>
+        {/* ── Image section ── */}
+        <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
+          {dealImg ? (
+            <img
+              src={dealImg}
+              alt={deal.vendorName}
+              loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+            />
+          ) : (
+            <div className="h-full w-full bg-gradient-to-br from-zinc-800 via-zinc-900 to-black flex items-center justify-center">
+              <Tag className="h-10 w-10 text-white/20" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#111]/80 via-transparent to-transparent" />
+
+          {/* Discount badge — top left */}
+          <div className="absolute top-3 left-3 z-10">
+            <span className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-[5px] text-[10px] font-black uppercase tracking-wide shadow-md ${a.badge}`}>
+              <BadgeIcon className="h-3 w-3" />{badgeText}
+            </span>
+          </div>
+
+          {/* Heart — top right */}
+          <span
+            aria-hidden
+            className="absolute top-3 right-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm border border-white/[0.10] text-white/50 transition-all group-hover:text-white"
+          >
+            <Heart className="h-3.5 w-3.5" />
+          </span>
+        </div>
+
+        {/* ── Content section ── */}
+        <div className="px-4 pt-3.5 pb-4 space-y-2">
+          <p className={`text-[13px] font-bold leading-tight line-clamp-1 ${a.text}`}>{deal.vendorName}</p>
+          <p className="text-white font-black text-[15px] leading-snug line-clamp-2 min-h-[38px]">{deal.title}</p>
+          {deal.description && (
+            <p className="text-[11px] text-white/55 line-clamp-2">{deal.description}</p>
+          )}
+          {timeLabel ? (
+            <p className="text-white/45 text-[11px] flex items-center gap-1.5">
+              <Clock className="h-3 w-3 flex-shrink-0 text-white/30" />{timeLabel}
+            </p>
+          ) : (
+            <div className="h-[16px]" />
+          )}
+          <DiscountDayPills activeDays={deal.days} accentPill={a.pill} />
+          {deal.vendorCity && (
+            <p className={`text-[10px] uppercase tracking-wide flex items-center gap-1 mt-0.5 ${a.tag} opacity-70`}>
+              <MapPin className="h-3 w-3 flex-shrink-0" /> {deal.vendorCity}
+            </p>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function DiscountPanel({ deals, accent, title, subtitle, Icon }: {
+  deals: AllDrinkDeal[]; accent: DiscountAccent; title: string; subtitle: string; Icon: LucideIcon;
+}) {
+  if (deals.length === 0) return null;
+  const a = DISCOUNT_ACCENT[accent];
+  return (
+    <div>
+      {/* Section header */}
+      <div className="flex items-center gap-2.5 mb-1.5">
+        <span className={`flex h-7 w-7 items-center justify-center rounded-lg border ${a.headerBox}`}>
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+        <h3 className="text-base md:text-lg font-bold tracking-tight">{title}</h3>
+      </div>
+      <p className="text-xs text-muted-foreground mb-5 ml-[2.25rem]">{subtitle}</p>
+
+      {/* Single-row rail with arrows — mirrors the Cover Charges layout. */}
+      <CarouselRow itemClassName="w-[160px] sm:w-[200px] md:w-[220px]" gapClass="gap-3 md:gap-4">
+        {deals.map((deal) => (
+          <DiscountCard key={deal.id} deal={deal} accent={accent} />
+        ))}
+      </CarouselRow>
+    </div>
+  );
+}
 
 /* â"€â"€â"€ Main page â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 export function PubOffers() {
@@ -97,6 +258,10 @@ export function PubOffers() {
         return d.days.length === 0 || d.days.includes(dayLower);
       })
     : allDrinkDeals;
+
+  // Keep Food and Drink discounts in their own colour-coded sections.
+  const foodDeals = filteredDeals.filter((d) => d.category === "food");
+  const drinkDeals = filteredDeals.filter((d) => d.category === "drink");
 
   // â"€â"€ Task 3: Notify Me â€" goes to /subscription; if already subscribed show sweet toast â"€â"€
   const handleNotifyMe = useCallback(async () => {
@@ -272,73 +437,27 @@ export function PubOffers() {
           </section>
         )}
 
-        {/* ── HAPPY HOUR & DRINK DEALS (vendor_offers) ─────────── */}
-        {filteredDeals.length > 0 && (
-          <section className="mb-12">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <Tag className="h-4 w-4 text-amber-400" />
-                <span className="text-xs uppercase tracking-[0.22em] text-amber-400 font-semibold">Happy Hour &amp; Drink Deals</span>
-                {dayFilter && (
-                  <span className="text-xs text-white/50 ml-1">— {DAYS_OF_WEEK.find(d => d.key === dayFilter)?.label}</span>
-                )}
-              </div>
-            </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredDeals.map((deal) => {
-                const badgeText =
-                  deal.discountType === "percent" ? `${deal.discountValue}% OFF` :
-                  deal.discountType === "fixed" ? `₹${deal.discountValue} FLAT` :
-                  deal.discountType === "bogo" ? "BUY 1 GET 1" :
-                  deal.freeItemName ? `FREE ${deal.freeItemName.toUpperCase()}` : "FREE ITEM";
-                const BadgeIcon =
-                  deal.discountType === "percent" ? Percent :
-                  deal.discountType === "bogo" ? RotateCcw :
-                  deal.discountType === "free_item" ? Gift : Tag;
-                const daysLabel = deal.days.length === 0 ? "Every Day" :
-                  deal.days.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(", ");
-                const timeLabel = deal.timeFrom && deal.timeTo
-                  ? `${deal.timeFrom} – ${deal.timeTo}`
-                  : deal.timeFrom || "";
-                // Prefer the offer's own deal image; fall back to the venue cover.
-                const dealImg = deal.imageUrl || deal.vendorCoverImage;
-                return (
-                  <Link key={deal.id} href={`/vendors/${deal.vendorId}`}>
-                    <div className="group relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111] hover:border-amber-400/30 transition-all cursor-pointer">
-                      {dealImg && (
-                        <div className="relative h-36 overflow-hidden">
-                          <img
-                            src={dealImg}
-                            alt={deal.vendorName}
-                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 border border-amber-400/40 px-3 py-1 text-[11px] font-bold text-amber-300">
-                            <BadgeIcon className="h-3 w-3" />{badgeText}
-                          </span>
-                        </div>
-                      )}
-                      <div className="p-4">
-                        <p className="text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-1">{deal.vendorName}</p>
-                        <h3 className="font-semibold text-white leading-snug mb-2">{deal.title}</h3>
-                        {deal.description && (
-                          <p className="text-xs text-white/55 line-clamp-2 mb-3">{deal.description}</p>
-                        )}
-                        <div className="flex flex-wrap gap-2">
-                          <span className="inline-flex items-center gap-1 text-[10px] text-white/40 bg-white/5 rounded-full px-2.5 py-1">
-                            <Clock className="h-3 w-3" />{daysLabel}
-                            {timeLabel && ` · ${timeLabel}`}
-                          </span>
-                          {deal.vendorCity && (
-                            <span className="text-[10px] text-white/40 bg-white/5 rounded-full px-2.5 py-1">{deal.vendorCity}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
+        {/* ── FOOD DISCOUNTS + DRINK DISCOUNTS (vendor_offers) — separate,
+            colour-coded sections using the Cover Charges card design. ───────── */}
+        {(foodDeals.length > 0 || drinkDeals.length > 0) && (
+          <section className="mb-12 space-y-10">
+            <DiscountPanel
+              deals={foodDeals}
+              accent="darkyellow"
+              title="Food Discounts"
+              subtitle="Tap on any deal to view venue & book"
+              Icon={Utensils}
+            />
+            {foodDeals.length > 0 && drinkDeals.length > 0 && (
+              <div className="premium-divider" />
+            )}
+            <DiscountPanel
+              deals={drinkDeals}
+              accent="primary"
+              title="Drink Discounts"
+              subtitle="Tap on any deal to view venue & book"
+              Icon={GlassWater}
+            />
           </section>
         )}
 

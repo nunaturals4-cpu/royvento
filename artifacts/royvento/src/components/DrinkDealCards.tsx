@@ -81,7 +81,7 @@ function pickPrimaryPlan(plans: DrinkPlanSummary[]): DrinkPlanSummary {
 const toImg = (v: string | null | undefined) => v || null;
 
 /* ─── Day pills (M T W T F S S) ─────────────────────────────────────────── */
-type Accent = "primary" | "amber" | "violet";
+type Accent = "primary" | "amber" | "violet" | "darkred";
 
 function DayPills({ activeDays, accent = "primary" }: { activeDays: string[]; accent?: Accent }) {
   // Match case-insensitively on the first three letters so any stored format
@@ -96,7 +96,9 @@ function DayPills({ activeDays, accent = "primary" }: { activeDays: string[]; ac
           ? "bg-amber-500 text-black"
           : accent === "violet"
             ? "bg-violet-500 text-white"
-            : "bg-primary text-primary-foreground";
+            : accent === "darkred"
+              ? "bg-red-800 text-white"
+              : "bg-primary text-primary-foreground";
         return (
           <span
             key={day}
@@ -154,12 +156,16 @@ export function DrinkDealCard({
     ? "bg-amber-500 text-black"
     : accent === "violet"
       ? "bg-violet-500 text-white"
-      : "bg-primary text-primary-foreground";
+      : accent === "darkred"
+        ? "bg-red-800 text-white"
+        : "bg-primary text-primary-foreground";
   const accentText = accent === "amber"
     ? "text-amber-400"
     : accent === "violet"
       ? "text-violet-400"
-      : "text-primary";
+      : accent === "darkred"
+        ? "text-red-400"
+        : "text-primary";
 
   const dealText = isTicket && items.length > 0
     ? items.slice(0, 2).map((it) => it.name).join(" · ") + (items.length > 2 ? " +more" : "")
@@ -312,12 +318,14 @@ interface SectionProps {
 }
 
 function DealPanel({ vendors, accent, title, subtitle }: SectionProps) {
-  const Icon = accent === "amber" ? Ticket : accent === "violet" ? Coins : Wine;
+  const Icon = accent === "amber" ? Ticket : (accent === "violet" || accent === "darkred") ? Coins : Wine;
   const headerBox = accent === "amber"
     ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
     : accent === "violet"
       ? "border-violet-500/30 bg-violet-500/10 text-violet-400"
-      : "border-primary/30 bg-primary/10 text-primary";
+      : accent === "darkred"
+        ? "border-red-800/40 bg-red-800/10 text-red-400"
+        : "border-primary/30 bg-primary/10 text-primary";
 
   return (
     <div>
@@ -370,7 +378,7 @@ export function CoverChargeSection({ vendors }: { vendors: VendorWithPlans[] }) 
   return (
     <DealPanel
       vendors={vendors}
-      accent="violet"
+      accent="primary"
       title="Cover Charges"
       subtitle="Tap on any deal to view venue & book"
     />

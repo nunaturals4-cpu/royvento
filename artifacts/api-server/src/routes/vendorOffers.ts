@@ -255,7 +255,10 @@ router.delete("/partner/offers/:id", requireAuth(["vendor", "admin"]), async (re
   }
 });
 
-// ─── Public: all active drink offers across all vendors (for pub-offers page) ─
+// ─── Public: all active food & drink discount offers across all vendors ──────
+// (Powers the "Food & Drink Discounts" section on the Happy Hours page.) Returns
+// both `food` and `drink` category offers; the `category` field lets the UI tag
+// each card. Route name kept for backward-compatibility with existing callers.
 router.get("/vendors/all-drink-deals", async (_req, res) => {
   try {
     const now = new Date();
@@ -263,6 +266,7 @@ router.get("/vendors/all-drink-deals", async (_req, res) => {
       .select({
         id: vendorOffersTable.id,
         vendorId: vendorOffersTable.vendorId,
+        category: vendorOffersTable.category,
         title: vendorOffersTable.title,
         description: vendorOffersTable.description,
         discountType: vendorOffersTable.discountType,
@@ -293,7 +297,6 @@ router.get("/vendors/all-drink-deals", async (_req, res) => {
       .innerJoin(vendorsTable, eq(vendorOffersTable.vendorId, vendorsTable.id))
       .where(and(
         eq(vendorOffersTable.active, true),
-        eq(vendorOffersTable.category, "drink"),
         eq(vendorsTable.status, "approved"),
         eq(vendorsTable.hidden, false),
       ))
