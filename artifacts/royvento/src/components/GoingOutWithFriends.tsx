@@ -358,7 +358,7 @@ export function GoingOutWithFriends() {
                 <span className="font-semibold text-primary">{sizeLabel.toLowerCase()}</span>
               </p>
             </div>
-            <CarouselRow itemClassName="w-[280px] sm:w-[300px]">
+            <CarouselRow itemClassName="w-[255px] sm:w-[275px]">
               {results.map((item) => (
                 <GroupCard key={item.key} item={item} size={size} />
               ))}
@@ -386,7 +386,7 @@ export function GoingOutWithFriends() {
                 <Link
                   key={p.key}
                   href={p.href}
-                  className="group flex w-[280px] flex-col overflow-hidden rounded-2xl border border-primary/20 bg-zinc-900/80 lift-3d"
+                  className="group flex w-[255px] flex-col overflow-hidden rounded-2xl border border-primary/20 bg-zinc-900/80 lift-3d"
                 >
                   <div className="relative h-32 overflow-hidden bg-zinc-800">
                     {p.imageUrl && (

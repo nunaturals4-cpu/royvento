@@ -459,7 +459,7 @@ export function Home() {
             seeAllHref="/pubs"
             seeAllLabel={t("home.view_all_pubs")}
           />
-          <CarouselRow itemClassName="w-[280px] sm:w-[300px]">
+          <CarouselRow itemClassName="w-[255px] sm:w-[275px]">
             {sortedPubs.slice(0, 8).map((e) => <EventCard key={e.id} event={e} hidePubBadge directBooking />)}
           </CarouselRow>
         </section>
@@ -475,7 +475,7 @@ export function Home() {
             seeAllHref="/pubs?category=DateNight"
             seeAllLabel="See all spots"
           />
-          <CarouselRow itemClassName="w-[280px] sm:w-[300px]">
+          <CarouselRow itemClassName="w-[255px] sm:w-[275px]">
             {dateNightPubs.map((e) => <EventCard key={e.id} event={e} hidePubBadge directBooking />)}
           </CarouselRow>
         </section>
@@ -547,7 +547,7 @@ export function Home() {
           seeAllHref="/pubs"
           seeAllLabel={t("home.view_all")}
         />
-        <CarouselRow itemClassName="w-[280px] sm:w-[300px]">
+        <CarouselRow itemClassName="w-[255px] sm:w-[275px]">
           {featured.map((e) => <EventCard key={e.id} event={e as any} directBooking={(e as any).type === "pub"} />)}
         </CarouselRow>
       </section>

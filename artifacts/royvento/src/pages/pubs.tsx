@@ -542,7 +542,7 @@ export function Pubs() {
             </div>
 
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 md:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="rounded-2xl bg-[#111111] animate-pulse h-64" />
                 ))}
@@ -566,7 +566,7 @@ export function Pubs() {
                       <h2 className="text-lg md:text-xl font-bold tracking-tight text-white">{label}</h2>
                       <span className="text-xs font-medium text-muted-foreground">({items.length})</span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 md:gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4">
                       {items.map((p) => <PubCard key={p.id} pub={p} />)}
                     </div>
                   </section>
