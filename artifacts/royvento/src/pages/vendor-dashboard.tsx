@@ -43,6 +43,7 @@ import {
 import { COUNTRY_NAMES, getStates, getCities } from "@/lib/locations";
 import { EVENT_CATEGORIES as ANNOUNCEMENT_CATEGORIES } from "@/lib/eventCategories";
 import { uploadImage as uploadImageToStorage, validateImageFile } from "@/lib/uploadImage";
+import { SquareImage } from "@/components/SquareImage";
 import { useFormErrors, fieldClass } from "@/lib/formErrors";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatDayRanges } from "@/lib/days";
@@ -5735,12 +5736,12 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
             <div className="sm:col-span-2">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">
                 Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
-                <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the offer card. Leave empty to use your venue cover photo.</span>
+                <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the offer card at 1:1 (square). Your whole image is displayed, nothing is cropped. Leave empty to use your venue cover photo.</span>
               </Label>
               {imagePreview ? (
-                <div className="relative mt-1 rounded-xl overflow-hidden group max-w-sm">
-                  <img src={imagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <div className="relative mt-1 rounded-xl overflow-hidden group max-w-[220px]">
+                  <SquareImage src={imagePreview} alt="Preview" className="rounded-xl" />
+                  <div className="absolute inset-0 z-10 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
                       <Upload className="h-3 w-3" /> Change
                       <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
@@ -6404,11 +6405,11 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                   <div className="sm:col-span-2">
                     <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
                       Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
-                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card. Leave empty to use your venue cover photo.</span>
+                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card at 1:1 (square). Your whole image is displayed, nothing is cropped. Leave empty to use your venue cover photo.</span>
                     </Label>
                     {feImagePreview ? (
-                      <div className="relative mt-1 rounded-xl overflow-hidden group">
-                        <img src={feImagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
+                      <div className="relative mt-1 rounded-xl overflow-hidden group max-w-[220px]">
+                        <SquareImage src={feImagePreview} alt="Preview" className="rounded-xl max-w-[220px]" />
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
                             <Upload className="h-3 w-3" /> Change
@@ -6486,11 +6487,11 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                   <div className="sm:col-span-2">
                     <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
                       Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
-                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card. Leave empty to use your venue cover photo.</span>
+                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card at 1:1 (square). Your whole image is displayed, nothing is cropped. Leave empty to use your venue cover photo.</span>
                     </Label>
                     {ticketImagePreview ? (
-                      <div className="relative mt-1 rounded-xl overflow-hidden group">
-                        <img src={ticketImagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
+                      <div className="relative mt-1 rounded-xl overflow-hidden group max-w-[220px]">
+                        <SquareImage src={ticketImagePreview} alt="Preview" className="rounded-xl max-w-[220px]" />
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
                             <Upload className="h-3 w-3" /> Change
@@ -6591,11 +6592,11 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                   <div className="sm:col-span-2">
                     <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
                       Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
-                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card. Leave empty to use your venue cover photo.</span>
+                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card at 1:1 (square). Your whole image is displayed, nothing is cropped. Leave empty to use your venue cover photo.</span>
                     </Label>
                     {coverChargeImagePreview ? (
-                      <div className="relative mt-1 rounded-xl overflow-hidden group">
-                        <img src={coverChargeImagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
+                      <div className="relative mt-1 rounded-xl overflow-hidden group max-w-[220px]">
+                        <SquareImage src={coverChargeImagePreview} alt="Preview" className="rounded-xl max-w-[220px]" />
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
                             <Upload className="h-3 w-3" /> Change
@@ -6761,8 +6762,8 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                           <span className="normal-case text-muted-foreground/60 font-normal ml-1">— leave empty to use your venue cover photo.</span>
                         </Label>
                         {editImagePreview ? (
-                          <div className="relative mt-1 rounded-xl overflow-hidden group">
-                            <img src={editImagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
+                          <div className="relative mt-1 rounded-xl overflow-hidden group max-w-[220px]">
+                            <SquareImage src={editImagePreview} alt="Preview" className="rounded-xl" />
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                               <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
                                 <Upload className="h-3 w-3" /> Change

@@ -2,12 +2,13 @@ import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Flame, Zap, GlassWater, Headphones, Ticket, Utensils, Mic2,
-  MapPin, Clock, Star, Sparkles, ArrowRight, X, Heart,
+  Flame, Zap, GlassWater, Headphones, Utensils, Mic2,
+  MapPin, Clock, Sparkles, ArrowRight, X, Heart,
 } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CarouselRow } from "@/components/CarouselRow";
+import { NightlifeOfferCard } from "@/components/NightlifeOfferCard";
 
 // ── Happening Tonight ───────────────────────────────────────────────────────
 // Real-time discovery: "It's 7 PM — what can I do in the next few hours?"
@@ -57,71 +58,31 @@ const FILTERS: { key: string; label: string; icon: React.ReactNode }[] = [
 function TonightCard({ item }: { item: TonightItem }) {
   const live = item.bucket === "now";
   const loc = item.city ? `${item.city}${item.state ? ", " + item.state : ""}` : "";
+  const statusBadge = live ? (
+    <span className="flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground red-glow">
+      <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Live Now
+    </span>
+  ) : item.bucket === "soon" ? (
+    <span className="flex items-center gap-1.5 rounded-full bg-amber-400/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-black">
+      <Zap className="h-3 w-3" /> {item.startTime || "Soon"}
+    </span>
+  ) : null;
+  // Show the deal in the gold pill, but don't repeat it when it equals the title.
+  const offerLabel = item.dealLabel && item.dealLabel.trim() && item.dealLabel !== item.title ? item.dealLabel : undefined;
+
   return (
-    <Link
-      href={item.href}
-      className="group flex h-full w-[260px] sm:w-[280px] flex-col overflow-hidden rounded-2xl border border-white/8 bg-zinc-900/80 lift-3d"
-    >
-      {/* Image — fixed height so every card lines up identically. */}
-      <div className="relative h-40 shrink-0 overflow-hidden bg-zinc-900">
-        {item.imageUrl ? (
-          <img
-            src={item.imageUrl}
-            alt={item.title}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/15 to-zinc-900">
-            <Flame className="h-10 w-10 text-primary/30" />
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
-        {/* Status badge only (deal moves to the body so it always reads in full). */}
-        {live ? (
-          <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground red-glow">
-            <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Live Now
-          </span>
-        ) : item.bucket === "soon" ? (
-          <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-amber-400/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-black">
-            <Zap className="h-3 w-3" /> {item.startTime || "Soon"}
-          </span>
-        ) : null}
-      </div>
-
-      {/* Body — flex-1 with a pinned footer keeps all cards the same height. */}
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <h3 className="font-serif text-lg leading-snug tracking-tight text-white line-clamp-1">{item.title}</h3>
-        <p className="min-h-[16px] text-xs text-white/55 line-clamp-1">{item.subtitle}</p>
-
-        {item.dealLabel && (
-          <p className="flex items-start gap-1.5 rounded-lg border border-amber-400/25 bg-amber-400/10 px-2.5 py-1.5 text-[11px] font-medium leading-snug text-amber-300 line-clamp-2">
-            <Ticket className="mt-0.5 h-3 w-3 shrink-0" />
-            <span>{item.dealLabel}</span>
-          </p>
-        )}
-
-        <div className="mt-auto flex items-center justify-between gap-2 border-t border-white/8 pt-2.5 text-xs text-white/55">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
-            <span className="truncate">{loc || "Tonight"}</span>
-          </span>
-          <span className="flex shrink-0 items-center gap-2">
-            {item.rating > 0 && (
-              <span className="flex items-center gap-1 text-amber-400">
-                <Star className="h-3.5 w-3.5 fill-amber-400" />{item.rating.toFixed(1)}
-              </span>
-            )}
-            {!live && item.startTime && item.bucket !== "soon" && (
-              <span className="flex items-center gap-1 text-white/45">
-                <Clock className="h-3.5 w-3.5" />{item.startTime}
-              </span>
-            )}
-          </span>
-        </div>
-      </div>
-    </Link>
+    <div className="h-full w-[195px] sm:w-[210px]">
+      <NightlifeOfferCard
+        href={item.href}
+        imageUrl={item.imageUrl}
+        title={item.title}
+        venueName={item.subtitle}
+        offerLabel={offerLabel}
+        offerIcon={<GlassWater className="h-3.5 w-3.5" />}
+        location={loc || "Tonight"}
+        statusBadge={statusBadge}
+      />
+    </div>
   );
 }
 

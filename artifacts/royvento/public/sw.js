@@ -1,6 +1,6 @@
 // ── Cache names — bump the version suffix to force eviction on deploy ──────
-const STATIC_CACHE = "royvento-assets-v1";
-const API_CACHE    = "royvento-api-v1";
+const STATIC_CACHE = "royvento-assets-v5";
+const API_CACHE    = "royvento-api-v5";
 
 // Public read-only API paths that are safe to serve stale while revalidating.
 const CACHEABLE_API_PREFIXES = [

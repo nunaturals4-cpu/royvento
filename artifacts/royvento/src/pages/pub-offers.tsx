@@ -12,6 +12,7 @@ import { useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react"
 import type { VendorDrinkOffer } from "@workspace/api-client-react";
 import { FreeDrinkSection, TicketSection, CoverChargeSection, splitVendorsByPlanType } from "@/components/DrinkDealCards";
 import { CarouselRow } from "@/components/CarouselRow";
+import { SquareImage } from "@/components/SquareImage";
 import { useToast } from "@/hooks/use-toast";
 
 interface AllDrinkDeal {
@@ -118,37 +119,37 @@ function DiscountCard({ deal, accent }: { deal: AllDrinkDeal; accent: DiscountAc
   return (
     <Link href={`/vendors/${deal.vendorId}`} className="group block">
       <div className={`overflow-hidden rounded-2xl border border-white/[0.07] bg-[#111] transition-all duration-300 group-hover:-translate-y-1 ${a.hoverBorder} group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.55)]`}>
-        {/* ── Image section ── */}
-        <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
-          {dealImg ? (
-            <img
-              src={dealImg}
-              alt={deal.vendorName}
-              loading="lazy"
-              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-            />
+        {/* ── Image section (1:1, whole image shown — never cropped) ── */}
+        {(() => {
+          const overlays = (
+            <>
+              <div className="absolute inset-0 z-[2] bg-gradient-to-t from-[#111]/80 via-transparent to-transparent pointer-events-none" />
+              <div className="absolute top-3 left-3 z-10">
+                <span className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-[5px] text-[10px] font-black uppercase tracking-wide shadow-md ${a.badge}`}>
+                  <BadgeIcon className="h-3 w-3" />{badgeText}
+                </span>
+              </div>
+              <span
+                aria-hidden
+                className="absolute top-3 right-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm border border-white/[0.10] text-white/50 transition-all group-hover:text-white"
+              >
+                <Heart className="h-3.5 w-3.5" />
+              </span>
+            </>
+          );
+          return dealImg ? (
+            <SquareImage src={dealImg} alt={deal.vendorName} imgClassName="transition-transform duration-700 group-hover:scale-105">
+              {overlays}
+            </SquareImage>
           ) : (
-            <div className="h-full w-full bg-gradient-to-br from-zinc-800 via-zinc-900 to-black flex items-center justify-center">
-              <Tag className="h-10 w-10 text-white/20" />
+            <div className="relative aspect-square overflow-hidden bg-zinc-900">
+              <div className="h-full w-full bg-gradient-to-br from-zinc-800 via-zinc-900 to-black flex items-center justify-center">
+                <Tag className="h-10 w-10 text-white/20" />
+              </div>
+              {overlays}
             </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#111]/80 via-transparent to-transparent" />
-
-          {/* Discount badge — top left */}
-          <div className="absolute top-3 left-3 z-10">
-            <span className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-[5px] text-[10px] font-black uppercase tracking-wide shadow-md ${a.badge}`}>
-              <BadgeIcon className="h-3 w-3" />{badgeText}
-            </span>
-          </div>
-
-          {/* Heart — top right */}
-          <span
-            aria-hidden
-            className="absolute top-3 right-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm border border-white/[0.10] text-white/50 transition-all group-hover:text-white"
-          >
-            <Heart className="h-3.5 w-3.5" />
-          </span>
-        </div>
+          );
+        })()}
 
         {/* ── Content section ── */}
         <div className="px-4 pt-3.5 pb-4 space-y-2">

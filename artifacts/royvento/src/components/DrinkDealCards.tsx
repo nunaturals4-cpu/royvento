@@ -1,7 +1,8 @@
-import { Link } from "wouter";
-import { Wine, Ticket, Clock, Calendar, Heart, GlassWater, Coins, Users } from "lucide-react";
+import { Wine, Ticket, Clock, Coins } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CarouselRow } from "@/components/CarouselRow";
+import { NightlifeOfferCard } from "@/components/NightlifeOfferCard";
+import { formatDayRanges } from "@/lib/days";
 import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-react";
 
 type PlanWithDates = DrinkPlanSummary & {
@@ -32,12 +33,6 @@ export interface DrinkDealPlanLike {
   imageUrl?: string | null;
 }
 
-/* ─── Constants ─────────────────────────────────────────────────────────── */
-const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-const DAY_LETTER: Record<string, string> = {
-  Mon: "M", Tue: "T", Wed: "W", Thu: "T", Fri: "F", Sat: "S", Sun: "S",
-};
-
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 function fmtTime(hhmm: string): string {
   if (!hhmm) return "";
@@ -45,13 +40,6 @@ function fmtTime(hhmm: string): string {
   const suffix = (h ?? 0) < 12 ? "AM" : "PM";
   const hr = (h ?? 0) % 12 || 12;
   return `${hr}:${String(m ?? 0).padStart(2, "0")} ${suffix}`;
-}
-
-function formatUntil(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
 function summarizePlan(plan: DrinkDealPlanLike): { badge: string; headline: string } {
@@ -80,39 +68,8 @@ function pickPrimaryPlan(plans: DrinkPlanSummary[]): DrinkPlanSummary {
 
 const toImg = (v: string | null | undefined) => v || null;
 
-/* ─── Day pills (M T W T F S S) ─────────────────────────────────────────── */
-type Accent = "primary" | "amber" | "violet" | "darkred";
-
-function DayPills({ activeDays, accent = "primary" }: { activeDays: string[]; accent?: Accent }) {
-  // Match case-insensitively on the first three letters so any stored format
-  // ("Thu" / "thu" / "Thursday") highlights correctly. Empty = every day.
-  const activeSet = new Set((activeDays ?? []).map((d) => d.slice(0, 3).toLowerCase()));
-  const isAll = activeSet.size === 0;
-  return (
-    <div className="flex items-center gap-[5px]">
-      {ALL_DAYS.map((day) => {
-        const active = isAll || activeSet.has(day.slice(0, 3).toLowerCase());
-        const activeClass = accent === "amber"
-          ? "bg-amber-500 text-black"
-          : accent === "violet"
-            ? "bg-violet-500 text-white"
-            : accent === "darkred"
-              ? "bg-red-800 text-white"
-              : "bg-primary text-primary-foreground";
-        return (
-          <span
-            key={day}
-            className={`flex h-[22px] w-[22px] items-center justify-center rounded-full text-[9px] font-bold leading-none select-none ${
-              active ? activeClass : "bg-white/[0.08] text-white/25"
-            }`}
-          >
-            {DAY_LETTER[day]}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
+/* Accent used by the section panels / tiles below. */
+type Accent = "primary" | "amber" | "violet" | "darkred" | "gold";
 
 /* ─── Reusable presentational deal card ──────────────────────────────────────
    Image on top + content below. Wrapper is a Link (href), a button (onClick),
@@ -135,8 +92,6 @@ export function DrinkDealCard({
   plan,
   title,
   fallbackImage,
-  accent = "primary",
-  extraPlansCount = 0,
   href,
   onClick,
 }: DrinkDealCardProps) {
@@ -146,147 +101,58 @@ export function DrinkDealCard({
   const isTicket = plan.type === "ticket";
   const isCoverCharge = plan.type === "cover_charge";
   const imageUrl = toImg(plan.imageUrl) ?? toImg(fallbackImage) ?? null;
-  const untilLabel = formatUntil(plan.validUntil);
   const gender = plan.gender === "female" ? t("pub_offers.filter_ladies") : null;
   const timeStr = (plan.timeFrom && plan.timeTo)
     ? `${fmtTime(plan.timeFrom)} – ${fmtTime(plan.timeTo)}`
     : null;
-
-  const badgeCls = accent === "amber"
-    ? "bg-amber-500 text-black"
-    : accent === "violet"
-      ? "bg-violet-500 text-white"
-      : accent === "darkred"
-        ? "bg-red-800 text-white"
-        : "bg-primary text-primary-foreground";
-  const accentText = accent === "amber"
-    ? "text-amber-400"
-    : accent === "violet"
-      ? "text-violet-400"
-      : accent === "darkred"
-        ? "text-red-400"
-        : "text-primary";
-
   const dealText = isTicket && items.length > 0
     ? items.slice(0, 2).map((it) => it.name).join(" · ") + (items.length > 2 ? " +more" : "")
     : headline;
 
-  const inner = (
-    <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#111] transition-all duration-300 group-hover:-translate-y-1 group-hover:border-primary/20 group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.55)]">
-      {/* ── Image section ── */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={title || badge}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-          />
-        ) : (
-          <div className="h-full w-full bg-gradient-to-br from-primary/20 via-zinc-900 to-black flex flex-col items-center justify-center gap-1.5">
-            <GlassWater className="h-10 w-10 text-primary/50" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40">{badge}</span>
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#111]/80 via-transparent to-transparent" />
+  const offerIcon = isCoverCharge
+    ? <Coins className="h-3.5 w-3.5" />
+    : isTicket
+      ? <Ticket className="h-3.5 w-3.5" />
+      : <Wine className="h-3.5 w-3.5" />;
+  const priceLabel = isCoverCharge && (plan.price ?? 0) > 0 ? `₹${((plan.price ?? 0) / 100).toFixed(0)}` : undefined;
+  const statusBadge = gender ? (
+    <span className="rounded-full bg-pink-500/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-md">{gender}</span>
+  ) : undefined;
 
-        {/* Deal badge — top left */}
-        <div className="absolute top-3 left-3 z-10">
-          <span className={`inline-flex items-center rounded-lg px-2.5 py-[5px] text-[10px] font-black uppercase tracking-wide shadow-md ${badgeCls}`}>
-            {badge}
-          </span>
-        </div>
-
-        {/* Heart — top right */}
-        <span
-          aria-hidden
-          className="absolute top-3 right-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm border border-white/[0.10] text-white/50 transition-all group-hover:text-primary group-hover:border-primary/40"
-        >
-          <Heart className="h-3.5 w-3.5" />
-        </span>
-      </div>
-
-      {/* ── Content section ── */}
-      <div className="px-4 pt-3.5 pb-4 space-y-2">
-        {(title || gender) && (
-          <div className="flex items-start justify-between gap-2 min-h-[20px]">
-            {title ? (
-              <p className={`text-[13px] font-bold leading-tight line-clamp-1 ${accentText}`}>{title}</p>
-            ) : <span />}
-            {gender && (
-              <span className="shrink-0 rounded-full bg-pink-500/15 border border-pink-500/25 px-2 py-0.5 text-[9px] font-semibold text-pink-400 uppercase tracking-wide">
-                {gender}
-              </span>
-            )}
-          </div>
-        )}
-
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-white font-black text-[15px] leading-snug line-clamp-2 min-h-[38px] flex-1">
-            {dealText}
-          </p>
-          {isCoverCharge && (plan.price ?? 0) > 0 && (
-            <span className={`shrink-0 font-black text-[15px] ${accentText}`}>₹{(plan.price! / 100).toFixed(0)}</span>
-          )}
-        </div>
-
-        {isCoverCharge && (plan.peoplePerPackage ?? 0) > 0 && (
-          <p className="text-[11px] text-white/55 flex items-center gap-1">
-            <Users className="h-3 w-3 flex-shrink-0 text-white/35" />
-            {plan.peoplePerPackage === 1 ? "Made just for you 🎉" : `Bring your squad of ${plan.peoplePerPackage} 🎉`}
-          </p>
-        )}
-
-        {(isTicket || isCoverCharge) && items.length > 0 && (
-          <ul className="space-y-1">
-            {items.slice(0, 3).map((it, i) => (
-              <li key={i} className="flex items-center justify-between text-xs text-white/70">
-                <span className="truncate flex-1">{it.name}</span>
-                <span className={`shrink-0 font-semibold ml-2 ${accentText}`}>
-                  {(it.discountedPrice ?? 0) > 0 ? `₹${it.discountedPrice}` : "Free"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {timeStr ? (
-          <p className="text-white/45 text-[11px] flex items-center gap-1.5">
-            <Clock className="h-3 w-3 flex-shrink-0 text-white/30" />
-            {timeStr}
-          </p>
-        ) : (
-          <div className="h-[16px]" />
-        )}
-
-        <DayPills activeDays={plan.days ?? []} accent={accent} />
-
-        {untilLabel && (
-          <p className={`text-[10px] uppercase tracking-wide flex items-center gap-1 mt-0.5 ${accentText} opacity-70`}>
-            <Calendar className="h-3 w-3 flex-shrink-0" /> Until {untilLabel}
-          </p>
-        )}
-
-        {extraPlansCount > 0 && (
-          <p className="text-[10px] text-white/25 uppercase tracking-wide">
-            +{extraPlansCount} more plan{extraPlansCount !== 1 ? "s" : ""}
-          </p>
-        )}
-      </div>
+  // Clean day · time footer row — mirrors the Happening Tonight card style.
+  const daysLabel = formatDayRanges(plan.days ?? []);
+  const extras = (
+    <div className="mt-auto flex items-center gap-1.5 pt-0.5 text-[12px] text-white/55">
+      <Clock className="h-3.5 w-3.5 shrink-0 text-[#D4AF37]" />
+      <span className="truncate">{daysLabel}{timeStr ? ` · ${timeStr}` : ""}</span>
     </div>
   );
 
-  if (href) {
-    return <Link href={href} className="group block">{inner}</Link>;
-  }
-  if (onClick) {
+  const card = (
+    <NightlifeOfferCard
+      href={href}
+      imageUrl={imageUrl}
+      title={dealText}
+      venueName={title}
+      offerLabel={badge}
+      offerIcon={offerIcon}
+      priceLabel={priceLabel}
+      statusBadge={statusBadge}
+    >
+      {extras}
+    </NightlifeOfferCard>
+  );
+
+  // NightlifeOfferCard wraps itself in a Link when `href` is set; otherwise wrap
+  // the click handler (single-venue Happy Hours tab) around it.
+  if (!href && onClick) {
     return (
-      <button type="button" onClick={onClick} className="group block w-full text-left">
-        {inner}
+      <button type="button" onClick={onClick} className="group block h-full w-full text-left">
+        {card}
       </button>
     );
   }
-  return <div className="group block">{inner}</div>;
+  return card;
 }
 
 /* ─── Vendor tile (wraps DrinkDealCard with offer → href) ────────────────── */

@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet, apiDelete } from "@/lib/api";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
+import { SquareImage } from "@/components/SquareImage";
 import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket, Check, Crown, ShieldCheck, Headphones, Zap, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -2791,7 +2792,7 @@ function PremiumOfferCard({
       <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} text-white p-5 flex flex-col gap-2 red-glow border border-white/[0.10]`}>
         <Icon className="absolute -right-6 -bottom-6 h-32 w-32 text-white/10 rotate-12 pointer-events-none" />
         {dealImage && (
-          <img src={dealImage} alt={offer.title} loading="lazy" className="relative z-[1] h-28 w-full object-cover rounded-xl border border-white/20 mb-1" />
+          <SquareImage src={dealImage} alt={offer.title} className="relative z-[1] w-full rounded-xl border border-white/20 mb-1" />
         )}
         <div className="flex items-start justify-between gap-3">
           <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/85">{category}</p>
@@ -2824,7 +2825,7 @@ function PremiumOfferCard({
   return (
     <div className="rounded-2xl glass-card p-5 flex flex-col gap-2">
       {dealImage && (
-        <img src={dealImage} alt={offer.title} loading="lazy" className="h-28 w-full object-cover rounded-xl border border-white/10 mb-1" />
+        <SquareImage src={dealImage} alt={offer.title} className="w-full rounded-xl border border-white/10 mb-1" />
       )}
       <div className="flex items-start justify-between gap-3">
         <p className={`text-[10px] font-bold uppercase tracking-[0.22em] ${labelColor}`}>{category}</p>
