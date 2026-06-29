@@ -56,8 +56,8 @@ const GOLD = "#d4af37";
 const RED = "#b91c1c";
 const PARTY = "#d4af37";
 
-// Cover photo constraints per the create-party workflow (JPG/PNG, ≤5 MB).
-const PARTY_IMAGE_TYPES = ["image/jpeg", "image/png"];
+// Cover photo constraints per the create-party workflow (JPG/PNG/AVIF, ≤5 MB).
+const PARTY_IMAGE_TYPES = ["image/jpeg", "image/png", "image/avif"];
 const PARTY_MAX_BYTES = 5 * 1024 * 1024;
 
 const DESC_MIN = 50;
@@ -207,7 +207,7 @@ export function CreatePartyWizard({ city, onClose }: { city: string; onClose: ()
 
   async function handleFile(file: File) {
     if (!PARTY_IMAGE_TYPES.includes(file.type)) {
-      toast({ title: "Only JPG or PNG images are supported.", variant: "destructive" });
+      toast({ title: "Only JPG, PNG or AVIF images are supported.", variant: "destructive" });
       return;
     }
     if (file.size > PARTY_MAX_BYTES) {
@@ -237,7 +237,7 @@ export function CreatePartyWizard({ city, onClose }: { city: string; onClose: ()
     try {
       for (const file of picked) {
         if (!PARTY_IMAGE_TYPES.includes(file.type)) {
-          toast({ title: `Skipped "${file.name}" — only JPG or PNG.`, variant: "destructive" });
+          toast({ title: `Skipped "${file.name}" — only JPG, PNG or AVIF.`, variant: "destructive" });
           continue;
         }
         if (file.size > PARTY_MAX_BYTES) {
@@ -477,12 +477,12 @@ function PhotoStep({
   const galleryFull = form.galleryImages.length >= GALLERY_MAX;
   return (
     <div>
-      <StepHeading icon={Camera} title="Upload party photo" hint="JPG or PNG · 4:5 or 1:1 · max 5 MB" />
+      <StepHeading icon={Camera} title="Upload party photo" hint="JPG, PNG or AVIF · 4:5 or 1:1 · max 5 MB" />
       <input className={`${field} mb-3`} style={fieldStyle} placeholder="Party name (e.g. Rooftop EDM Night)" value={form.name} onChange={(e) => set("name", e.target.value)} />
       <input
         ref={fileRef}
         type="file"
-        accept="image/jpeg,image/png"
+        accept="image/jpeg,image/png,image/avif"
         className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }}
       />
@@ -527,7 +527,7 @@ function PhotoStep({
         <input
           ref={galleryRef}
           type="file"
-          accept="image/jpeg,image/png"
+          accept="image/jpeg,image/png,image/avif"
           multiple
           className="hidden"
           onChange={(e) => { if (e.target.files?.length) onGalleryFiles(e.target.files); e.currentTarget.value = ""; }}

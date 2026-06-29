@@ -3444,9 +3444,9 @@ export function AnnouncementsPanel({ adminVendorId }: { adminVendorId?: number }
   };
 
   const applyFile = (file: File) => {
-    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/avif"];
     if (!allowed.includes(file.type)) {
-      toast({ title: "Only JPG, PNG or WebP images are allowed", variant: "destructive" });
+      toast({ title: "Only JPG, PNG, WebP or AVIF images are allowed", variant: "destructive" });
       return;
     }
     if (file.size > 8 * 1024 * 1024) {
@@ -3619,7 +3619,7 @@ export function AnnouncementsPanel({ adminVendorId }: { adminVendorId?: number }
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <label className="cursor-pointer px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
                   <Upload className="h-3 w-3" /> Change
-                  <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={handleFileChange} />
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={handleFileChange} />
                 </label>
                 <button type="button" onClick={removeImage} className="px-3 py-1 rounded-lg bg-destructive/80 hover:bg-destructive text-xs text-white border border-white/10">
                   Remove
@@ -3638,7 +3638,7 @@ export function AnnouncementsPanel({ adminVendorId }: { adminVendorId?: number }
               <span className="text-xs text-muted-foreground text-center leading-snug">
                 Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB
               </span>
-              <input id="ann-img-input" type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={handleFileChange} />
+              <input id="ann-img-input" type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={handleFileChange} />
             </label>
           )}
           {imageFile && (
@@ -5744,7 +5744,7 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
                   <div className="absolute inset-0 z-10 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
                       <Upload className="h-3 w-3" /> Change
-                      <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                      <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                         onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setImageFile(f); setForm((prev) => ({ ...prev, imageUrl: "" })); setImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                     </label>
                     <button type="button" onClick={() => { setImageFile(null); setForm((prev) => ({ ...prev, imageUrl: "" })); setImagePreview(""); }}
@@ -5759,7 +5759,7 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
                 >
                   <ImageIcon className="h-7 w-7 text-white/25" />
                   <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
-                  <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                     onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setImageFile(f); setForm((prev) => ({ ...prev, imageUrl: "" })); setImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                 </label>
               )}
@@ -6413,7 +6413,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
                             <Upload className="h-3 w-3" /> Change
-                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                            <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                               onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setFeImageFile(f); setFeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                           </label>
                           <button type="button" onClick={() => { setFeImageFile(null); setFeImagePreview(""); }}
@@ -6428,7 +6428,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                       >
                         <ImageIcon className="h-7 w-7 text-white/25" />
                         <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
-                        <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                        <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                           onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setFeImageFile(f); setFeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                       </label>
                     )}
@@ -6495,7 +6495,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
                             <Upload className="h-3 w-3" /> Change
-                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                            <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                               onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setTicketImageFile(f); setTicketImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                           </label>
                           <button type="button" onClick={() => { setTicketImageFile(null); setTicketImagePreview(""); }}
@@ -6510,7 +6510,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                       >
                         <ImageIcon className="h-7 w-7 text-white/25" />
                         <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
-                        <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                        <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                           onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setTicketImageFile(f); setTicketImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                       </label>
                     )}
@@ -6600,7 +6600,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
                             <Upload className="h-3 w-3" /> Change
-                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                            <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                               onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setCoverChargeImageFile(f); setCoverChargeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                           </label>
                           <button type="button" onClick={() => { setCoverChargeImageFile(null); setCoverChargeImagePreview(""); }}
@@ -6615,7 +6615,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                       >
                         <ImageIcon className="h-7 w-7 text-white/25" />
                         <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
-                        <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                        <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                           onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setCoverChargeImageFile(f); setCoverChargeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                       </label>
                     )}
@@ -6767,7 +6767,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                               <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
                                 <Upload className="h-3 w-3" /> Change
-                                <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                                <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                                   onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setEditImageFile(f); setEditImageUrl(""); setEditImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                               </label>
                               <button type="button" onClick={() => { setEditImageUrl(""); setEditImageFile(null); setEditImagePreview(""); }}
@@ -6782,7 +6782,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                           >
                             <ImageIcon className="h-7 w-7 text-white/25" />
                             <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
-                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                            <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                               onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setEditImageFile(f); setEditImageUrl(""); setEditImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                           </label>
                         )}

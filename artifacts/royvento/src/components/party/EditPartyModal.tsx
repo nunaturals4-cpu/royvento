@@ -10,7 +10,7 @@ const GOLD = "#d4af37";
 const RED = "#b91c1c";
 const PARTY = "#f472b6";
 
-const IMG_TYPES = ["image/jpeg", "image/png"];
+const IMG_TYPES = ["image/jpeg", "image/png", "image/avif"];
 const MAX_BYTES = 5 * 1024 * 1024;
 const GALLERY_MAX = 8;
 
@@ -53,7 +53,7 @@ export function EditPartyModal({ party, onClose, onSaved }: { party: Party; onCl
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
 
   async function onFile(file: File) {
-    if (!IMG_TYPES.includes(file.type)) { toast({ title: "Only JPG or PNG.", variant: "destructive" }); return; }
+    if (!IMG_TYPES.includes(file.type)) { toast({ title: "Only JPG, PNG or AVIF.", variant: "destructive" }); return; }
     if (file.size > MAX_BYTES) { toast({ title: "Image must be 5 MB or smaller.", variant: "destructive" }); return; }
     setUploading(true);
     try {
@@ -72,7 +72,7 @@ export function EditPartyModal({ party, onClose, onSaved }: { party: Party; onCl
     setGalleryUploading(true);
     try {
       for (const file of picked) {
-        if (!IMG_TYPES.includes(file.type)) { toast({ title: `Skipped "${file.name}" — JPG/PNG only.`, variant: "destructive" }); continue; }
+        if (!IMG_TYPES.includes(file.type)) { toast({ title: `Skipped "${file.name}" — JPG/PNG/AVIF only.`, variant: "destructive" }); continue; }
         if (file.size > MAX_BYTES) { toast({ title: `Skipped "${file.name}" — max 5 MB.`, variant: "destructive" }); continue; }
         const url = await uploadImage(file);
         setF((p) => ({ ...p, galleryImages: [...p.galleryImages, url] }));
@@ -154,7 +154,7 @@ export function EditPartyModal({ party, onClose, onSaved }: { party: Party; onCl
             <p className="text-xs mb-1.5" style={{ color: "rgba(255,255,255,0.55)" }}>Cover image</p>
             <label className="block w-full rounded-2xl overflow-hidden cursor-pointer transition-all hover:brightness-110"
               style={{ border: `1.5px dashed ${f.coverImageUrl ? PARTY : "rgba(255,255,255,0.2)"}` }}>
-              <input type="file" accept="image/jpeg,image/png" className="hidden"
+              <input type="file" accept="image/jpeg,image/png,image/avif" className="hidden"
                 onChange={(e) => { const file = e.target.files?.[0]; if (file) onFile(file); e.currentTarget.value = ""; }} />
               {f.coverImageUrl ? (
                 <div className="relative">
@@ -194,7 +194,7 @@ export function EditPartyModal({ party, onClose, onSaved }: { party: Party; onCl
               {f.galleryImages.length < GALLERY_MAX && (
                 <label className="h-20 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer transition-all hover:brightness-110"
                   style={{ border: "1.5px dashed rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.03)" }}>
-                  <input type="file" accept="image/jpeg,image/png" multiple className="hidden"
+                  <input type="file" accept="image/jpeg,image/png,image/avif" multiple className="hidden"
                     onChange={(e) => { if (e.target.files?.length) onGalleryFiles(e.target.files); e.currentTarget.value = ""; }} />
                   {galleryUploading ? <Loader2 className="h-5 w-5 animate-spin" style={{ color: PARTY }} /> : <Plus className="h-5 w-5" style={{ color: PARTY }} />}
                   <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.5)" }}>{galleryUploading ? "Uploading…" : "Add"}</span>

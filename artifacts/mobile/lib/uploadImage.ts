@@ -1,6 +1,6 @@
 import { customFetch, getBaseUrl } from "@workspace/api-client-react";
 
-export const ALLOWED_IMAGE_EXTS = ["jpg", "jpeg", "png", "webp", "gif"];
+export const ALLOWED_IMAGE_EXTS = ["jpg", "jpeg", "png", "webp", "gif", "avif"];
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 const MIME_MAP: Record<string, string> = {
@@ -9,6 +9,7 @@ const MIME_MAP: Record<string, string> = {
   png: "image/png",
   webp: "image/webp",
   gif: "image/gif",
+  avif: "image/avif",
 };
 
 const ALLOWED_MIMES = new Set(Object.values(MIME_MAP));
@@ -36,7 +37,7 @@ export async function uploadImageToStorage(localUri: string, mimeHint?: string):
   const contentType = inferContentType(localUri, mimeHint);
 
   if (!contentType) {
-    throw new Error("Only JPEG, PNG, WebP, or GIF images are allowed.");
+    throw new Error("Only JPEG, PNG, WebP, GIF, or AVIF images are allowed.");
   }
 
   const fileRes = await fetch(localUri);

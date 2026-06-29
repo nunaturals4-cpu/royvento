@@ -32,6 +32,7 @@ import { migrateMediaToS3 } from "../lib/migrateMedia";
 import { seedDemoPubs } from "../lib/seedDemoPubs";
 import { seedProdShowcase } from "../lib/seedProdShowcase";
 import { repairProdMedia } from "../lib/repairProdMedia";
+import { optimizeExistingMedia } from "../lib/optimizeExistingMedia";
 import { eq, desc, asc, sql, inArray, isNotNull, isNull, and, gte, lte, or } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { requireAuth, hashPassword, type AuthedRequest } from "../lib/auth";
@@ -3590,6 +3591,24 @@ router.post("/admin/migrate-media", requireAuth(["admin"]), async (req, res) => 
   } catch (err) {
     req.log.error({ err }, "media migration failed");
     res.status(500).json({ error: err instanceof Error ? err.message : "Migration failed" });
+  }
+});
+
+/**
+ * Re-compress every already-uploaded image in place: shrinks oversized files
+ * to ≤1920px WebP (with a light sharpen) and overwrites them under the same
+ * storage key, so existing URLs keep working and pages load faster. New
+ * uploads are already optimised on the way in — this fixes the back catalogue.
+ *
+ * Body: { confirm: "yes" }. Idempotent — already-optimised files are skipped.
+ */
+router.post("/admin/optimize-images", requireAuth(["admin"]), async (req, res) => {
+  try {
+    const report = await optimizeExistingMedia({ concurrency: 4 });
+    res.json(report);
+  } catch (err) {
+    req.log.error({ err }, "image optimisation failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Optimisation failed" });
   }
 });
 

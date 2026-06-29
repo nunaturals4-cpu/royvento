@@ -865,7 +865,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                       <ImagePlus className="h-4 w-4" />
                       <span>{reviewUploading ? "Uploading…" : reviewImages.length === 0 ? "Add photos" : "Add more"}</span>
                       <input
-                        type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple className="hidden"
+                        type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple className="hidden"
                         disabled={reviewUploading || reviewImages.length >= 5}
                         onChange={async (e) => {
                           const files = e.target.files; e.target.value = "";

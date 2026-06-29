@@ -66,7 +66,7 @@ export function getIndianPhoneError(value: string, opts?: { required?: boolean }
   return null;
 }
 
-export const ALLOWED_IMAGE_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
+export const ALLOWED_IMAGE_MIME = ["image/jpeg", "image/png", "image/webp", "image/avif"] as const;
 export type AllowedImageMime = (typeof ALLOWED_IMAGE_MIME)[number];
 
 export function isAllowedImageMime(mime: string): mime is AllowedImageMime {

@@ -234,7 +234,7 @@ export function Profile() {
               </Avatar>
               <label className="inline-flex items-center gap-2 px-3 h-10 rounded-md border border-white/15 cursor-pointer text-sm hover:bg-white/5">
                 <Upload className="h-4 w-4" /> Upload image
-                <input id="ppic" type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleProfileFile} />
+                <input id="ppic" type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" onChange={handleProfileFile} />
               </label>
               {profileImage && (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setProfileImage("")}>

@@ -5,8 +5,9 @@ import {
   PutObjectCommand,
   HeadObjectCommand,
   DeleteObjectCommand,
+  ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
-import { readFile, writeFile, mkdir, unlink, access } from "fs/promises";
+import { readFile, writeFile, mkdir, unlink, access, readdir } from "fs/promises";
 import { Readable } from "stream";
 import { randomUUID } from "crypto";
 import path from "path";
@@ -295,6 +296,54 @@ export class ObjectStorageService {
       throw new ObjectNotFoundError();
     }
     return objectFile;
+  }
+
+  /**
+   * List the UUIDs of every object stored under the `uploads/` prefix, across
+   * whichever backend is active (S3, local volume, or GCS). Used by the admin
+   * "optimise existing images" tool to re-compress already-uploaded files in
+   * place. The returned ids map 1:1 to `uploadBuffer(uuid, …)` keys, so an
+   * overwrite keeps every existing URL valid.
+   */
+  async listUploadKeys(): Promise<string[]> {
+    if (this.s3) {
+      const ids: string[] = [];
+      let token: string | undefined;
+      do {
+        const out = await this.s3.client.send(
+          new ListObjectsV2Command({
+            Bucket: this.s3.bucket,
+            Prefix: "uploads/",
+            ContinuationToken: token,
+          }),
+        );
+        for (const obj of out.Contents ?? []) {
+          const key = obj.Key ?? "";
+          const id = key.slice("uploads/".length);
+          if (id) ids.push(id);
+        }
+        token = out.IsTruncated ? out.NextContinuationToken : undefined;
+      } while (token);
+      return ids;
+    }
+
+    if (this.localDir) {
+      const uploadsDir = path.join(this.localDir, "uploads");
+      let entries: string[];
+      try {
+        entries = await readdir(uploadsDir);
+      } catch {
+        return [];
+      }
+      // Skip the `<uuid>.meta` sidecars — only the payload files are objects.
+      return entries.filter((name) => !name.endsWith(".meta"));
+    }
+
+    // GCS object-listing isn't wired up (and is the broken path in prod), so
+    // fail loudly rather than silently reporting zero images.
+    throw new Error(
+      "Listing uploads is only supported on S3 and local-volume storage.",
+    );
   }
 
   async uploadBuffer(uuid: string, buffer: Buffer, contentType: string): Promise<void> {

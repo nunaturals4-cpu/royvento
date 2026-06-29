@@ -30,7 +30,7 @@ const uploadUrlLimiter = rateLimit({
   message: { error: "Too many upload requests — please slow down." },
 });
 
-const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]);
 const ALLOWED_VIDEO_TYPES = new Set(["video/mp4"]);
 const ALLOWED_UPLOAD_TYPES = new Set([...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES]);
 const MAX_IMAGE_UPLOAD_BYTES = 8 * 1024 * 1024;
@@ -54,7 +54,7 @@ router.post("/storage/uploads/request-url", requireAuth(), uploadUrlLimiter, asy
   const { name, size, contentType } = parsed.data;
 
   if (!ALLOWED_UPLOAD_TYPES.has(contentType)) {
-    res.status(400).json({ error: "Only JPEG, PNG, WebP, GIF images and MP4 videos are allowed" });
+    res.status(400).json({ error: "Only JPEG, PNG, WebP, GIF, AVIF images and MP4 videos are allowed" });
     return;
   }
   const isVideo = ALLOWED_VIDEO_TYPES.has(contentType);

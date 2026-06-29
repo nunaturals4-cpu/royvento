@@ -2452,6 +2452,57 @@ interface AdminAd {
   id: number; vendorId: number; status: string; message: string;
   createdAt: string; reviewedAt: string | null; vendorName: string;
 }
+type OptimizeImagesReport = {
+  scanned: number;
+  optimized: number;
+  skipped: number;
+  failed: number;
+  bytesSaved: number;
+};
+
+function OptimizeImagesButton() {
+  const { toast } = useToast();
+  const [running, setRunning] = useState(false);
+
+  const run = async () => {
+    setRunning(true);
+    try {
+      const r = await apiPost<OptimizeImagesReport>("/api/admin/optimize-images");
+      const savedMb = (r.bytesSaved / (1024 * 1024)).toFixed(1);
+      toast({
+        title: "Image optimisation complete",
+        description: `${r.optimized} optimised · ${r.skipped} already optimal · ${r.failed} failed — ${savedMb} MB saved`,
+      });
+    } catch (e: any) {
+      toast({ title: "Optimisation failed", description: e?.message, variant: "destructive" });
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl glass-card p-6 flex items-center justify-between gap-4 flex-wrap">
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <p className="font-serif text-lg">Optimise existing images</p>
+        </div>
+        <p className="text-sm text-muted-foreground max-w-xl">
+          Re-compress and sharpen every previously uploaded image so pages load faster.
+          Runs in place — existing links keep working, and already-optimal images are skipped.
+        </p>
+      </div>
+      <Button
+        onClick={run}
+        disabled={running}
+        className="bg-gradient-to-br from-red-600 to-red-800 border-0"
+      >
+        {running ? "Optimising…" : "Optimise images"}
+      </Button>
+    </div>
+  );
+}
+
 function AdsAdmin() {
   const [items, setItems] = useState<AdminAd[]>([]);
   const { toast } = useToast();
@@ -2468,14 +2519,15 @@ function AdsAdmin() {
     }
   };
 
-  if (items.length === 0)
-    return <div className="rounded-2xl glass-card p-10 text-center">
-      <Megaphone className="h-8 w-8 text-primary mx-auto mb-3" />
-      <p className="text-muted-foreground">No ad requests.</p>
-    </div>;
   return (
     <div className="space-y-4">
-      {items.map((a) => (
+      <OptimizeImagesButton />
+      {items.length === 0 ? (
+        <div className="rounded-2xl glass-card p-10 text-center">
+          <Megaphone className="h-8 w-8 text-primary mx-auto mb-3" />
+          <p className="text-muted-foreground">No ad requests.</p>
+        </div>
+      ) : items.map((a) => (
         <div key={a.id} className="rounded-2xl glass-card p-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>

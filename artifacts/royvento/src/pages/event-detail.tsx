@@ -1724,7 +1724,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     {reviewImages.length > 0 && <div className="flex flex-wrap gap-2">{reviewImages.map((url, i) => <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border border-white/10"><img src={url} alt="" className="w-full h-full object-cover" /><button type="button" disabled={disabled} onClick={() => setReviewImages((prev) => prev.filter((_, idx) => idx !== i))} className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/80 text-white flex items-center justify-center" aria-label="Remove image"><X className="h-3 w-3" /></button></div>)}</div>}
                     <label className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/15 text-sm cursor-pointer hover:bg-white/5 transition-colors ${disabled || reviewUploading || reviewImages.length >= 5 ? "opacity-50 pointer-events-none" : ""}`}>
                       <ImagePlus className="h-4 w-4" /><span>{reviewUploading ? "Uploading…" : reviewImages.length === 0 ? "Add photos" : "Add more"}</span>
-                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple className="hidden" disabled={disabled || reviewUploading || reviewImages.length >= 5} onChange={(e) => { handleReviewImagesPicked(e.target.files); e.target.value = ""; }} />
+                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple className="hidden" disabled={disabled || reviewUploading || reviewImages.length >= 5} onChange={(e) => { handleReviewImagesPicked(e.target.files); e.target.value = ""; }} />
                     </label>
                   </div>
                   <Button onClick={handleReview} disabled={disabled || createReview.isPending || reviewUploading || !reviewComment.trim()} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0 h-12 w-full rounded-xl">{t("events.post_review")}</Button>
@@ -1740,9 +1740,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
             {(ev as any).galleryImages?.length > 0 && (
               <section>
                 <h2 className="font-serif text-3xl mb-6 accent-underline inline-block">Gallery</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-6">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mt-6">
                   {((ev as any).galleryImages ?? []).map((src: string, i: number) => (
-                    <button key={i} type="button" onClick={() => openLightbox(((ev as any).galleryImages ?? []) as string[], i)} className="group relative aspect-square overflow-hidden rounded-2xl border border-white/8 hover:border-primary/40 transition-all cursor-zoom-in">
+                    <button key={i} type="button" onClick={() => openLightbox(((ev as any).galleryImages ?? []) as string[], i)} className="group relative aspect-square overflow-hidden rounded-xl border border-white/8 hover:border-primary/40 transition-all cursor-zoom-in">
                       <img src={src} alt={`Gallery photo ${i + 1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                     </button>
@@ -1756,9 +1756,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               return (
                 <section>
                   <h2 className="font-serif text-3xl mb-6 accent-underline inline-block">Dance Floor</h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-6">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mt-6">
                     {dfl.map((url: string, i: number) => (
-                      <button key={i} type="button" onClick={() => openLightbox(dfl, i)} className="group relative aspect-square overflow-hidden rounded-2xl border border-white/8 hover:border-primary/40 transition-all cursor-zoom-in">
+                      <button key={i} type="button" onClick={() => openLightbox(dfl, i)} className="group relative aspect-square overflow-hidden rounded-xl border border-white/8 hover:border-primary/40 transition-all cursor-zoom-in">
                         <img src={url} alt={`Dance floor ${i + 1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                       </button>
@@ -1774,9 +1774,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               const MenuGrid = ({ title, urls }: { title: string; urls: string[] }) => (
                 <section>
                   <h2 className="font-serif text-3xl mb-6 accent-underline inline-block">{title}</h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-6">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mt-6">
                     {urls.map((url: string, i: number) => (
-                      <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/8 hover:border-primary/40 transition-all">
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group relative aspect-[3/4] overflow-hidden rounded-xl border border-white/8 hover:border-primary/40 transition-all">
                         <img src={url} alt={`${title} page ${i + 1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3"><span className="text-xs font-medium text-white flex items-center gap-1"><ExternalLink className="h-3 w-3" /> View</span></div>
                       </a>

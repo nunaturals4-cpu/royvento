@@ -220,6 +220,7 @@ const ALLOWED_MENU_IMAGE_TYPES = new Set([
   "image/png",
   "image/webp",
   "image/gif",
+  "image/avif",
 ]);
 const ALLOWED_MENU_TYPES = ["application/pdf", ...ALLOWED_MENU_IMAGE_TYPES];
 const MAX_MENU_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB — same cap as managed proxy
@@ -259,7 +260,7 @@ router.post(
     if (!ALLOWED_MENU_TYPES.includes(contentType))
       return res
         .status(400)
-        .json({ error: "Only PDF, JPEG, PNG, WebP, and GIF files are allowed" });
+        .json({ error: "Only PDF, JPEG, PNG, WebP, GIF, and AVIF files are allowed" });
 
     const isImage = ALLOWED_MENU_IMAGE_TYPES.has(contentType);
     const maxBytes = isImage ? MAX_MENU_IMAGE_BYTES : MAX_MENU_BYTES;
