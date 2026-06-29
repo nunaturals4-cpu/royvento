@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import crypto from "crypto";
 import {
   db,
@@ -14,9 +14,13 @@ import {
   organizerAdRequestsTable,
   organizerProfileViewsTable,
   bookingsTable,
+  paymentsTable,
   usersTable,
+  vendorRequestsTable,
+  vendorsTable,
   pointsLedgerTable,
 } from "@workspace/db";
+import { createOrder as createRazorpayOrder, isRazorpayConfigured, getKeyId as getRazorpayKeyId } from "../lib/razorpay";
 import type { OrganizerManagerPermissions } from "@workspace/db";
 import { eq, and, desc, sql, inArray, or, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -87,6 +91,50 @@ async function getMyOrganizer(userId: number) {
     .where(eq(organizersTable.userId, userId))
     .limit(1);
   return rows[0] ?? null;
+}
+
+// The pub/club/bar/lounge an organizer can link an event to. Any approved venue
+// is an eligible host — including ones hidden from the public catalog, so an
+// organizer can always find a partner to collaborate with.
+async function getApprovedVenue(venueId: number) {
+  const rows = await db
+    .select()
+    .from(vendorsTable)
+    .where(and(eq(vendorsTable.id, venueId), eq(vendorsTable.status, "approved")))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+// Resolve the vendor (venue) owned by a partner user, for the approval endpoints.
+async function getMyVendor(userId: number) {
+  const rows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, userId)).limit(1);
+  return rows[0] ?? null;
+}
+
+type VenueRow = typeof vendorsTable.$inferSelect;
+
+// Validate an optional venue link. Returns the venue row when linked, null when
+// not linked, or the "invalid" sentinel (after sending a 400) for a bad id.
+async function resolveVenueLink(
+  venueId: number | null | undefined,
+  res: Response,
+): Promise<VenueRow | null | "invalid"> {
+  if (venueId == null) return null;
+  const venue = await getApprovedVenue(venueId);
+  if (!venue) {
+    res.status(400).json({ error: "Selected venue is not available" });
+    return "invalid";
+  }
+  return venue;
+}
+
+// Link/approval columns for an organizer event. A linked event starts as
+// venue-pending; an unlinked one clears the link. Visible venue fields
+// (name/address/city) are auto-filled client-side and kept editable, so they
+// flow through the normal event body — not overridden here.
+function venueValues(venue: VenueRow | null) {
+  if (!venue) return { venueId: null, venueApprovalStatus: "", venueRejectionReason: "" };
+  return { venueId: venue.id, venueApprovalStatus: "pending" as const, venueRejectionReason: "" };
 }
 
 // Earn-only Royvento Coins stub. Full redemption/cashback lands in a later phase.
@@ -161,6 +209,7 @@ const EventBody = z.object({
   address: z.string().optional().default(""),
   mapsUrl: z.string().optional().default(""),
   capacity: z.coerce.number().int().min(0).optional().default(0),
+  country: z.string().optional().default("India"),
   city: z.string().optional().default(""),
   state: z.string().optional().default(""),
   startDate: z.string().optional().nullable().default(null),
@@ -180,6 +229,9 @@ const EventBody = z.object({
     dressCode: "", entryRules: "", agePolicy: "", refundPolicy: "", cancellationPolicy: "",
   }),
   faqs: z.array(FaqSchema).optional().default([]),
+  // Host venue link (pub/club/bar/lounge). When set, the event must be approved
+  // by that venue's partner before going public. null = standalone event.
+  venueId: z.coerce.number().int().positive().optional().nullable().default(null),
 });
 
 const TicketBody = z.object({
@@ -213,6 +265,7 @@ function eventValuesFromBody(data: z.infer<typeof EventBody>) {
     address: data.address,
     mapsUrl: data.mapsUrl,
     capacity: data.capacity,
+    country: data.country,
     city: data.city,
     state: data.state,
     startDate: data.startDate || null,
@@ -299,6 +352,26 @@ router.get("/organizer/events", requireAuth(["organizer"]), async (req, res) => 
   return res.json(rows);
 });
 
+// Venues an organizer can pick as a host for their event. Returns every approved
+// venue (including ones hidden from the public catalog) ordered by name, with the
+// minimal fields the searchable dropdown needs.
+router.get("/organizer/host-venues", requireAuth(["organizer"]), async (_req, res) => {
+  const rows = await db
+    .select({
+      id: vendorsTable.id,
+      businessName: vendorsTable.businessName,
+      category: vendorsTable.category,
+      country: vendorsTable.country,
+      city: vendorsTable.city,
+      state: vendorsTable.state,
+      address: vendorsTable.address,
+    })
+    .from(vendorsTable)
+    .where(eq(vendorsTable.status, "approved"))
+    .orderBy(vendorsTable.businessName);
+  return res.json(rows);
+});
+
 router.post("/organizer/events", requireAuth(["organizer"]), async (req, res) => {
   const user = (req as any).user as { id: number };
   const org = await getMyOrganizer(user.id);
@@ -306,6 +379,12 @@ router.post("/organizer/events", requireAuth(["organizer"]), async (req, res) =>
   const parsed = EventBody.safeParse(req.body);
   if (!parsed.success) return respondInvalid(res, parsed.error);
   const slug = await uniqueEventSlug(parsed.data.title);
+
+  // Host-venue link: when set, the event awaits that venue partner's approval
+  // and its venue fields are auto-filled from the vendor record.
+  const venue = await resolveVenueLink(parsed.data.venueId, res);
+  if (venue === "invalid") return; // response already sent
+
   const [row] = await db
     .insert(organizerEventsTable)
     .values({
@@ -313,6 +392,7 @@ router.post("/organizer/events", requireAuth(["organizer"]), async (req, res) =>
       slug,
       approvalStatus: "pending",
       ...eventValuesFromBody(parsed.data),
+      ...venueValues(venue),
     })
     .returning();
   return res.json(row);
@@ -347,10 +427,19 @@ router.patch("/organizer/events/:id", requireAuth(["organizer"]), async (req, re
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
   const parsed = EventBody.partial().safeParse(req.body);
   if (!parsed.success) return respondInvalid(res, parsed.error);
-  // Edits send the event back to pending review.
+  const { venueId: venueIdInput, ...rest } = parsed.data;
+  // Re-evaluate the venue link only when the edit references venueId, so a
+  // partial update that doesn't touch the venue keeps its current link.
+  let venueSet: Record<string, unknown> = {};
+  if ("venueId" in parsed.data) {
+    const venue = await resolveVenueLink(venueIdInput, res);
+    if (venue === "invalid") return; // response already sent
+    venueSet = venueValues(venue);
+  }
+  // Edits send the event back to pending review (admin or venue partner).
   const [row] = await db
     .update(organizerEventsTable)
-    .set({ ...parsed.data, approvalStatus: "pending", rejectionReason: "" })
+    .set({ ...rest, ...venueSet, approvalStatus: "pending", rejectionReason: "" })
     .where(and(eq(organizerEventsTable.id, id), eq(organizerEventsTable.organizerId, org.id)))
     .returning();
   if (!row) return res.status(404).json({ error: "Not found" });
@@ -367,6 +456,301 @@ router.delete("/organizer/events/:id", requireAuth(["organizer"]), async (req, r
     .delete(organizerEventsTable)
     .where(and(eq(organizerEventsTable.id, id), eq(organizerEventsTable.organizerId, org.id)));
   return res.json({ ok: true });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// VENUE PARTNER ↔ ORGANIZER EVENT APPROVAL
+// A partner (pub/club/bar/lounge) reviews organizer events hosted at their venue
+// from their dashboard. Approving makes the event public (it also flips the
+// admin-facing approvalStatus to 'approved' so all existing public queries work).
+// ════════════════════════════════════════════════════════════════════════════
+
+// Admins target a specific venue via ?vendorId=; partners resolve to their own.
+async function resolvePartnerVenue(
+  req: { query: Record<string, unknown> },
+  user: { id: number; role: string },
+) {
+  if (user.role === "admin") {
+    const raw = req.query["vendorId"];
+    const n = raw != null ? Number(raw) : NaN;
+    if (Number.isFinite(n)) {
+      const rows = await db.select().from(vendorsTable).where(eq(vendorsTable.id, n)).limit(1);
+      return rows[0] ?? null;
+    }
+  }
+  return getMyVendor(user.id);
+}
+
+// Organizer events hosted at the partner's venue (any status) — the partner's
+// inbox of incoming requests shown in the Announcements tab.
+router.get("/partner/organizer-events", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const venue = await resolvePartnerVenue(req, user);
+  if (!venue) return res.json([]);
+  const rows = await db
+    .select({
+      id: organizerEventsTable.id,
+      title: organizerEventsTable.title,
+      slug: organizerEventsTable.slug,
+      coverImageUrl: organizerEventsTable.coverImageUrl,
+      category: organizerEventsTable.category,
+      city: organizerEventsTable.city,
+      startDate: organizerEventsTable.startDate,
+      startTime: organizerEventsTable.startTime,
+      shortDescription: organizerEventsTable.shortDescription,
+      venueApprovalStatus: organizerEventsTable.venueApprovalStatus,
+      venueRejectionReason: organizerEventsTable.venueRejectionReason,
+      organizerName: organizersTable.name,
+      organizerId: organizersTable.id,
+    })
+    .from(organizerEventsTable)
+    .innerJoin(organizersTable, eq(organizersTable.id, organizerEventsTable.organizerId))
+    .where(eq(organizerEventsTable.venueId, venue.id))
+    .orderBy(desc(organizerEventsTable.createdAt));
+  return res.json(rows);
+});
+
+// Load a venue-linked event the partner is authorised to act on.
+async function loadPartnerVenueEvent(eventId: number, venueId: number) {
+  const rows = await db
+    .select()
+    .from(organizerEventsTable)
+    .where(and(eq(organizerEventsTable.id, eventId), eq(organizerEventsTable.venueId, venueId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+// Full details of a venue-linked event so the partner can review it (with the
+// organizer's name + ticket tiers) before approving.
+router.get("/partner/organizer-events/:id", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const venue = await resolvePartnerVenue(req, user);
+  if (!venue) return res.status(403).json({ error: "No partner profile" });
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const ev = await loadPartnerVenueEvent(id, venue.id);
+  if (!ev) return res.status(404).json({ error: "Not found" });
+  const organizer = (await db.select({ id: organizersTable.id, name: organizersTable.name, supportPhone: organizersTable.supportPhone }).from(organizersTable).where(eq(organizersTable.id, ev.organizerId)).limit(1))[0] ?? null;
+  const tickets = await db.select().from(eventTicketsTable).where(eq(eventTicketsTable.eventId, id)).orderBy(eventTicketsTable.id);
+  return res.json({ ...ev, organizer, tickets });
+});
+
+// The host venue partner can edit the event details before approving. The venue
+// link itself can't be changed here (it's their own venue); approval status is
+// left untouched so the partner can edit then approve in either order.
+router.patch("/partner/organizer-events/:id", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const venue = await resolvePartnerVenue(req, user);
+  if (!venue) return res.status(403).json({ error: "No partner profile" });
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const ev = await loadPartnerVenueEvent(id, venue.id);
+  if (!ev) return res.status(404).json({ error: "Not found" });
+  const parsed = EventBody.partial().safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  // Never let the partner re-point the venue link from this endpoint.
+  const { venueId: _ignore, ...rest } = parsed.data;
+  // Empty date strings must become NULL — the columns are typed `date`.
+  if (rest.startDate === "") rest.startDate = null;
+  if (rest.endDate === "") rest.endDate = null;
+  const [row] = await db
+    .update(organizerEventsTable)
+    .set(rest)
+    .where(eq(organizerEventsTable.id, id))
+    .returning();
+  return res.json(row);
+});
+
+// ── Partner-side ticket tiers for a venue-linked event ──────────────────────
+// Mirror the organizer ticket endpoints but authorise via venue ownership so the
+// host partner can fully manage tiers on events at their venue.
+router.get("/partner/organizer-events/:id/tickets", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const venue = await resolvePartnerVenue(req, user);
+  if (!venue) return res.status(403).json({ error: "No partner profile" });
+  const eventId = Number(req.params["id"]);
+  if (!Number.isFinite(eventId)) return res.status(400).json({ error: "Invalid id" });
+  if (!(await loadPartnerVenueEvent(eventId, venue.id))) return res.status(404).json({ error: "Not found" });
+  const rows = await db.select().from(eventTicketsTable).where(eq(eventTicketsTable.eventId, eventId)).orderBy(eventTicketsTable.id);
+  return res.json(rows);
+});
+
+router.post("/partner/organizer-events/:id/tickets", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const venue = await resolvePartnerVenue(req, user);
+  if (!venue) return res.status(403).json({ error: "No partner profile" });
+  const eventId = Number(req.params["id"]);
+  if (!Number.isFinite(eventId)) return res.status(400).json({ error: "Invalid id" });
+  if (!(await loadPartnerVenueEvent(eventId, venue.id))) return res.status(404).json({ error: "Not found" });
+  const parsed = TicketBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const { price, salesStartAt, salesEndAt, ...rest } = parsed.data;
+  const [row] = await db
+    .insert(eventTicketsTable)
+    .values({
+      eventId,
+      ...rest,
+      price: String(price ?? 0),
+      salesStartAt: salesStartAt ? new Date(salesStartAt) : null,
+      salesEndAt: salesEndAt ? new Date(salesEndAt) : null,
+    })
+    .returning();
+  return res.json(row);
+});
+
+// Verify the partner's venue hosts the event a given ticket belongs to.
+async function partnerOwnsTicket(tid: number, venueId: number) {
+  const existing = await db.select().from(eventTicketsTable).where(eq(eventTicketsTable.id, tid)).limit(1);
+  const ticket = existing[0];
+  if (!ticket) return null;
+  if (!(await loadPartnerVenueEvent(ticket.eventId, venueId))) return null;
+  return ticket;
+}
+
+router.patch("/partner/organizer-tickets/:tid", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const venue = await resolvePartnerVenue(req, user);
+  if (!venue) return res.status(403).json({ error: "No partner profile" });
+  const tid = Number(req.params["tid"]);
+  if (!Number.isFinite(tid)) return res.status(400).json({ error: "Invalid id" });
+  if (!(await partnerOwnsTicket(tid, venue.id))) return res.status(404).json({ error: "Not found" });
+  const parsed = TicketBody.partial().safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const { price, salesStartAt, salesEndAt, ...rest } = parsed.data;
+  const updates: Record<string, unknown> = { ...rest };
+  if (price != null) updates["price"] = String(price);
+  if (salesStartAt !== undefined) updates["salesStartAt"] = salesStartAt ? new Date(salesStartAt) : null;
+  if (salesEndAt !== undefined) updates["salesEndAt"] = salesEndAt ? new Date(salesEndAt) : null;
+  const [row] = await db.update(eventTicketsTable).set(updates).where(eq(eventTicketsTable.id, tid)).returning();
+  return res.json(row);
+});
+
+router.delete("/partner/organizer-tickets/:tid", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const venue = await resolvePartnerVenue(req, user);
+  if (!venue) return res.status(403).json({ error: "No partner profile" });
+  const tid = Number(req.params["tid"]);
+  if (!Number.isFinite(tid)) return res.status(400).json({ error: "Invalid id" });
+  if (!(await partnerOwnsTicket(tid, venue.id))) return res.status(404).json({ error: "Not found" });
+  await db.delete(eventTicketsTable).where(eq(eventTicketsTable.id, tid));
+  return res.json({ ok: true });
+});
+
+router.patch("/partner/organizer-events/:id/approve", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const venue = await resolvePartnerVenue(req, user);
+  if (!venue) return res.status(403).json({ error: "No partner profile" });
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const ev = await loadPartnerVenueEvent(id, venue.id);
+  if (!ev) return res.status(404).json({ error: "Not found" });
+  // Partner approval is the public gate for venue-linked events.
+  const [row] = await db
+    .update(organizerEventsTable)
+    .set({ venueApprovalStatus: "approved", venueRejectionReason: "", approvalStatus: "approved", rejectionReason: "", approvedAt: new Date() })
+    .where(eq(organizerEventsTable.id, id))
+    .returning();
+  // Notify the organizer that their event is live at the venue.
+  const org = (await db.select({ userId: organizersTable.userId }).from(organizersTable).where(eq(organizersTable.id, ev.organizerId)).limit(1))[0];
+  if (org?.userId) {
+    await createUserNotification({
+      userId: org.userId,
+      title: "Event approved by venue",
+      message: `${venue.businessName} approved "${ev.title}". It's now live and bookable.`,
+      url: `/organizer-events/${ev.slug}`,
+      tag: `org-event-venue-approved-${ev.id}`,
+    }).catch(() => {});
+  }
+  return res.json(row);
+});
+
+router.patch("/partner/organizer-events/:id/reject", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const venue = await resolvePartnerVenue(req, user);
+  if (!venue) return res.status(403).json({ error: "No partner profile" });
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const { rejectionReason } = req.body as { rejectionReason?: string };
+  const ev = await loadPartnerVenueEvent(id, venue.id);
+  if (!ev) return res.status(404).json({ error: "Not found" });
+  const [row] = await db
+    .update(organizerEventsTable)
+    .set({ venueApprovalStatus: "rejected", venueRejectionReason: rejectionReason ?? "", approvalStatus: "rejected", rejectionReason: rejectionReason ?? "" })
+    .where(eq(organizerEventsTable.id, id))
+    .returning();
+  const org = (await db.select({ userId: organizersTable.userId }).from(organizersTable).where(eq(organizersTable.id, ev.organizerId)).limit(1))[0];
+  if (org?.userId) {
+    await createUserNotification({
+      userId: org.userId,
+      title: "Event declined by venue",
+      message: `${venue.businessName} declined "${ev.title}"${rejectionReason ? `: ${rejectionReason}` : ""}.`,
+      url: `/dashboard/organizer`,
+      tag: `org-event-venue-rejected-${ev.id}`,
+    }).catch(() => {});
+  }
+  return res.json(row);
+});
+
+// Public: approved organizer events hosted at a given venue, for the venue's
+// public page. Same shape as the public organizer-events grid.
+router.get("/vendors/:vendorId/organizer-events", async (req, res) => {
+  const vendorId = Number(req.params["vendorId"]);
+  if (!Number.isFinite(vendorId)) return res.status(400).json({ error: "Invalid id" });
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+  const rows = await db.execute(sql`
+    SELECT
+      e.id, e.title, e.slug, e.category, e.short_description AS "shortDescription",
+      e.cover_image_url AS "coverImageUrl", e.banner_url AS "bannerUrl",
+      e.city, e.start_date AS "startDate", e.start_time AS "startTime",
+      o.name AS "organizerName", o.verified AS "organizerVerified"
+    FROM organizer_events e
+    JOIN organizers o ON o.id = e.organizer_id
+    WHERE e.venue_id = ${vendorId}
+      AND e.approval_status = 'approved'
+      AND e.venue_approval_status = 'approved'
+    ORDER BY e.start_date ASC NULLS LAST, e.created_at DESC
+  `);
+  return res.json(rows.rows);
+});
+
+// Bookings for organizer events hosted at the partner's venue — the host pub/club
+// sees who booked tickets for events held there (read-only). Admins target a
+// specific venue via ?vendorId=.
+router.get("/partner/hosted-event-bookings", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const venue = await resolvePartnerVenue(req, user);
+  if (!venue) return res.json([]);
+  const rows = await db.execute(sql`
+    SELECT
+      b.id, b.booking_date AS "date", b.guests AS "quantity",
+      (b.final_price + COALESCE(b.base_fee, 0)) AS "amount", b.checked_in AS "checkedIn",
+      b.checked_in_at AS "checkedInAt", b.person_name AS "personName",
+      b.phone AS "phone", b.created_at AS "createdAt",
+      e.title AS "eventTitle", e.start_time AS "startTime", e.slug AS "eventSlug",
+      o.name AS "organizerName",
+      t.name AS "ticketName",
+      u.name AS "buyerName"
+    FROM bookings b
+    JOIN organizer_events e ON e.id = b.organizer_event_id
+    LEFT JOIN organizers o ON o.id = b.organizer_id
+    LEFT JOIN event_tickets t ON t.id = b.event_ticket_id
+    LEFT JOIN users u ON u.id = b.user_id
+    -- Filter on the event's live venue link (source of truth) so the report works
+    -- even for bookings whose denormalized host_vendor_id wasn't populated.
+    WHERE e.venue_id = ${venue.id} AND b.kind = 'organizer'
+    ORDER BY b.created_at DESC
+  `);
+  return res.json(rows.rows);
 });
 
 // ─── ticket tiers ────────────────────────────────────────────────────────────
@@ -681,6 +1065,18 @@ router.post("/organizer-events/:slug/book", requireAuth(), async (req, res) => {
   const finalPrice = Math.max(0, total - discount - pointsDeduction);
   const bookingDate = ev.startDate || todayIstDate();
 
+  // Platform base fee (incl. GST) added on top of the ticket price — mirrors the
+  // pub booking flow. Hosted events use the host venue's configured percent;
+  // standalone events use the 3.5% default. Stored separately so it shows on the
+  // ticket "Amount due" / manager views without inflating the organizer's revenue.
+  let baseFeePct = 3.5;
+  if (ev.venueId) {
+    const v = (await db.select({ pct: vendorsTable.baseFeePercent, en: vendorsTable.baseFeeEnabled }).from(vendorsTable).where(eq(vendorsTable.id, ev.venueId)).limit(1))[0];
+    if (v && v.en === false) baseFeePct = 0;
+    else if (v?.pct != null) baseFeePct = Number(v.pct);
+  }
+  const baseFee = finalPrice > 0 ? Math.round((finalPrice * baseFeePct) / 100) : 0;
+
   try {
     // Reserve inventory + create the booking. soldCount moves now because the
     // booking is confirmed immediately (COD model), so it can't be oversold.
@@ -696,22 +1092,26 @@ router.post("/organizer-events/:slug/book", requireAuth(), async (req, res) => {
       organizerId: organizer.id,
       organizerEventId: ev.id,
       eventTicketId: ticket.id,
+      // Host venue (if the event is hosted at a partner pub/club) so they can
+      // see and scan the booking. Null for standalone organizer events.
+      hostVendorId: ev.venueId ?? null,
       bookingDate,
       guests: quantity,
       totalPrice: String(total),
       finalPrice: String(finalPrice),
+      baseFee,
       couponCode: appliedCode,
       discountAmount: String(discount),
       pointsUsed,
       // Lock the per-event commission rate at booking time (Phase C uses it).
       eventCommissionPct: String(ev.commissionPct ?? "0"),
-      status: "confirmed",
+      status: total > 0 && isRazorpayConfigured() ? "pending" : "confirmed",
       pubMode: "event_booking",
       selectedPubEvent: ev.title,
       personName: name || user.name,
       phone,
-      approvedBy: "auto",
-      paymentMethod: "cod",
+      approvedBy: total > 0 && isRazorpayConfigured() ? "payment" : "auto",
+      paymentMethod: total > 0 && isRazorpayConfigured() ? "online" : "cod",
     } as unknown as typeof bookingsTable.$inferInsert;
     const [booking] = await db.insert(bookingsTable).values(bookingValues).returning();
 
@@ -721,7 +1121,42 @@ router.post("/organizer-events/:slug/book", requireAuth(), async (req, res) => {
       ? generateTicketCode(booking.id, { ticketPrefix: organizer.ticketPrefix, ticketSalt: organizer.ticketSalt })
       : `RV-${String(booking.id).padStart(6, "0")}`;
 
-    // Confirmation notification (reuses the shared notify helper).
+    // Paid ticket → create Razorpay order and return payment details for the client
+    if (total > 0 && isRazorpayConfigured()) {
+      try {
+        const amountPaise = Math.round((finalPrice + baseFee) * 100);
+        const order = await createRazorpayOrder({
+          amountPaise,
+          receipt: `org_booking_${booking.id}`,
+          notes: { bookingId: String(booking.id), userId: String(user.id) },
+        });
+        await db.insert(paymentsTable).values({
+          merchantTransactionId: order.id,
+          bookingId: booking.id,
+          amount: amountPaise,
+          status: "initiated",
+          razorpayOrderId: order.id,
+          phonepeTransactionId: "",
+        });
+        return res.json({
+          ok: true,
+          paymentPending: true,
+          bookingId: booking.id,
+          ticketCode,
+          eventTitle: ev.title,
+          razorpayOrderId: order.id,
+          razorpayKeyId: getRazorpayKeyId(),
+          amountPaise,
+          total,
+        });
+      } catch (err) {
+        logger.error({ err, bookingId: booking.id }, "[razorpay] organizer booking order failed");
+        await db.update(bookingsTable).set({ status: "cancelled" }).where(eq(bookingsTable.id, booking.id));
+        return res.status(502).json({ error: "Payment gateway unavailable. Please try again." });
+      }
+    }
+
+    // Free / COD booking → confirm immediately
     createUserNotification({
       userId: user.id,
       title: "Ticket booked!",
@@ -741,9 +1176,10 @@ router.post("/organizer-events/:slug/book", requireAuth(), async (req, res) => {
       discount,
       pointsUsed,
       pointsValue: pointsDeduction,
-      total: finalPrice,
+      baseFee,
+      total: finalPrice + baseFee,
       couponApplied: appliedCode || null,
-      free: finalPrice === 0,
+      free: finalPrice + baseFee === 0,
     });
   } catch (err) {
     logger.error({ err }, "Organizer ticket booking failed");
@@ -928,43 +1364,59 @@ const ScanBody = z.object({
   confirm: z.boolean().optional().default(false),
 });
 
-router.post("/organizer/scan-ticket", requireAuth(), async (req, res) => {
-  const user = (req as any).user as { id: number };
-  const parsed = ScanBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ code: "INVALID_CODE", message: "Please provide a ticket code." });
-  const code = parsed.data.code.trim().toUpperCase();
+// Parse a ticket code into its bookingId. New format PREFIX-NNNNNN-XX needs an
+// HMAC checksum verify; legacy RV-/numeric forms don't.
+export function parseTicketBookingId(code: string): { bookingId: number; needsChecksum: boolean } | null {
+  const c = code.trim().toUpperCase();
+  const m = c.match(/^([A-Z][A-Z0-9]{1,7})-(\d{1,10})-([0-9A-F]{2})$/);
+  const legacy = c.match(/^(?:RV-?)?(\d+)$/);
+  if (m && m[2] && m[1] !== "RV") { const id = parseInt(m[2], 10); return id > 0 ? { bookingId: id, needsChecksum: true } : null; }
+  if (legacy && legacy[1]) { const id = parseInt(legacy[1], 10); return id > 0 ? { bookingId: id, needsChecksum: false } : null; }
+  return null;
+}
 
-  // Parse the new-format code PREFIX-NNNNNN-XX → bookingId (+ checksum verify).
-  const m = code.match(/^([A-Z][A-Z0-9]{1,7})-(\d{1,10})-([0-9A-F]{2})$/);
-  const legacy = code.match(/^(?:RV-?)?(\d+)$/);
-  let bookingId: number;
-  let needsChecksum = false;
-  if (m && m[2] && m[1] !== "RV") { bookingId = parseInt(m[2], 10); needsChecksum = true; }
-  else if (legacy && legacy[1]) { bookingId = parseInt(legacy[1], 10); }
-  else return res.status(400).json({ code: "INVALID_CODE", message: "Invalid ticket code format." });
-  if (!Number.isFinite(bookingId) || bookingId <= 0) return res.status(400).json({ code: "INVALID_CODE", message: "Invalid ticket code." });
+// An organizer event is "over" once its last date (end, else start) is before
+// today (IST). Past that, tickets can no longer be scanned by anyone.
+function isOrganizerEventOver(ev?: { startDate: string | null; endDate: string | null }): boolean {
+  if (!ev) return false;
+  const last = ev.endDate || ev.startDate;
+  return !!last && last < todayIstDate();
+}
 
-  const allowed = await scannerOrganizerPerms(user.id);
-  if (allowed.size === 0) return res.status(403).json({ code: "FORBIDDEN", message: "You are not an organizer or accepted manager." });
+type ScanPerms = { scan: boolean; attendance: boolean };
 
-  const bRows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
-  const b = bRows[0];
-  if (!b || b.kind !== "organizer" || b.organizerId == null) {
-    return res.status(404).json({ code: "NOT_FOUND", message: "Event ticket not found." });
+// Shared organizer-ticket scan/check-in. Used by both the organizer scanner and
+// the host-venue partner scanner; `authorize` decides who may scan a given
+// ticket. Enforces the event-date gate, HMAC verify, duplicate-checkin guard,
+// attendance permission, and the Phase-C commission realisation at check-in.
+export async function scanOrganizerTicket(params: {
+  booking: typeof bookingsTable.$inferSelect;
+  code: string;
+  confirm: boolean;
+  authorize: (b: typeof bookingsTable.$inferSelect, ev: typeof organizerEventsTable.$inferSelect | undefined) => Promise<ScanPerms | null>;
+  denyMessage?: string;
+}): Promise<{ http: number; body: Record<string, unknown> }> {
+  const b = params.booking;
+  const ev = b.organizerEventId != null
+    ? (await db.select().from(organizerEventsTable).where(eq(organizerEventsTable.id, b.organizerEventId)).limit(1))[0]
+    : undefined;
+  const organizer = b.organizerId != null
+    ? (await db.select().from(organizersTable).where(eq(organizersTable.id, b.organizerId)).limit(1))[0]
+    : undefined;
+
+  const perms = await params.authorize(b, ev);
+  if (!perms || !perms.scan) {
+    return { http: 403, body: { code: "WRONG_SCANNER", message: params.denyMessage ?? "You can't scan this ticket here." } };
   }
-  const perms = allowed.get(b.organizerId);
-  if (!perms || !perms.scan) return res.status(403).json({ code: "WRONG_ORGANIZER", message: "This ticket belongs to a different organizer's event." });
 
   // Verify the HMAC checksum with the organizer's signing material.
-  const orgRows = await db.select().from(organizersTable).where(eq(organizersTable.id, b.organizerId)).limit(1);
-  const organizer = orgRows[0];
-  if (needsChecksum && organizer?.ticketPrefix && organizer?.ticketSalt) {
-    if (!verifyTicketCode(code, bookingId, { ticketPrefix: organizer.ticketPrefix, ticketSalt: organizer.ticketSalt })) {
-      return res.status(400).json({ code: "INVALID_CODE", message: "Ticket code failed verification." });
+  const parsedCode = parseTicketBookingId(params.code);
+  if (parsedCode?.needsChecksum && organizer?.ticketPrefix && organizer?.ticketSalt) {
+    if (!verifyTicketCode(params.code, b.id, { ticketPrefix: organizer.ticketPrefix, ticketSalt: organizer.ticketSalt })) {
+      return { http: 400, body: { code: "INVALID_CODE", message: "Ticket code failed verification." } };
     }
   }
 
-  const ev = b.organizerEventId != null ? (await db.select().from(organizerEventsTable).where(eq(organizerEventsTable.id, b.organizerEventId)).limit(1))[0] : undefined;
   const tk = b.eventTicketId != null ? (await db.select().from(eventTicketsTable).where(eq(eventTicketsTable.id, b.eventTicketId)).limit(1))[0] : undefined;
   const buyer = (await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, b.userId)).limit(1))[0];
   const ticketInfo = {
@@ -981,33 +1433,30 @@ router.post("/organizer/scan-ticket", requireAuth(), async (req, res) => {
     checkedInAt: b.checkedInAt ? b.checkedInAt.toISOString() : null,
   };
 
-  // Duplicate check-in prevention.
+  // Event-date gate: once the event is over, no one can scan (org or venue side).
+  if (isOrganizerEventOver(ev)) {
+    return { http: 200, body: { status: "EVENT_ENDED", message: "This event has ended — tickets can no longer be scanned.", ticket: ticketInfo } };
+  }
   if (b.checkedIn) {
-    return res.status(200).json({ status: "ALREADY_CHECKED_IN", message: "Already checked in.", ticket: ticketInfo });
+    return { http: 200, body: { status: "ALREADY_CHECKED_IN", message: "Already checked in.", ticket: ticketInfo } };
   }
-  // Read-only lookup (no confirm) — let the scanner UI show details first.
-  if (!parsed.data.confirm) {
-    return res.status(200).json({ status: "VALID", message: "Valid ticket.", ticket: ticketInfo });
+  if (!params.confirm) {
+    return { http: 200, body: { status: "VALID", message: "Valid ticket.", ticket: ticketInfo } };
   }
-  // Mark attendance (requires attendance permission).
-  if (!perms.attendance) return res.status(403).json({ code: "NO_PERMISSION", message: "You don't have permission to mark attendance." });
+  if (!perms.attendance) {
+    return { http: 403, body: { code: "NO_PERMISSION", message: "You don't have permission to mark attendance." } };
+  }
   const now = new Date();
-  // ── Commission realisation (Phase C) ──────────────────────────────────────
-  // COD model: revenue is only real when the attendee shows up and pays at the
-  // door, so we realise the commission split exactly here, at check-in. The
-  // per-event rate was locked onto the booking at booking time
-  // (eventCommissionPct) so later admin rate changes never re-price history.
+  // ── Commission realisation (Phase C) — COD revenue is real only at check-in.
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const revenue = Number(b.finalPrice ?? 0);
   const commissionPct = Number(b.eventCommissionPct ?? 0);
-  const gatewayPct = b.paymentMethod === "online" ? Number(ev?.gatewayFeePercent ?? 0) : 0; // 0 for COD
+  const gatewayPct = b.paymentMethod === "online" ? Number(ev?.gatewayFeePercent ?? 0) : 0;
   const commission = round2((revenue * commissionPct) / 100);
   const gatewayFee = round2((revenue * gatewayPct) / 100);
   const net = round2(revenue - commission - gatewayFee);
   await db.transaction(async (tx) => {
     await tx.update(bookingsTable).set({ checkedIn: true, checkedInAt: now }).where(eq(bookingsTable.id, b.id));
-    // Idempotent: the unique(bookingId) index means a (theoretical) double
-    // realisation can never double-count.
     const inserted = await tx.insert(organizerCommissionLedgerTable).values({
       organizerId: b.organizerId!,
       organizerEventId: b.organizerEventId,
@@ -1017,14 +1466,42 @@ router.post("/organizer/scan-ticket", requireAuth(), async (req, res) => {
       gatewayFee: String(gatewayFee),
       net: String(net),
     }).onConflictDoNothing({ target: organizerCommissionLedgerTable.bookingId }).returning({ id: organizerCommissionLedgerTable.id });
-    // Organizer holds the cash (COD) and owes the platform its commission.
     if (inserted.length > 0) {
       await tx.update(organizersTable)
         .set({ commissionOwed: sql`${organizersTable.commissionOwed} + ${String(commission)}` })
         .where(eq(organizersTable.id, b.organizerId!));
     }
   });
-  return res.status(200).json({ status: "CHECKED_IN", message: "Checked in!", ticket: { ...ticketInfo, checkedIn: true, checkedInAt: now.toISOString() } });
+  return { http: 200, body: { status: "CHECKED_IN", message: "Checked in!", ticket: { ...ticketInfo, checkedIn: true, checkedInAt: now.toISOString() } } };
+}
+
+router.post("/organizer/scan-ticket", requireAuth(), async (req, res) => {
+  const user = (req as any).user as { id: number };
+  const parsed = ScanBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ code: "INVALID_CODE", message: "Please provide a ticket code." });
+  const code = parsed.data.code.trim().toUpperCase();
+  const parsedCode = parseTicketBookingId(code);
+  if (!parsedCode) return res.status(400).json({ code: "INVALID_CODE", message: "Invalid ticket code format." });
+
+  const allowed = await scannerOrganizerPerms(user.id);
+  if (allowed.size === 0) return res.status(403).json({ code: "FORBIDDEN", message: "You are not an organizer or accepted manager." });
+
+  const bRows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, parsedCode.bookingId)).limit(1);
+  const b = bRows[0];
+  if (!b || b.kind !== "organizer" || b.organizerId == null) {
+    return res.status(404).json({ code: "NOT_FOUND", message: "Event ticket not found." });
+  }
+  const result = await scanOrganizerTicket({
+    booking: b,
+    code,
+    confirm: parsed.data.confirm,
+    denyMessage: "This ticket belongs to a different organizer's event.",
+    authorize: async (bk) => {
+      const p = bk.organizerId != null ? allowed.get(bk.organizerId) : undefined;
+      return p && p.scan ? { scan: true, attendance: !!p.attendance } : null;
+    },
+  });
+  return res.status(result.http).json(result.body);
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1184,7 +1661,7 @@ router.get("/organizer/bookings", requireAuth(["organizer"]), async (req, res) =
   const filter = Number.isFinite(eventId) && eventId > 0 ? sql` AND b.organizer_event_id = ${eventId}` : sql``;
   const rows = await db.execute(sql`
     SELECT b.id, b.created_at AS "createdAt", b.booking_date AS "bookingDate",
-      b.guests AS "quantity", b.final_price AS "amount", b.checked_in AS "checkedIn",
+      b.guests AS "quantity", (b.final_price + COALESCE(b.base_fee, 0)) AS "amount", b.checked_in AS "checkedIn",
       b.person_name AS "attendee", b.phone, u.email AS "email",
       e.title AS "eventTitle", t.name AS "ticketType"
     FROM bookings b
@@ -1440,11 +1917,15 @@ router.delete("/admin/organizers/:id", requireAuth(["admin"]), async (req, res) 
     await tx.delete(organizerProfileViewsTable).where(eq(organizerProfileViewsTable.organizerId, id));
     await tx.delete(organizersTable).where(eq(organizersTable.id, id));
     // The person keeps their account — only the organizer profile is removed.
-    // Demote them from the "organizer" partner role back to a regular user.
+    // Demote them from the "organizer" partner role back to a regular user, and
+    // wipe their prior partner applications so the become-vendor form treats them
+    // as fresh (a stale "approved" request otherwise shows "You're already a
+    // partner!" and blocks re-applying).
     if (org.userId) {
       await tx.update(usersTable)
         .set({ role: "user" })
         .where(and(eq(usersTable.id, org.userId), eq(usersTable.role, "organizer")));
+      await tx.delete(vendorRequestsTable).where(eq(vendorRequestsTable.userId, org.userId));
     }
   });
 

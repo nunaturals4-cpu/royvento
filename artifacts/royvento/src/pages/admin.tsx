@@ -1789,6 +1789,16 @@ function EventsAdmin() {
 
   const toggleHidden = async (e: AdminEvent) => {
     const isVenue = e.type === "pub";
+    // Hiding a venue cascades to its events, offers, announcements & drink plans
+    // — i.e. it removes the whole business from every customer-facing page. That
+    // is a big, easy-to-misclick action, so require an explicit confirmation
+    // before hiding (un-hiding is harmless and needs none).
+    if (isVenue && !e.hidden) {
+      const ok = window.confirm(
+        `Hide "${e.title}"?\n\nThis hides the ENTIRE venue — all of its events, offers, announcements and drink plans disappear from every customer-facing page until you make it visible again.`,
+      );
+      if (!ok) return;
+    }
     try {
       await apiPatch(`/api/admin/events/${e.id}`, { hidden: !e.hidden });
       toast({
@@ -2454,24 +2464,32 @@ interface AdminAd {
 }
 type OptimizeImagesReport = {
   scanned: number;
-  optimized: number;
+  reoptimised: number;
+  rehosted: number;
   skipped: number;
   failed: number;
   bytesSaved: number;
+  byCategory: Record<string, { scanned: number; reduced: number; bytesSaved: number }>;
+  failures: string[];
 };
+
+const mb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1);
 
 function OptimizeImagesButton() {
   const { toast } = useToast();
   const [running, setRunning] = useState(false);
+  const [report, setReport] = useState<OptimizeImagesReport | null>(null);
 
   const run = async () => {
     setRunning(true);
+    setReport(null);
     try {
       const r = await apiPost<OptimizeImagesReport>("/api/admin/optimize-images");
-      const savedMb = (r.bytesSaved / (1024 * 1024)).toFixed(1);
+      setReport(r);
+      const changed = r.reoptimised + r.rehosted;
       toast({
-        title: "Image optimisation complete",
-        description: `${r.optimized} optimised · ${r.skipped} already optimal · ${r.failed} failed — ${savedMb} MB saved`,
+        title: changed > 0 ? "Images enhanced & optimised" : "All images already enhanced",
+        description: `${changed} of ${r.scanned} photos enhanced · ${r.rehosted} self-hosted from external · ${r.skipped} already current · ${r.failed} failed — ${mb(r.bytesSaved)} MB saved`,
       });
     } catch (e: any) {
       toast({ title: "Optimisation failed", description: e?.message, variant: "destructive" });
@@ -2480,25 +2498,92 @@ function OptimizeImagesButton() {
     }
   };
 
+  const categories = report
+    ? Object.entries(report.byCategory).sort((a, b) => b[1].reduced - a[1].reduced)
+    : [];
+
   return (
-    <div className="rounded-2xl glass-card p-6 flex items-center justify-between gap-4 flex-wrap">
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <p className="font-serif text-lg">Optimise existing images</p>
+    <div className="rounded-2xl glass-card p-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <p className="font-serif text-lg">Enhance &amp; optimise images</p>
+          </div>
+          <p className="text-sm text-muted-foreground max-w-xl">
+            Makes every pub, club, event and game partner photo richer and sharper — gallery,
+            dance floor, food &amp; bar menu, covers and more — then shrinks it so pages load fast.
+            External images are pulled in and self-hosted. Each photo is enhanced once; re-runs
+            only touch new or changed images.
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground max-w-xl">
-          Re-compress and sharpen every previously uploaded image so pages load faster.
-          Runs in place — existing links keep working, and already-optimal images are skipped.
-        </p>
+        <Button
+          onClick={run}
+          disabled={running}
+          className="bg-gradient-to-br from-red-600 to-red-800 border-0"
+        >
+          {running ? "Optimising…" : "Optimise images"}
+        </Button>
       </div>
-      <Button
-        onClick={run}
-        disabled={running}
-        className="bg-gradient-to-br from-red-600 to-red-800 border-0"
-      >
-        {running ? "Optimising…" : "Optimise images"}
-      </Button>
+
+      {running && (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Scanning and optimising partner photos — this can take a minute for external images…
+        </p>
+      )}
+
+      {report && (
+        <div className="mt-5 rounded-xl border border-white/10 bg-black/30 p-4">
+          <p className="text-sm font-medium mb-3">
+            {report.reoptimised + report.rehosted > 0
+              ? `Enhanced ${report.reoptimised + report.rehosted} of ${report.scanned} photos and saved ${mb(report.bytesSaved)} MB.`
+              : `Scanned ${report.scanned} photos — all were already enhanced.`}
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3 text-xs">
+            <OptStat label="Re-enhanced (new URL)" value={report.reoptimised} />
+            <OptStat label="Pulled in & self-hosted" value={report.rehosted} />
+            <OptStat label="Already current" value={report.skipped} />
+            <OptStat label="Failed" value={report.failed} />
+            <OptStat label="MB saved" value={mb(report.bytesSaved)} />
+            <OptStat label="Total scanned" value={report.scanned} />
+          </div>
+          {categories.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">By category</p>
+              {categories.map(([label, s]) => (
+                <div key={label} className="flex items-center justify-between text-xs gap-3">
+                  <span className="text-muted-foreground">{label}</span>
+                  <span className="tabular-nums">
+                    {s.reduced}/{s.scanned} optimised
+                    {s.bytesSaved > 0 ? ` · ${mb(s.bytesSaved)} MB` : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {report.failed > 0 && report.failures.length > 0 && (
+            <details className="mt-3">
+              <summary className="text-xs text-amber-300/80 cursor-pointer">
+                {report.failed} image(s) could not be processed
+              </summary>
+              <ul className="mt-1 max-h-32 overflow-y-auto text-[11px] text-muted-foreground space-y-0.5">
+                {report.failures.map((f, i) => (
+                  <li key={i} className="truncate">{f}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OptStat({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-lg bg-white/5 px-3 py-2">
+      <p className="text-base font-semibold tabular-nums">{value}</p>
+      <p className="text-[11px] text-muted-foreground leading-tight">{label}</p>
     </div>
   );
 }

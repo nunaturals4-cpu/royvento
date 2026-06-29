@@ -1,7 +1,7 @@
 import { customFetch, getBaseUrl } from "@workspace/api-client-react";
 
 export const ALLOWED_IMAGE_EXTS = ["jpg", "jpeg", "png", "webp", "gif", "avif"];
-export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const MIME_MAP: Record<string, string> = {
   jpg: "image/jpeg",
@@ -45,7 +45,7 @@ export async function uploadImageToStorage(localUri: string, mimeHint?: string):
   const size = blob.size || 1;
 
   if (size > MAX_IMAGE_BYTES) {
-    throw new Error("Image must be 8 MB or smaller.");
+    throw new Error("Image must be 5 MB or smaller.");
   }
 
   const { uploadURL, objectPath } = await requestPresignedUrl(filename, size, contentType);

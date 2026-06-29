@@ -43,6 +43,7 @@ export default function BecomeVendorScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
   const [businessName, setBusinessName] = useState("");
+  const [phone, setPhone] = useState("");
   const [category, setCategory] = useState("Pub");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState({ country: "India", state: "", city: "" });
@@ -56,8 +57,22 @@ export default function BecomeVendorScreen() {
   }, []);
 
   async function handleSubmit() {
+    // All fields are required for a partner application.
     if (!businessName.trim()) {
       Alert.alert("Required", "Please enter your business name.");
+      return;
+    }
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 7 || digits.length > 15) {
+      Alert.alert("Required", "Please enter a valid phone number.");
+      return;
+    }
+    if (!location.state.trim() || !location.city.trim()) {
+      Alert.alert("Required", "Please select your state and city.");
+      return;
+    }
+    if (!description.trim()) {
+      Alert.alert("Required", "Please tell us about your venue.");
       return;
     }
     setSubmitting(true);
@@ -67,8 +82,9 @@ export default function BecomeVendorScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           businessName: businessName.trim(),
+          phone: phone.trim(),
           category,
-          message: description.trim() || "Partner application",
+          message: description.trim(),
           country: location.country.trim() || "India",
           state: location.state.trim(),
           city: location.city.trim(),
@@ -224,6 +240,18 @@ export default function BecomeVendorScreen() {
           </View>
 
           <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.mutedForeground }]}>Phone Number *</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="e.g. +91 98765 43210"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="phone-pad"
+            />
+          </View>
+
+          <View style={styles.field}>
             <Text style={[styles.label, { color: colors.mutedForeground }]}>Category *</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
               <View style={{ flexDirection: "row", gap: 8, paddingBottom: 4 }}>
@@ -244,12 +272,12 @@ export default function BecomeVendorScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.mutedForeground }]}>Location</Text>
+            <Text style={[styles.label, { color: colors.mutedForeground }]}>Location *</Text>
             <LocationPicker value={location} onChange={setLocation} />
           </View>
 
           <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.mutedForeground }]}>About Your Venue</Text>
+            <Text style={[styles.label, { color: colors.mutedForeground }]}>About Your Venue *</Text>
             <TextInput
               style={[styles.input, styles.textarea, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
               value={description}

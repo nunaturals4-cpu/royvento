@@ -63,11 +63,8 @@ export function Events() {
   const whatsOnRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    // Slider respects the admin's "Announcement Slider rules" (featured first,
-    // recent fallback) — same source as the home/Events slider.
     apiGet<SliderAnnouncement[]>("/api/announcements/slider").then(setSlider).catch(() => {});
     apiGet<EventAnnouncement[]>("/api/announcements/recent").then(setAnnouncements).catch(() => {});
-    // Event Organizer vertical — approved events + admin-featured slider entries.
     apiGet<OrganizerEventCard[]>("/api/organizer-events").then(setOrganizerEvents).catch(() => {});
     apiGet<SliderAnnouncement[]>("/api/organizer-events/slider").then(setOrgSlider).catch(() => {});
   }, []);
@@ -106,63 +103,48 @@ export function Events() {
         canonical="/events"
       />
 
+      {/* ── Events Hero — hidden only when the hero slider is actively showing ── */}
+      {heroSlides.length === 0 && (
+        <div
+          className="relative w-full overflow-hidden bg-zinc-950"
+          style={{ height: "clamp(260px, 45vw, 520px)" }}
+        >
+          <img
+            src="/images/events-hero.png"
+            alt="Luxury events"
+            className="absolute inset-0 h-full w-full object-cover object-center"
+            loading="eager"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+          {/* layered gradient for depth */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
+
+          <div className="absolute inset-0 flex flex-col justify-end pb-10 md:pb-14 px-6 md:px-12">
+            <div className="max-w-3xl">
+              <p className="text-xs uppercase tracking-[0.28em] text-primary font-semibold mb-3">
+                Royvento · Events
+              </p>
+              <h1 className="font-serif text-4xl md:text-6xl tracking-tight text-white leading-[1.05] mb-4">
+                Unforgettable<br />Nights Await
+              </h1>
+              <p className="text-sm md:text-base text-white/60 leading-relaxed max-w-md">
+                Discover exclusive DJ nights, live music, themed parties, and
+                curated experiences — all in one place.
+              </p>
+            </div>
+          </div>
+
+          {/* bottom fade into page bg */}
+          <div className="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-background to-transparent" />
+        </div>
+      )}
+
       <div className="container mx-auto px-4 md:px-6 py-8">
         {/* ── Announcement slider (admin-controlled featured first) ── */}
         {heroSlides.length > 0 && <AnnouncementSlider announcements={heroSlides} />}
 
-        {/* ── Event Categories — home-style "Popular Categories" tiles ── */}
-        <section className="py-6 md:py-8">
-          <div className="flex items-end justify-between mb-6">
-            <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-primary mb-2">Browse by vibe</p>
-              <h2 className="font-serif text-2xl md:text-4xl tracking-tight">Event Categories</h2>
-            </div>
-            {eventTypeFilter && (
-              <button
-                onClick={() => setEventTypeFilter("")}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Clear filter
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
-            {EVENT_CATEGORIES.map((cat) => {
-              const Icon = CATEGORY_ICONS[cat] ?? Megaphone;
-              const count = countByCat[cat] ?? 0;
-              const active = eventTypeFilter === cat;
-              return (
-                <button
-                  key={cat}
-                  onClick={() => selectCategory(cat)}
-                  className={`sheen group relative overflow-hidden rounded-2xl border lift-3d aspect-[4/5] text-left transition-colors ${active ? "border-primary" : "border-white/8"}`}
-                >
-                  <img
-                    src={EVENT_CATEGORY_IMAGES[cat]}
-                    alt=""
-                    loading="lazy"
-                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/15" />
-                  {active && <div className="absolute inset-0 ring-2 ring-inset ring-primary rounded-2xl" />}
-                  {count > 0 && (
-                    <span className="absolute top-2 right-2 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground">
-                      {count}
-                    </span>
-                  )}
-                  <div className="absolute inset-0 flex flex-col items-center justify-end text-center p-3 md:p-4">
-                    <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl border border-primary/40 bg-black/40 text-primary backdrop-blur-sm">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <span className="text-sm font-semibold text-white leading-tight">{cat}</span>
-                    <span className="text-[11px] text-white/55 mt-0.5">{EVENT_CATEGORY_SUBTITLES[cat]}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        {/* ── Event Categories — hidden ── */}
 
         {/* ── Live Events — ticketed events from Event Organizers ── */}
         {organizerEvents.length > 0 && (
@@ -219,26 +201,26 @@ export function Events() {
             </div>
 
             {/* Genre + event type filters */}
-            <div className="mb-5 space-y-3">
+            <div className="mb-5 space-y-2.5">
               <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Genre</p>
-                <div className="flex flex-wrap gap-2">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.18em] mb-2">Genre</p>
+                <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 pb-1">
                   {["", ...ANN_GENRES].map((g) => (
                     <button key={g || "all"} onClick={() => setGenreFilter(g === genreFilter ? "" : g)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                        genreFilter === g ? "bg-amber-400/20 border-amber-400 text-amber-400" : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"
-                      }`}>{g || t("pub_offers.filter_all")}</button>
+                      className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        genreFilter === g ? "border-amber-400 text-amber-400" : "border-white/15 text-white/60 hover:border-white/30 hover:text-white/80"
+                      }`}>{g || "All"}</button>
                   ))}
                 </div>
               </div>
               <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Event Type</p>
-                <div className="flex flex-wrap gap-2">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.18em] mb-2">Event Type</p>
+                <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 pb-1">
                   {["", ...EVENT_CATEGORIES].map((et) => (
                     <button key={et || "all"} onClick={() => setEventTypeFilter(et === eventTypeFilter ? "" : et)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                        eventTypeFilter === et ? "bg-amber-400/20 border-amber-400 text-amber-400" : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"
-                      }`}>{et || t("pub_offers.filter_all")}</button>
+                      className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        eventTypeFilter === et ? "border-amber-400 text-amber-400" : "border-white/15 text-white/60 hover:border-white/30 hover:text-white/80"
+                      }`}>{et || "All"}</button>
                   ))}
                 </div>
               </div>

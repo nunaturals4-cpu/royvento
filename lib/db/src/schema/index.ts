@@ -253,6 +253,9 @@ export const bookingsTable = pgTable(
     organizerId: integer("organizer_id"),
     organizerEventId: integer("organizer_event_id"),
     eventTicketId: integer("event_ticket_id"),
+    // Host venue for a venue-linked organizer booking (organizer_events.venue_id),
+    // so the hosting pub/club can see the booking in its dashboard. NULL otherwise.
+    hostVendorId: integer("host_vendor_id"),
     // `kind = 'game'` is a Game Organizer booking. gameOrganizerId is always set;
     // exactly one of gameId / gamePackageId is set (a single game vs a package).
     // Like organizer bookings these DB columns are nullable; the TS columns below
@@ -377,6 +380,7 @@ export const vendorRequestsTable = pgTable(
     id: serial("id").primaryKey(),
     userId: integer("user_id").notNull(),
     businessName: varchar("business_name", { length: 255 }).notNull().default(""),
+    phone: varchar("phone", { length: 50 }).notNull().default(""),
     category: varchar("category", { length: 100 }).notNull().default(""),
     message: text("message").notNull().default(""),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
@@ -642,6 +646,8 @@ export const announcementsTable = pgTable(
     isFeaturedSlider: boolean("is_featured_slider").notNull().default(false),
     genre: varchar("genre", { length: 100 }).notNull().default(""),
     eventType: varchar("event_type", { length: 100 }).notNull().default(""),
+    organizerName: varchar("organizer_name", { length: 255 }).notNull().default(""),
+    contactDetails: varchar("contact_details", { length: 255 }).notNull().default(""),
     capacity: integer("capacity"),
     isActive: boolean("is_active").notNull().default(true),
     price: numeric("price", { precision: 10, scale: 2 }).notNull().default("0"),
@@ -1245,6 +1251,7 @@ export const organizerEventsTable = pgTable(
     address: text("address").notNull().default(""),
     mapsUrl: text("maps_url").notNull().default(""),
     capacity: integer("capacity").notNull().default(0),
+    country: varchar("country", { length: 100 }).notNull().default("India"),
     city: varchar("city", { length: 100 }).notNull().default(""),
     state: varchar("state", { length: 100 }).notNull().default(""),
     // Date & time
@@ -1274,6 +1281,14 @@ export const organizerEventsTable = pgTable(
     // via bookings.eventCommissionPct so later changes don't re-price history.
     commissionPct: numeric("commission_pct", { precision: 5, scale: 2 }).notNull().default("8"),
     gatewayFeePercent: numeric("gateway_fee_percent", { precision: 5, scale: 2 }).notNull().default("2"),
+    // ── Venue link (host pub/club/bar/lounge) ──────────────────────────────
+    // When an organizer hosts the event at a partner venue, venueId points at
+    // that vendor. The venue's partner must approve it (venueApprovalStatus)
+    // before it goes public — partner approval also flips approvalStatus to
+    // 'approved'. '' venueApprovalStatus means the event isn't venue-linked.
+    venueId: integer("venue_id"),
+    venueApprovalStatus: varchar("venue_approval_status", { length: 20 }).notNull().default(""),
+    venueRejectionReason: text("venue_rejection_reason").notNull().default(""),
     // Workflow
     approvalStatus: varchar("approval_status", { length: 20 }).notNull().default("pending"),
     rejectionReason: text("rejection_reason").notNull().default(""),
@@ -1285,6 +1300,7 @@ export const organizerEventsTable = pgTable(
     organizerIdx: index("organizer_events_organizer_idx").on(t.organizerId),
     approvalIdx: index("organizer_events_approval_idx").on(t.approvalStatus),
     slugIdx: index("organizer_events_slug_idx").on(t.slug),
+    venueIdx: index("organizer_events_venue_idx").on(t.venueId),
   }),
 );
 

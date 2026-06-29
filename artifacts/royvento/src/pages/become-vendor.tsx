@@ -8,8 +8,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { LocationSelect } from "@/components/LocationSelect";
 import { useToast } from "@/hooks/use-toast";
 import { apiGet, apiPost } from "@/lib/api";
-import { Sparkles, MapPin, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { Sparkles, MapPin, CheckCircle2, Clock, AlertCircle, Phone } from "lucide-react";
 import { Link } from "wouter";
+import { useGetMe } from "@workspace/api-client-react";
+
+// Roles that mean the account is an active partner. The "already a partner"
+// screen keys off the live role — NOT a stale vendor_requests row — so a user
+// whose partner profile was deleted by an admin (role reset to "user") always
+// sees the application form again, even if an old "approved" request lingers.
+const PARTNER_ROLES = new Set(["vendor", "organizer", "game_organizer"]);
 
 interface VendorRequest {
   id: number;
@@ -29,7 +36,11 @@ const VENUE_CATEGORIES = [
 
 export function BecomeVendor() {
   const { toast } = useToast();
+  const { data: me } = useGetMe({ query: { retry: false } as any });
+  const role = (me?.user as any)?.role as string | undefined;
+  const isPartner = role != null && PARTNER_ROLES.has(role);
   const [businessName, setBusinessName] = useState("");
+  const [phone, setPhone] = useState("");
   const [category, setCategory] = useState<string>("Pub");
   const [reason, setReason] = useState("");
   const [country, setCountry] = useState("India");
@@ -45,14 +56,34 @@ export function BecomeVendor() {
       .catch(() => setExistingRequest(null));
   }, []);
 
+  // All fields are required. Validate before hitting the API so the user gets a
+  // clear inline message instead of a generic server rejection.
+  const validate = (): string | null => {
+    if (!businessName.trim()) return "Please enter your business name.";
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 7 || digits.length > 15) return "Please enter a valid phone number.";
+    if (!category) return "Please select a venue category.";
+    if (!country.trim()) return "Please select your country.";
+    if (!stateF.trim()) return "Please select your state.";
+    if (!city.trim()) return "Please select your city.";
+    if (!reason.trim()) return "Please tell us about your business.";
+    return null;
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const error = validate();
+    if (error) {
+      toast({ title: "Missing details", description: error, variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
     try {
       await apiPost("/api/vendor-requests", {
-        businessName,
+        businessName: businessName.trim(),
+        phone: phone.trim(),
         category,
-        message: reason,
+        message: reason.trim(),
         country,
         state: stateF,
         city,
@@ -98,6 +129,27 @@ export function BecomeVendor() {
     );
   }
 
+  // Source of truth for "already a partner" is the live role, not the request
+  // row. An admin-deleted partner (role back to "user") falls through to the
+  // application form even if a stale "approved" vendor_requests row remains.
+  if (isPartner) {
+    return (
+      <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl flex flex-col items-center text-center">
+        <SEO title="Already a Partner" canonical="/dashboard/become-vendor" noindex />
+        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+          <CheckCircle2 className="h-10 w-10 text-primary" />
+        </div>
+        <h1 className="font-serif text-4xl tracking-tight mb-3">You're already a partner!</h1>
+        <p className="text-muted-foreground text-lg max-w-md leading-relaxed">
+          Your application was approved. Head to your dashboard to manage your listing.
+        </p>
+        <Link href="/dashboard/profile" className="mt-8">
+          <Button className="bg-primary text-primary-foreground">Go to dashboard</Button>
+        </Link>
+      </div>
+    );
+  }
+
   if (existingRequest?.status === "pending") {
     return (
       <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl flex flex-col items-center text-center">
@@ -114,24 +166,6 @@ export function BecomeVendor() {
         </p>
         <Link href="/dashboard/profile" className="mt-8">
           <Button variant="outline">Back to profile</Button>
-        </Link>
-      </div>
-    );
-  }
-
-  if (existingRequest?.status === "approved") {
-    return (
-      <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl flex flex-col items-center text-center">
-        <SEO title="Already a Partner" canonical="/dashboard/become-vendor" noindex />
-        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-          <CheckCircle2 className="h-10 w-10 text-primary" />
-        </div>
-        <h1 className="font-serif text-4xl tracking-tight mb-3">You're already a partner!</h1>
-        <p className="text-muted-foreground text-lg max-w-md leading-relaxed">
-          Your application was approved. Head to your vendor dashboard to manage your listing.
-        </p>
-        <Link href="/vendor/dashboard" className="mt-8">
-          <Button className="bg-primary text-primary-foreground">Go to dashboard</Button>
         </Link>
       </div>
     );
@@ -162,6 +196,10 @@ export function BecomeVendor() {
         <div>
           <Label htmlFor="bname">Business name</Label>
           <Input id="bname" required value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. The Royal Arms Pub" />
+        </div>
+        <div>
+          <Label htmlFor="bphone" className="flex items-center gap-1.5"><Phone className="h-4 w-4 text-primary" />Phone number</Label>
+          <Input id="bphone" type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. +91 98765 43210" className="mt-1" />
         </div>
         <div>
           <Label htmlFor="bcategory">Venue category</Label>

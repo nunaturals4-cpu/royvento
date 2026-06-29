@@ -8,6 +8,9 @@ import {
   couponsTable,
   bookingsTable,
   eventsTable,
+  organizerEventsTable,
+  organizersTable,
+  eventTicketsTable,
 } from "@workspace/db";
 import { eq, desc, and, inArray, sql, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -375,6 +378,85 @@ router.get(
       totalViews: views.reduce((sum, v) => sum + v.visitCount, 0),
       bookedCount: views.filter((v) => v.hasBooked).length,
       views,
+    });
+  },
+);
+
+// ── Top events leads ─────────────────────────────────────────────────────────
+// Surfaces the most successful ticketed events (ranked by total tickets sold)
+// so a pub/club/bar/lounge partner can find high-performing organizers to host.
+// Two buckets: events in the partner's own state, and events across the country.
+const soldExpr = sql<number>`coalesce(sum(${eventTicketsTable.soldCount}), 0)::int`;
+
+async function topEventsByLocation(field: "state" | "country", value: string) {
+  if (!value) return [];
+  const col =
+    field === "state" ? organizerEventsTable.state : organizerEventsTable.country;
+  return db
+    .select({
+      eventId: organizerEventsTable.id,
+      title: organizerEventsTable.title,
+      slug: organizerEventsTable.slug,
+      coverImageUrl: organizerEventsTable.coverImageUrl,
+      venueName: organizerEventsTable.venueName,
+      city: organizerEventsTable.city,
+      state: organizerEventsTable.state,
+      country: organizerEventsTable.country,
+      startDate: organizerEventsTable.startDate,
+      organizerId: organizersTable.id,
+      organizerName: organizersTable.name,
+      organizerSlug: organizersTable.slug,
+      organizerCity: organizersTable.city,
+      organizerState: organizersTable.state,
+      supportEmail: organizersTable.supportEmail,
+      supportPhone: organizersTable.supportPhone,
+      website: organizersTable.website,
+      instagram: organizersTable.instagram,
+      verified: organizersTable.verified,
+      ticketsSold: soldExpr.as("tickets_sold"),
+    })
+    .from(organizerEventsTable)
+    .innerJoin(
+      organizersTable,
+      eq(organizersTable.id, organizerEventsTable.organizerId),
+    )
+    .leftJoin(
+      eventTicketsTable,
+      eq(eventTicketsTable.eventId, organizerEventsTable.id),
+    )
+    .where(
+      and(
+        eq(organizerEventsTable.approvalStatus, "approved"),
+        eq(col, value),
+      ),
+    )
+    .groupBy(organizerEventsTable.id, organizersTable.id)
+    .having(sql`coalesce(sum(${eventTicketsTable.soldCount}), 0) > 0`)
+    .orderBy(desc(soldExpr))
+    .limit(20);
+}
+
+router.get(
+  "/partner/leads/top-events",
+  requireAuth(["vendor", "admin"]),
+  async (req, res) => {
+    const user = await loadUserFromRequest(req);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+    const vendor = await resolveLeadsVendor(req, user);
+    if (!vendor) {
+      return res.json({ state: "", country: "", stateEvents: [], countryEvents: [] });
+    }
+    const stateName = vendor.state ?? "";
+    const countryName = vendor.country ?? "";
+    const [stateEvents, countryEvents] = await Promise.all([
+      topEventsByLocation("state", stateName),
+      topEventsByLocation("country", countryName),
+    ]);
+    return res.json({
+      state: stateName,
+      country: countryName,
+      stateEvents,
+      countryEvents,
     });
   },
 );

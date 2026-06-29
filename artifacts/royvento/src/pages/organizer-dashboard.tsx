@@ -16,11 +16,16 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { LocationSelect } from "@/components/LocationSelect";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
+} from "@/components/ui/command";
 import {
   CalendarDays, LayoutGrid, Plus, Ticket, Settings, ImagePlus, Trash2, Pencil,
   Users, Sparkles, CheckCircle2, Clock, XCircle, ArrowLeft, ExternalLink, X,
   ScanLine, UserCog, Camera, CameraOff, Mail, Shield, Wallet, TrendingUp, Banknote,
-  BarChart3, Tag, Megaphone, Download, Eye,
+  BarChart3, Tag, Megaphone, Download, Eye, User, Phone, MapPin, Check, ChevronsUpDown, CalendarX2,
 } from "lucide-react";
 
 // ─── shared types (mirror api-server/src/routes/organizers.ts) ──────────────
@@ -40,12 +45,13 @@ interface OrganizerEvent {
   id: number; title: string; slug: string; category: string; subcategory: string;
   shortDescription: string; description: string; tags: string[]; language: string; ageRestriction: string;
   coverImageUrl: string; bannerUrl: string; mobileBannerUrl: string; galleryImages: string[]; promoVideos: string[];
-  venueName: string; address: string; mapsUrl: string; capacity: number; city: string; state: string;
+  venueName: string; address: string; mapsUrl: string; capacity: number; country: string; city: string; state: string;
   startDate: string | null; endDate: string | null; startTime: string; endTime: string; isMultiDay: boolean;
   happeningTonight?: boolean; startingSoon?: boolean; lastMinuteDeal?: boolean; dealLabel?: string;
   artists: Artist[] | null; highlights: string[] | null; schedule: ScheduleItem[] | null;
   policies: Policies | null; faqs: Faq[] | null;
   approvalStatus: string; rejectionReason: string;
+  venueId?: number | null; venueApprovalStatus?: string; venueRejectionReason?: string;
 }
 interface TicketTier {
   id: number; type: string; name: string; description: string; price: string;
@@ -235,7 +241,7 @@ export function BecomeOrganizer() {
 // ORGANIZER DASHBOARD
 // ════════════════════════════════════════════════════════════════════════════
 
-type Tab = "overview" | "events" | "create" | "scanner" | "managers" | "earnings" | "insights" | "leads" | "coupons" | "promote" | "profile";
+type Tab = "overview" | "identity" | "events" | "create" | "scanner" | "managers" | "earnings" | "insights" | "leads" | "coupons" | "promote" | "profile";
 
 export function OrganizerDashboard() {
   const { toast } = useToast();
@@ -273,6 +279,7 @@ export function OrganizerDashboard() {
 
   const NAV: { value: Tab; label: string; icon: React.ReactNode }[] = [
     { value: "overview", label: "Overview", icon: <LayoutGrid className="h-4 w-4" /> },
+    { value: "identity", label: "Profile", icon: <User className="h-4 w-4" /> },
     { value: "events", label: "Events", icon: <CalendarDays className="h-4 w-4" /> },
     { value: "create", label: "Create Event", icon: <Plus className="h-4 w-4" /> },
     { value: "scanner", label: "Scanner", icon: <ScanLine className="h-4 w-4" /> },
@@ -354,6 +361,10 @@ export function OrganizerDashboard() {
             </div>
           )}
 
+          {tab === "identity" && (
+            <ProfileBasics organizer={organizer} onSaved={loadProfile} />
+          )}
+
           {tab === "events" && (
             <EventsList events={events} onEdit={(id) => { setEditingId(id); setTab("create"); }} onChanged={loadEvents} />
           )}
@@ -413,7 +424,16 @@ function EventsList({ events, onEdit, onChanged }: { events: OrganizerEvent[]; o
             <div className="min-w-0 flex-1">
               <p className="font-medium truncate">{e.title}</p>
               <p className="text-white/50 text-sm truncate">{e.category || "—"} · {e.city || "—"} · {e.startDate || "no date"}</p>
-              <div className="mt-1.5"><StatusBadge status={e.approvalStatus} /></div>
+              <div className="mt-1.5 flex items-center gap-2">
+                <StatusBadge status={e.approvalStatus} />
+                {e.venueId ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-white/50"><MapPin className="h-3 w-3" />
+                    {e.venueApprovalStatus === "approved" ? "Venue approved"
+                      : e.venueApprovalStatus === "rejected" ? "Venue declined"
+                      : "Awaiting venue approval"}
+                  </span>
+                ) : null}
+              </div>
               {e.approvalStatus === "rejected" && e.rejectionReason && <p className="text-red-300/80 text-xs mt-1">Reason: {e.rejectionReason}</p>}
             </div>
             <div className="flex items-center gap-1 shrink-0">
@@ -434,7 +454,52 @@ function EventsList({ events, onEdit, onChanged }: { events: OrganizerEvent[]; o
 
 const EMPTY_POLICIES: Policies = { dressCode: "", entryRules: "", agePolicy: "", refundPolicy: "", cancellationPolicy: "" };
 
-function EventEditor({ eventId, onDone, onCancel }: { eventId: number | null; onDone: () => void; onCancel: () => void }) {
+// Endpoint + UI config so the same editor serves both the organizer (their own
+// events) and the host venue partner (events at their venue, via /partner/*).
+export interface EventEditorApi {
+  getEvent: (id: number) => string;
+  saveEvent: (id: number) => string;
+  createEvent: string;
+  ticketsList: (id: number) => string;
+  ticketCreate: (id: number) => string;
+  ticketUpdate: (tid: number) => string;
+  ticketDelete: (tid: number) => string;
+  showVenuePicker: boolean;
+  showHeader: boolean;
+  editedToast: string;
+}
+
+const ORGANIZER_EVENT_API: EventEditorApi = {
+  getEvent: (id) => `/api/organizer/events/${id}`,
+  saveEvent: (id) => `/api/organizer/events/${id}`,
+  createEvent: "/api/organizer/events",
+  ticketsList: (id) => `/api/organizer/events/${id}/tickets`,
+  ticketCreate: (id) => `/api/organizer/events/${id}/tickets`,
+  ticketUpdate: (tid) => `/api/organizer/tickets/${tid}`,
+  ticketDelete: (tid) => `/api/organizer/tickets/${tid}`,
+  showVenuePicker: true,
+  showHeader: true,
+  editedToast: "Event updated — sent for re-approval",
+};
+
+// Config for the venue partner editing an event hosted at their venue. The venue
+// link can't be changed here, so the host picker is hidden.
+export function partnerEventApi(vq: string): EventEditorApi {
+  return {
+    getEvent: (id) => `/api/partner/organizer-events/${id}${vq}`,
+    saveEvent: (id) => `/api/partner/organizer-events/${id}${vq}`,
+    createEvent: "",
+    ticketsList: (id) => `/api/partner/organizer-events/${id}/tickets${vq}`,
+    ticketCreate: (id) => `/api/partner/organizer-events/${id}/tickets${vq}`,
+    ticketUpdate: (tid) => `/api/partner/organizer-tickets/${tid}${vq}`,
+    ticketDelete: (tid) => `/api/partner/organizer-tickets/${tid}${vq}`,
+    showVenuePicker: false,
+    showHeader: false,
+    editedToast: "Event updated",
+  };
+}
+
+export function EventEditor({ eventId, onDone, onCancel, api = ORGANIZER_EVENT_API }: { eventId: number | null; onDone: () => void; onCancel: () => void; api?: EventEditorApi }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(eventId != null);
   const [saving, setSaving] = useState(false);
@@ -444,13 +509,28 @@ function EventEditor({ eventId, onDone, onCancel }: { eventId: number | null; on
   useEffect(() => {
     if (eventId == null) { setF(blankEvent()); setLoading(false); return; }
     setLoading(true);
-    apiGet<OrganizerEvent & { tickets: TicketTier[] }>(`/api/organizer/events/${eventId}`)
+    apiGet<OrganizerEvent & { tickets: TicketTier[] }>(api.getEvent(eventId))
       .then((data) => setF({ ...blankEvent(), ...data }))
       .catch(() => toast({ title: "Could not load event", variant: "destructive" }))
       .finally(() => setLoading(false));
-  }, [eventId, toast]);
+  }, [eventId, toast, api]);
 
   const upd = <K extends keyof OrganizerEvent>(k: K, v: OrganizerEvent[K]) => setF((p) => ({ ...p, [k]: v }));
+
+  // Selecting a host venue auto-fills the venue fields (kept editable). Clearing
+  // it drops the link so the event follows the normal admin-approval path.
+  const onVenueSelect = (v: VenueOption | null) => {
+    if (!v) { setF((p) => ({ ...p, venueId: null })); return; }
+    setF((p) => ({
+      ...p,
+      venueId: v.id,
+      venueName: v.businessName,
+      address: v.address || p.address,
+      country: v.country || p.country,
+      city: v.city || p.city,
+      state: v.state || p.state,
+    }));
+  };
 
   async function save() {
     if (!f.title.trim()) { toast({ title: "Event name is required", variant: "destructive" }); return; }
@@ -458,12 +538,12 @@ function EventEditor({ eventId, onDone, onCancel }: { eventId: number | null; on
     const body = { ...f };
     try {
       if (isEdit) {
-        await apiPatch(`/api/organizer/events/${eventId}`, body);
-        toast({ title: "Event updated — sent for re-approval" });
+        await apiPatch(api.saveEvent(eventId), body);
+        toast({ title: api.editedToast });
         onDone();
       } else {
-        const created = await apiPost<OrganizerEvent>("/api/organizer/events", body);
-        toast({ title: "Event created", description: "Add ticket tiers, then it goes for admin approval." });
+        const created = await apiPost<OrganizerEvent>(api.createEvent, body);
+        toast({ title: "Event created", description: f.venueId ? "Add ticket tiers — then the venue partner approves it." : "Add ticket tiers, then it goes for admin approval." });
         // jump into edit mode of the new event so tickets can be added
         onDone();
         void created;
@@ -479,16 +559,28 @@ function EventEditor({ eventId, onDone, onCancel }: { eventId: number | null; on
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" className="text-white/60" onClick={onCancel}><ArrowLeft className="h-4 w-4 mr-1" /> Back</Button>
-        <h1 className="font-serif text-2xl">{isEdit ? "Edit event" : "Create event"}</h1>
-      </div>
+      {api.showHeader && (
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" className="text-white/60" onClick={onCancel}><ArrowLeft className="h-4 w-4 mr-1" /> Back</Button>
+          <h1 className="font-serif text-2xl">{isEdit ? "Edit event" : "Create event"}</h1>
+        </div>
+      )}
 
       {/* BASIC */}
       <GlassCard className="p-6 space-y-4">
         <SectionTitle><Sparkles className="h-4 w-4 text-primary" /> Basic details</SectionTitle>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Event name *" full><Input className={inputCls} value={f.title} onChange={(e) => upd("title", e.target.value)} /></Field>
+          {api.showVenuePicker && (
+            <Field label="Host venue (pub / club / bar / lounge)" full>
+              <VenuePicker value={f.venueId} onSelect={onVenueSelect} />
+              {f.venueId ? (
+                <p className="text-xs text-primary/80 mt-1.5 flex items-center gap-1.5"><MapPin className="h-3 w-3" /> Sent to this venue for approval before going public. Once approved, it shows on the venue's page too.</p>
+              ) : (
+                <p className="text-xs text-white/40 mt-1.5">Optional. Pick a venue to host the event there — the venue partner approves it and it's listed on their page as well.</p>
+              )}
+            </Field>
+          )}
           <Field label="Category">
             <Select value={f.category} onValueChange={(v) => upd("category", v)}>
               <SelectTrigger className={inputCls}><SelectValue placeholder="Select" /></SelectTrigger>
@@ -522,8 +614,14 @@ function EventEditor({ eventId, onDone, onCancel }: { eventId: number | null; on
           <Field label="Capacity"><Input type="number" className={inputCls} value={f.capacity || 0} onChange={(e) => upd("capacity", Number(e.target.value) || 0)} /></Field>
           <Field label="Address" full><Input className={inputCls} value={f.address} onChange={(e) => upd("address", e.target.value)} /></Field>
           <Field label="Google Maps URL" full><Input className={inputCls} value={f.mapsUrl} onChange={(e) => upd("mapsUrl", e.target.value)} /></Field>
-          <Field label="City"><Input className={inputCls} value={f.city} onChange={(e) => upd("city", e.target.value)} /></Field>
-          <Field label="State"><Input className={inputCls} value={f.state} onChange={(e) => upd("state", e.target.value)} /></Field>
+          <Field label="Location (country / state / city)" full>
+            <LocationSelect
+              country={f.country || ""}
+              state={f.state}
+              city={f.city}
+              onChange={(n) => setF((p) => ({ ...p, country: n.country, state: n.state, city: n.city }))}
+            />
+          </Field>
         </div>
       </GlassCard>
 
@@ -607,7 +705,7 @@ function EventEditor({ eventId, onDone, onCancel }: { eventId: number | null; on
 
       {/* TICKETS (edit mode only — needs an event id) */}
       {isEdit
-        ? <TicketManager eventId={eventId!} />
+        ? <TicketManager eventId={eventId!} api={api} />
         : <GlassCard className="p-5 text-sm text-white/55 flex items-center gap-2"><Ticket className="h-4 w-4 text-primary" /> Save the event first, then add ticket tiers from its edit screen.</GlassCard>}
 
       <div className="flex justify-end gap-3 pt-2">
@@ -622,12 +720,71 @@ function blankEvent(): OrganizerEvent {
   return {
     id: 0, title: "", slug: "", category: "", subcategory: "", shortDescription: "", description: "",
     tags: [], language: "", ageRestriction: "", coverImageUrl: "", bannerUrl: "", mobileBannerUrl: "",
-    galleryImages: [], promoVideos: [], venueName: "", address: "", mapsUrl: "", capacity: 0, city: "", state: "",
+    galleryImages: [], promoVideos: [], venueName: "", address: "", mapsUrl: "", capacity: 0, country: "India", city: "", state: "",
     startDate: null, endDate: null, startTime: "", endTime: "", isMultiDay: false,
     happeningTonight: true, startingSoon: true, lastMinuteDeal: false, dealLabel: "",
     artists: [], highlights: [], schedule: [], policies: { ...EMPTY_POLICIES }, faqs: [],
     approvalStatus: "pending", rejectionReason: "",
+    venueId: null, venueApprovalStatus: "", venueRejectionReason: "",
   };
+}
+
+// ─── host-venue picker (searchable pub/club/bar/lounge dropdown) ────────────
+
+interface VenueOption {
+  id: number; businessName: string; category: string;
+  country: string; city: string; state: string; address: string | null;
+}
+
+function VenuePicker({ value, onSelect }: { value: number | null | undefined; onSelect: (v: VenueOption | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const [venues, setVenues] = useState<VenueOption[]>([]);
+  useEffect(() => {
+    apiGet<VenueOption[]>("/api/organizer/host-venues").then(setVenues).catch(() => setVenues([]));
+  }, []);
+  const selected = venues.find((v) => v.id === value) ?? null;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={inputCls + " flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm"}
+        >
+          <span className={selected ? "truncate" : "text-white/40 truncate"}>
+            {selected ? selected.businessName : "No venue — standalone event"}
+          </span>
+          <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-zinc-900 border-white/10 text-white" align="start">
+        <Command className="bg-transparent">
+          <CommandInput placeholder="Search pubs, clubs, bars, lounges…" className="text-white" />
+          <CommandList>
+            <CommandEmpty>No venues found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value="none standalone no venue" onSelect={() => { onSelect(null); setOpen(false); }}>
+                <span className="text-white/60">No venue — standalone event</span>
+                {value == null && <Check className="ml-auto h-4 w-4" />}
+              </CommandItem>
+              {venues.map((v) => (
+                <CommandItem
+                  key={v.id}
+                  value={`${v.businessName} ${v.category} ${v.city} ${v.state}`}
+                  onSelect={() => { onSelect(v); setOpen(false); }}
+                >
+                  <div className="flex flex-col min-w-0">
+                    <span className="truncate">{v.businessName}</span>
+                    <span className="text-xs text-white/40 truncate">{[v.category, v.city].filter(Boolean).join(" · ")}</span>
+                  </div>
+                  {value === v.id && <Check className="ml-auto h-4 w-4 shrink-0" />}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function Field({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
@@ -730,27 +887,27 @@ function RepeatableFaqs({ faqs, onChange }: { faqs: Faq[]; onChange: (q: Faq[]) 
 
 // ─── ticket manager ──────────────────────────────────────────────────────────
 
-function TicketManager({ eventId }: { eventId: number }) {
+function TicketManager({ eventId, api = ORGANIZER_EVENT_API }: { eventId: number; api?: EventEditorApi }) {
   const { toast } = useToast();
   const [tickets, setTickets] = useState<TicketTier[]>([]);
   const [draft, setDraft] = useState<Partial<TicketTier> | null>(null);
 
   const load = useCallback(() => {
-    apiGet<TicketTier[]>(`/api/organizer/events/${eventId}/tickets`).then(setTickets).catch(() => {});
-  }, [eventId]);
+    apiGet<TicketTier[]>(api.ticketsList(eventId)).then(setTickets).catch(() => {});
+  }, [eventId, api]);
   useEffect(() => { load(); }, [load]);
 
   async function save() {
     if (!draft?.name?.trim()) { toast({ title: "Ticket name required", variant: "destructive" }); return; }
     try {
-      if (draft.id) await apiPatch(`/api/organizer/tickets/${draft.id}`, draft);
-      else await apiPost(`/api/organizer/events/${eventId}/tickets`, draft);
+      if (draft.id) await apiPatch(api.ticketUpdate(draft.id), draft);
+      else await apiPost(api.ticketCreate(eventId), draft);
       toast({ title: "Ticket saved" }); setDraft(null); load();
     } catch (e: any) { toast({ title: "Save failed", description: e?.message, variant: "destructive" }); }
   }
   async function remove(id: number) {
     if (!confirm("Delete this ticket tier?")) return;
-    try { await apiDelete(`/api/organizer/tickets/${id}`); load(); } catch (e: any) { toast({ title: "Delete failed", description: e?.message, variant: "destructive" }); }
+    try { await apiDelete(api.ticketDelete(id)); load(); } catch (e: any) { toast({ title: "Delete failed", description: e?.message, variant: "destructive" }); }
   }
 
   return (
@@ -799,6 +956,60 @@ function TicketManager({ eventId }: { eventId: number }) {
 }
 
 // ─── profile settings ────────────────────────────────────────────────────────
+
+// Focused identity card: the organizer's business name + contact phone. The
+// name here IS the business name used everywhere in the app (events, public
+// page, bookings, scanner) — those read it via a live join, so editing it here
+// updates it everywhere. Changing the name also re-slugs the public URL.
+function ProfileBasics({ organizer, onSaved }: { organizer: Organizer; onSaved: () => void }) {
+  const { toast } = useToast();
+  const [name, setName] = useState(organizer.name);
+  const [phone, setPhone] = useState(organizer.supportPhone);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { setName(organizer.name); setPhone(organizer.supportPhone); }, [organizer]);
+
+  const dirty = name.trim() !== organizer.name || phone.trim() !== organizer.supportPhone;
+
+  async function save() {
+    const trimmed = name.trim();
+    if (!trimmed) { toast({ title: "Business name is required", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      await apiPatch("/api/organizer/profile", { name: trimmed, supportPhone: phone.trim() });
+      toast({ title: "Profile updated", description: "Your business name updates across the app." });
+      onSaved();
+    } catch (e: any) { toast({ title: "Save failed", description: e?.message, variant: "destructive" }); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-[11px] uppercase tracking-[0.3em] text-primary mb-1">Event Management</p>
+        <h1 className="font-serif text-2xl md:text-3xl">Profile</h1>
+        <p className="text-white/50 text-sm mt-1">Your business name and contact number. The business name is your organizer name shown everywhere.</p>
+      </div>
+      <GlassCard className="p-6 space-y-4 max-w-xl">
+        <Field label="Business name (organizer name)" full>
+          <div className="relative">
+            <User className="h-4 w-4 text-white/35 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Input className={inputCls + " pl-9"} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Royvento Events" />
+          </div>
+        </Field>
+        <Field label="Phone number" full>
+          <div className="relative">
+            <Phone className="h-4 w-4 text-white/35 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Input className={inputCls + " pl-9"} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. +91 98765 43210" />
+          </div>
+        </Field>
+        <p className="text-white/40 text-xs">Updating the business name changes it across your events, public page, tickets and bookings. Your public link may change too.</p>
+        <div className="flex justify-end">
+          <Button className="bg-primary text-white min-w-28" onClick={save} disabled={saving || !dirty}>{saving ? <Spinner /> : "Save changes"}</Button>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
 
 function ProfileSettings({ organizer, onSaved }: { organizer: Organizer; onSaved: () => void }) {
   const { toast } = useToast();
@@ -850,7 +1061,7 @@ interface ScannedTicket {
   attendee: string; quantity: number; date: string; time: string; venue: string;
   checkedIn: boolean; checkedInAt: string | null;
 }
-type ScanStatus = "VALID" | "ALREADY_CHECKED_IN" | "CHECKED_IN";
+type ScanStatus = "VALID" | "ALREADY_CHECKED_IN" | "CHECKED_IN" | "EVENT_ENDED";
 
 function ScannerPanel() {
   const { toast } = useToast();
@@ -878,6 +1089,7 @@ function ScannerPanel() {
       setResult({ status: res.status, ticket: res.ticket });
       if (res.status === "CHECKED_IN") toast({ title: "Checked in ✓", description: res.ticket.attendee });
       if (res.status === "ALREADY_CHECKED_IN") toast({ title: "Already checked in", variant: "destructive" });
+      if (res.status === "EVENT_ENDED") toast({ title: "Event ended", description: "Tickets can no longer be scanned.", variant: "destructive" });
     } catch (e: any) {
       setResult(null);
       setError(e?.message || "Scan failed");
@@ -964,7 +1176,18 @@ function ScannerPanel() {
         </GlassCard>
       )}
 
-      {result && (
+      {result && result.status === "EVENT_ENDED" && (
+        <GlassCard className="p-6 border-red-500/30 bg-red-500/[0.06] flex flex-col items-center text-center">
+          <div className="h-16 w-16 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mb-3">
+            <CalendarX2 className="h-8 w-8 text-red-400" />
+          </div>
+          <p className="font-serif text-xl text-red-200">Event has ended</p>
+          <p className="text-white/60 text-sm mt-1 max-w-xs">This ticket is for <span className="text-white/80">{result.ticket.eventTitle || "an event"}</span> which is over. Tickets can no longer be scanned.</p>
+          <p className="text-white/40 text-xs mt-3">Booking #{result.ticket.bookingId} · {result.ticket.date}</p>
+        </GlassCard>
+      )}
+
+      {result && result.status !== "EVENT_ENDED" && (
         <GlassCard className={"p-5 " + (result.status === "ALREADY_CHECKED_IN" ? "border-amber-500/30 bg-amber-500/[0.05]" : result.status === "CHECKED_IN" ? "border-emerald-500/30 bg-emerald-500/[0.05]" : "border-white/10")}>
           <div className="flex items-center gap-2 mb-3">
             {result.status === "CHECKED_IN" ? <CheckCircle2 className="h-5 w-5 text-emerald-400" />

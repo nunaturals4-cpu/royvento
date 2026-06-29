@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useUpdateParty, type Party } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { uploadImage } from "@/lib/uploadImage";
+import { resolveImageMime } from "@workspace/validators";
 import { JOIN_TYPES, AGE_GROUPS, DRESS_CODES, PARTY_PREFS } from "@/components/solo-connect/CreatePartyWizard";
 import { LocationSelect } from "@/components/LocationSelect";
 import { X, Camera, Loader2, Pencil, Plus } from "lucide-react";
@@ -53,7 +54,7 @@ export function EditPartyModal({ party, onClose, onSaved }: { party: Party; onCl
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
 
   async function onFile(file: File) {
-    if (!IMG_TYPES.includes(file.type)) { toast({ title: "Only JPG, PNG or AVIF.", variant: "destructive" }); return; }
+    if (!IMG_TYPES.includes(resolveImageMime(file))) { toast({ title: "Only JPG, PNG or AVIF.", variant: "destructive" }); return; }
     if (file.size > MAX_BYTES) { toast({ title: "Image must be 5 MB or smaller.", variant: "destructive" }); return; }
     setUploading(true);
     try {
@@ -72,7 +73,7 @@ export function EditPartyModal({ party, onClose, onSaved }: { party: Party; onCl
     setGalleryUploading(true);
     try {
       for (const file of picked) {
-        if (!IMG_TYPES.includes(file.type)) { toast({ title: `Skipped "${file.name}" — JPG/PNG/AVIF only.`, variant: "destructive" }); continue; }
+        if (!IMG_TYPES.includes(resolveImageMime(file))) { toast({ title: `Skipped "${file.name}" — JPG/PNG/AVIF only.`, variant: "destructive" }); continue; }
         if (file.size > MAX_BYTES) { toast({ title: `Skipped "${file.name}" — max 5 MB.`, variant: "destructive" }); continue; }
         const url = await uploadImage(file);
         setF((p) => ({ ...p, galleryImages: [...p.galleryImages, url] }));

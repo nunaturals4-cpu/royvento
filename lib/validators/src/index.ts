@@ -72,3 +72,29 @@ export type AllowedImageMime = (typeof ALLOWED_IMAGE_MIME)[number];
 export function isAllowedImageMime(mime: string): mime is AllowedImageMime {
   return (ALLOWED_IMAGE_MIME as readonly string[]).includes(mime);
 }
+
+// Filename-extension → MIME fallback. Browsers on some platforms (notably
+// Windows for `.avif`/`.webp`) report an empty or non-image `File.type`, which
+// would make every upload look like `application/octet-stream` and get
+// rejected. We recover the real type from the extension instead.
+export const IMAGE_EXT_TO_MIME: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  avif: "image/avif",
+};
+
+/**
+ * Best-effort image MIME for a picked file: trust `File.type` when it already
+ * names an image, otherwise fall back to the filename extension. Returns the
+ * original `type` (possibly empty) when nothing matches, so callers still get
+ * to run their own allow-list check.
+ */
+export function resolveImageMime(file: { name?: string | null; type?: string | null }): string {
+  const type = (file?.type ?? "").toLowerCase();
+  if (type.startsWith("image/")) return type;
+  const ext = (file?.name ?? "").split(".").pop()?.toLowerCase() ?? "";
+  return IMAGE_EXT_TO_MIME[ext] ?? type;
+}

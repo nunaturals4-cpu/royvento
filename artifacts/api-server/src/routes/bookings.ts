@@ -55,6 +55,7 @@ import { initiatePayment, isPhonePeConfigured, getAppUrl } from "../lib/phonepe"
 import { createOrder as createRazorpayOrder, isRazorpayConfigured, getKeyId as getRazorpayKeyId } from "../lib/razorpay";
 import { computeEffectiveRevenues, bookingDiscountRatio } from "../lib/effectiveRevenue";
 import { respondInvalid } from "../lib/validationError";
+import { scanOrganizerTicket } from "./organizers";
 
 /** How many hours before the event date customers are locked out of self-service cancellation. */
 const CANCELLATION_CUTOFF_HOURS = Number(process.env["CANCELLATION_CUTOFF_HOURS"] ?? 3);
@@ -1656,12 +1657,66 @@ router.get("/bookings/vendor/summary", requireAuth(["vendor", "admin"]), async (
   const monthlyRevenue = Array.from(monthlyRevMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, revenue]) => ({ month, revenue: Math.round(revenue) }));
-  const perEvent = Array.from(perEventMap.values())
+
+  // ── Organizer events hosted at this venue ───────────────────────────────────
+  // Their bookings are kind='organizer' (not part of the vendor's own bookings),
+  // so add them to the per-event breakdown grouped by the organizer event title.
+  // Negative eventId keeps the React key unique vs the venue's own pub events.
+  const hostedConds = [
+    eq(bookingsTable.kind, "organizer"),
+    eq(organizerEventsTable.venueId, vendor.id),
+    inArray(bookingsTable.status, [...confirmedStatuses]),
+  ];
+  if (fromDate) hostedConds.push(gte(bookingsTable.bookingDate, fromDate));
+  const hostedBookings = await db
+    .select({ finalPrice: bookingsTable.finalPrice, eventId: organizerEventsTable.id, title: organizerEventsTable.title })
+    .from(bookingsTable)
+    .innerJoin(organizerEventsTable, eq(organizerEventsTable.id, bookingsTable.organizerEventId))
+    .where(and(...hostedConds));
+  const hostedMap = new Map<number, { eventId: number; eventTitle: string; bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number }>();
+  for (const h of hostedBookings) {
+    const rev = Number(h.finalPrice ?? 0);
+    const ex = hostedMap.get(h.eventId);
+    if (ex) { ex.bookingCount += 1; ex.revenue += rev; }
+    else hostedMap.set(h.eventId, { eventId: -h.eventId, eventTitle: h.title, bookingCount: 1, ticketWomen: 0, ticketMen: 0, ticketCouple: 0, revenue: rev });
+  }
+
+  const perEvent = [...Array.from(perEventMap.values()), ...Array.from(hostedMap.values())]
     .map((r) => ({ ...r, revenue: Math.round(r.revenue) }))
     .sort((a, b) => b.revenue - a.revenue);
 
   const stats = statsRows[0] ?? { totalBookings: 0, countConfirmed: 0, countCompleted: 0, countCancelled: 0, countPending: 0, totalGuests: 0 };
   res.json({ ...stats, totalRevenue: Math.round(totalRevenue), monthlyRevenue, monthlyTrend: monthlyTrendRows, perEvent });
+});
+
+// Per-booking "Revenue by event" report for the partner: bookings for events an
+// organizer created for this venue (hosted organizer events) ONLY — the venue's
+// own bookings live in the separate all-bookings table. Columns: attendee,
+// event, ticket, qty, amount (incl. base fee), in.
+router.get("/bookings/vendor/event-bookings", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const adminVendorId = user.role === "admin" && req.query["vendorId"] ? Number(req.query["vendorId"]) : null;
+  const vRows = adminVendorId && Number.isFinite(adminVendorId)
+    ? await db.select().from(vendorsTable).where(eq(vendorsTable.id, adminVendorId)).limit(1)
+    : await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  const vendor = vRows[0];
+  if (!vendor) { res.json([]); return; }
+  const rows = await db.execute(sql`
+    SELECT b.id, b.created_at AS "createdAt", b.person_name AS "attendee",
+      e.title AS "event", COALESCE(NULLIF(t.name, ''), 'Ticket') AS "ticket",
+      b.guests AS "qty", (b.final_price + COALESCE(b.base_fee, 0)) AS "amount",
+      b.checked_in AS "checkedIn", b.phone, u.email AS "email",
+      o.name AS "organizerName"
+    FROM bookings b
+    JOIN organizer_events e ON e.id = b.organizer_event_id
+    LEFT JOIN organizers o ON o.id = b.organizer_id
+    LEFT JOIN event_tickets t ON t.id = b.event_ticket_id
+    LEFT JOIN users u ON u.id = b.user_id
+    WHERE e.venue_id = ${vendor.id} AND b.kind = 'organizer' AND b.status = 'confirmed'
+    ORDER BY b.created_at DESC
+  `);
+  res.json(rows.rows);
 });
 
 router.get("/bookings/vendor", requireAuth(["vendor", "admin"]), async (req, res) => {
@@ -2277,6 +2332,29 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   const b = bRows[0];
   if (!b) {
     res.status(404).json({ code: "NOT_FOUND", message: "Ticket not found. Check the code and try again." });
+    return;
+  }
+
+  // Organizer-event ticket hosted at one of this user's venues → route to the
+  // shared organizer scan flow (verifies the organizer's QR, realises organizer
+  // commission, and enforces the event-date gate). Host venue managers get full
+  // scan+attendance for events held at their venue.
+  if (b.kind === "organizer") {
+    const confirmFlag = body["confirm"] === true || actualEntry != null;
+    const result = await scanOrganizerTicket({
+      booking: b,
+      code,
+      confirm: confirmFlag,
+      denyMessage: "This ticket isn't for an event hosted at your venue.",
+      // Authorize off the event's live venue link (source of truth), falling back
+      // to the booking's denormalized host_vendor_id. This keeps scanning working
+      // even for bookings created before host_vendor_id was populated.
+      authorize: async (bk, ev) => {
+        const hostVid = ev?.venueId ?? bk.hostVendorId ?? null;
+        return (hostVid != null && allowedVendorIds.has(hostVid)) ? { scan: true, attendance: true } : null;
+      },
+    });
+    res.status(result.http).json(result.body);
     return;
   }
 

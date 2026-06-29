@@ -25,12 +25,16 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { LocationSelect } from "@/components/LocationSelect";
+import { EventEditor, partnerEventApi } from "./organizer-dashboard";
 import {
   Trash2, Calendar as CalIcon, Image as ImageIcon,
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
   TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus, CalendarCheck, Check,
   Banknote, CreditCard, CheckCircle, Search, ChevronLeft, ChevronRight, UserCheck, UserX, Percent, RefreshCw,
   FileText, Star, Menu, X, Sparkles, ArrowUpRight, Utensils, Gift, Loader2,
+  Trophy, Mail, Phone, Globe,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -43,6 +47,7 @@ import {
 import { COUNTRY_NAMES, getStates, getCities } from "@/lib/locations";
 import { EVENT_CATEGORIES as ANNOUNCEMENT_CATEGORIES } from "@/lib/eventCategories";
 import { uploadImage as uploadImageToStorage, validateImageFile } from "@/lib/uploadImage";
+import { resolveImageMime } from "@workspace/validators";
 import { SquareImage } from "@/components/SquareImage";
 import { useFormErrors, fieldClass } from "@/lib/formErrors";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -606,6 +611,9 @@ const CROWD_LEVELS = [
 function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }) {
   const [businessName, setName] = useState(vendor.businessName);
   const [description, setDescription] = useState(vendor.description);
+  const [country, setCountry] = useState(vendor.country || "India");
+  const [stateF, setStateF] = useState(vendor.state ?? "");
+  const [city, setCity] = useState(vendor.city ?? "");
   const profileFormErrors = useFormErrors();
   const crowdLevel: string | null = vendor.crowdLevel ?? null;
   const update = useUpdateMyVendor();
@@ -623,10 +631,12 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
       });
     }
     profileFormErrors.reset();
-    const city = vendor.city ?? "";
-    const stateF = vendor.state ?? "";
+    if (!stateF.trim() || !city.trim()) {
+      toast({ title: "Location required", description: "Please select your state and city so your venue appears in local listings.", variant: "destructive" });
+      return;
+    }
     update.mutate(
-      { data: { businessName, category: vendor.category, description: descToSave, location: `${city}${stateF ? ", " + stateF : ""}`, country: vendor.country || "India", state: stateF, city, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
+      { data: { businessName, category: vendor.category, description: descToSave, location: `${city}${stateF ? ", " + stateF : ""}`, country: country || "India", state: stateF, city, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
       {
         onSuccess: () => {
           toast({ title: "Profile updated" });
@@ -668,6 +678,17 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             <p className={`text-xs ml-auto ${description.length > 300 ? "text-destructive" : "text-muted-foreground"}`}>
               {description.length} / 300
             </p>
+          </div>
+        </div>
+        <div>
+          <Label className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" />Location <span className="text-muted-foreground text-xs">(required — used for local listings)</span></Label>
+          <div className="mt-2">
+            <LocationSelect
+              country={country}
+              state={stateF}
+              city={city}
+              onChange={(next) => { setCountry(next.country); setStateF(next.state); setCity(next.city); }}
+            />
           </div>
         </div>
         <Button type="submit" disabled={update.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
@@ -940,14 +961,14 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
     const res = await fetch("/api/partner/menu-upload", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: resolveImageMime(file) || "application/octet-stream" }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error((err as { error?: string }).error ?? "Could not get upload URL");
     }
     const { uploadURL, objectPath } = await res.json();
-    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": resolveImageMime(file) || "application/octet-stream" } });
     if (!put.ok) throw new Error("Upload failed");
     return `${window.location.origin}/api/storage${objectPath}`;
   };
@@ -956,11 +977,11 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
     const res = await fetch("/api/storage/uploads/request-url", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: resolveImageMime(file) || "application/octet-stream" }),
     });
     if (!res.ok) throw new Error("Could not get upload URL");
     const { uploadURL, objectPath } = await res.json();
-    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": resolveImageMime(file) || "application/octet-stream" } });
     if (!put.ok) throw new Error("Upload failed");
     return `/api/storage${objectPath}`;
   };
@@ -1342,7 +1363,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
             <div>
               <Label>Event types you host</Label>
               <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {PUB_EVENT_TYPES.map((t) => (
+                {ANNOUNCEMENT_CATEGORIES.map((t) => (
                   <button
                     key={t}
                     type="button"
@@ -1871,14 +1892,14 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
     const res = await fetch("/api/partner/menu-upload", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: resolveImageMime(file) || "application/octet-stream" }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error((err as { error?: string }).error ?? "Could not get upload URL");
     }
     const { uploadURL, objectPath } = await res.json();
-    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": resolveImageMime(file) || "application/octet-stream" } });
     if (!put.ok) throw new Error("Upload failed");
     return `${window.location.origin}/api/storage${objectPath}`;
   };
@@ -1887,11 +1908,11 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
     const res = await fetch("/api/storage/uploads/request-url", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: resolveImageMime(file) || "application/octet-stream" }),
     });
     if (!res.ok) throw new Error("Could not get upload URL");
     const { uploadURL, objectPath } = await res.json();
-    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": resolveImageMime(file) || "application/octet-stream" } });
     if (!put.ok) throw new Error("Upload failed");
     return `/api/storage${objectPath}`;
   };
@@ -2193,7 +2214,7 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
             <div>
               <Label>Event types</Label>
               <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {PUB_EVENT_TYPES.map((t) => (
+                {ANNOUNCEMENT_CATEGORIES.map((t) => (
                   <button
                     key={t}
                     type="button"
@@ -2563,6 +2584,13 @@ export function BookingReport({ bookTablePage, setBookTablePage, adminVendorId }
     queryFn: () => apiGet(`/api/bookings/vendor?page=${bookTablePage}&limit=${BR_PAGE_SIZE}&from=${encodeURIComponent(startStr)}${vParam}`),
   });
 
+  // Per-booking event report: the venue's own event bookings + events organizers
+  // created for this venue (Attendee / Event / Ticket / Qty / Amount / In).
+  const { data: eventBookings = [] } = useQuery<any[]>({
+    queryKey: ["vendor-event-bookings", adminVendorId ?? "me"],
+    queryFn: () => apiGet<any[]>(`/api/bookings/vendor/event-bookings${adminVendorId ? `?vendorId=${adminVendorId}` : ""}`),
+  });
+
   const totalBookings = summary?.totalBookings ?? 0;
   const totalRevenue = summary?.totalRevenue ?? 0;
   const totalGuests = summary?.totalGuests ?? 0;
@@ -2854,52 +2882,43 @@ export function BookingReport({ bookTablePage, setBookTablePage, adminVendorId }
             </div>
           )}
 
-          {perEvent.length > 0 && (
+          {eventBookings.length > 0 && (
             <div className="rounded-2xl glass-card p-6">
-              <h3 className="font-serif text-xl mb-4">Revenue by event</h3>
+              <h3 className="font-serif text-xl mb-1">Revenue by event</h3>
+              <p className="text-sm text-muted-foreground mb-4">Event bookings at your venue — your own events plus events organizers created for you.</p>
               <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
-                <table className="w-full text-sm min-w-[480px]">
+                <table className="w-full text-sm min-w-[640px]">
                   <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
                     <tr>
-                      <th className="text-left py-2 pr-4">Event</th>
-                      <th className="text-right py-2 px-2">Bookings</th>
-                      <th className="text-right py-2 px-2 text-pink-300">Women</th>
-                      <th className="text-right py-2 px-2 text-blue-300">Men</th>
-                      <th className="text-right py-2 px-2 text-purple-300">Couples</th>
-                      <th className="text-right py-2 pl-2">Revenue</th>
+                      <th className="text-left py-2 pr-4">Attendee</th>
+                      <th className="text-left py-2 px-2">Event</th>
+                      <th className="text-left py-2 px-2">Ticket</th>
+                      <th className="text-left py-2 px-2">Contact</th>
+                      <th className="text-right py-2 px-2">Qty</th>
+                      <th className="text-right py-2 px-2">Amount</th>
+                      <th className="text-center py-2 pl-2">In</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {perEvent.map((row) => (
-                      <tr key={row.eventId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                        <td className="py-3 pr-4 font-medium">{row.eventTitle}</td>
-                        <td className="text-right px-2 tabular-nums">{row.bookingCount}</td>
-                        <td className="text-right px-2 tabular-nums text-pink-300">{row.ticketWomen || "—"}</td>
-                        <td className="text-right px-2 tabular-nums text-blue-300">{row.ticketMen || "—"}</td>
-                        <td className="text-right px-2 tabular-nums text-purple-300">{row.ticketCouple || "—"}</td>
-                        <td className="text-right pl-2 tabular-nums text-primary font-medium">{formatINR(row.revenue)}</td>
+                    {eventBookings.map((r: any) => (
+                      <tr key={r.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-3 pr-4 font-medium">{r.attendee || "—"}</td>
+                        <td className="px-2 text-muted-foreground">{r.event}{r.organizerName ? <span className="text-white/30"> · by {r.organizerName}</span> : null}</td>
+                        <td className="px-2 text-muted-foreground">{r.ticket}</td>
+                        <td className="px-2 text-muted-foreground text-xs">{[r.phone, r.email].filter(Boolean).join(" · ") || "—"}</td>
+                        <td className="text-right px-2 tabular-nums">{r.qty}</td>
+                        <td className="text-right px-2 tabular-nums text-primary font-medium">{formatINR(Number(r.amount || 0))}</td>
+                        <td className="text-center pl-2">{r.checkedIn ? <CheckCircle className="h-4 w-4 text-emerald-400 inline" /> : <span className="text-white/20">—</span>}</td>
                       </tr>
                     ))}
                   </tbody>
-                  {perEvent.length > 1 && (
+                  {eventBookings.length > 1 && (
                     <tfoot className="border-t border-white/15 text-xs text-muted-foreground">
                       <tr>
-                        <td className="py-2 pr-4 font-semibold text-foreground">Total</td>
-                        <td className="text-right px-2 font-semibold text-foreground tabular-nums">
-                          {perEvent.reduce((s, r) => s + r.bookingCount, 0)}
-                        </td>
-                        <td className="text-right px-2 tabular-nums text-pink-300">
-                          {perEvent.reduce((s, r) => s + r.ticketWomen, 0) || "—"}
-                        </td>
-                        <td className="text-right px-2 tabular-nums text-blue-300">
-                          {perEvent.reduce((s, r) => s + r.ticketMen, 0) || "—"}
-                        </td>
-                        <td className="text-right px-2 tabular-nums text-purple-300">
-                          {perEvent.reduce((s, r) => s + r.ticketCouple, 0) || "—"}
-                        </td>
-                        <td className="text-right pl-2 tabular-nums text-primary font-semibold">
-                          {formatINR(perEvent.reduce((s, r) => s + r.revenue, 0))}
-                        </td>
+                        <td className="py-2 pr-4 font-semibold text-foreground" colSpan={4}>Total — {eventBookings.length} bookings</td>
+                        <td className="text-right px-2 font-semibold text-foreground tabular-nums">{eventBookings.reduce((s: number, r: any) => s + Number(r.qty || 0), 0)}</td>
+                        <td className="text-right px-2 tabular-nums text-primary font-semibold">{formatINR(eventBookings.reduce((s: number, r: any) => s + Number(r.amount || 0), 0))}</td>
+                        <td />
                       </tr>
                     </tfoot>
                   )}
@@ -3394,6 +3413,8 @@ interface Announcement {
   imageUrl: string;
   genre: string;
   eventType: string;
+  organizerName: string;
+  contactDetails: string;
   price: string;
   createdAt: string;
 }
@@ -3401,7 +3422,152 @@ interface Announcement {
 const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
 const ANN_EVENT_TYPES = [...ANNOUNCEMENT_CATEGORIES];
 
-const emptyAnnForm = { title: "", body: "", announceDate: "", announceTime: "", imageUrl: "", genre: "", eventType: "", price: "" };
+const emptyAnnForm = { organizerName: "", contactDetails: "", title: "", body: "", announceDate: "", announceTime: "", imageUrl: "", genre: "", eventType: "", price: "" };
+
+// ─── organizer events hosted at this venue (partner approves to go public) ──
+
+// View + fully edit a venue-linked organizer event from the partner dashboard.
+// Reuses the organizer's EventEditor (every field + ticket tiers) pointed at the
+// /partner/* endpoints, so the partner can edit exactly what the organizer added.
+function OrgEventEditModal({ eventId, vq, onClose, onSaved }: { eventId: number; vq: string; onClose: () => void; onSaved: () => void }) {
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto bg-black border-white/10 text-white">
+        <DialogHeader><DialogTitle>Event details</DialogTitle></DialogHeader>
+        <EventEditor
+          eventId={eventId}
+          api={partnerEventApi(vq)}
+          onDone={() => { onSaved(); onClose(); }}
+          onCancel={onClose}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface OrgEventRequest {
+  id: number; title: string; slug: string; coverImageUrl: string; category: string;
+  city: string; startDate: string | null; startTime: string; shortDescription: string;
+  venueApprovalStatus: string; venueRejectionReason: string; organizerName: string; organizerId: number;
+}
+
+function OrganizerEventRequestsPanel({ adminVendorId }: { adminVendorId?: number }) {
+  const { toast } = useToast();
+  const vq = adminVendorId ? `?vendorId=${adminVendorId}` : "";
+  const [items, setItems] = useState<OrgEventRequest[]>([]);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [viewId, setViewId] = useState<number | null>(null);
+  const load = () => apiGet<OrgEventRequest[]>(`/api/partner/organizer-events${vq}`).then(setItems).catch(() => {});
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  const decide = async (id: number, action: "approve" | "reject") => {
+    let rejectionReason = "";
+    if (action === "reject") rejectionReason = window.prompt("Reason for declining (optional):") ?? "";
+    setBusyId(id);
+    try {
+      await apiPatch(`/api/partner/organizer-events/${id}/${action}${vq}`, action === "reject" ? { rejectionReason } : {});
+      toast({ title: action === "approve" ? "Event approved — now live" : "Event declined" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Action failed", description: e?.message, variant: "destructive" });
+    } finally { setBusyId(null); }
+  };
+
+  if (items.length === 0) return null;
+  const pending = items.filter((i) => i.venueApprovalStatus === "pending");
+  const decided = items.filter((i) => i.venueApprovalStatus !== "pending");
+
+  const Row = ({ e }: { e: OrgEventRequest }) => (
+    <div className="rounded-xl border border-white/10 p-3 flex items-center gap-3">
+      <div className="h-14 w-20 rounded-lg overflow-hidden bg-white/5 shrink-0">
+        {e.coverImageUrl ? <img src={e.coverImageUrl} alt={e.title} className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center"><CalendarCheck className="h-5 w-5 text-white/30" /></div>}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-white truncate">{e.title}</p>
+        <p className="text-xs text-white/50 truncate">by {e.organizerName} · {e.category || "—"} · {e.startDate || "no date"}{e.startTime ? ` · ${e.startTime}` : ""}</p>
+        {e.venueApprovalStatus === "rejected" && e.venueRejectionReason && <p className="text-xs text-red-300/80 mt-0.5">Declined: {e.venueRejectionReason}</p>}
+      </div>
+      <div className="flex flex-col items-end gap-1.5 shrink-0">
+        <Button size="sm" variant="outline" onClick={() => setViewId(e.id)} className="h-8 border-white/15">
+          <Eye className="h-4 w-4 mr-1" /> View / Edit
+        </Button>
+        {e.venueApprovalStatus === "pending" ? (
+          <div className="flex gap-1.5">
+            <Button size="sm" disabled={busyId === e.id} onClick={() => decide(e.id, "approve")} className="h-8 bg-emerald-600 hover:bg-emerald-500 text-white">
+              {busyId === e.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4 mr-1" /> Approve</>}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={busyId === e.id} onClick={() => decide(e.id, "reject")} className="h-8 text-destructive hover:text-destructive">
+              <X className="h-4 w-4 mr-1" /> Decline
+            </Button>
+          </div>
+        ) : (
+          <span className={"text-xs font-semibold " + (e.venueApprovalStatus === "approved" ? "text-emerald-400" : "text-red-300/80")}>
+            {e.venueApprovalStatus === "approved" ? "Approved" : "Declined"}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="rounded-3xl glass-card-strong p-6 space-y-4">
+      <p className="font-serif text-xl flex items-center gap-2">
+        <MapPin className="h-5 w-5 text-primary" /> Organizer event requests
+        {pending.length > 0 && <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-primary/20 text-primary">{pending.length} pending</span>}
+      </p>
+      <p className="text-sm text-muted-foreground -mt-2">Events that organizers want to host at your venue. Approve to make them public and list them on your venue page.</p>
+      <div className="space-y-2">
+        {pending.map((e) => <Row key={e.id} e={e} />)}
+        {decided.map((e) => <Row key={e.id} e={e} />)}
+      </div>
+      {viewId != null && (
+        <OrgEventEditModal eventId={viewId} vq={vq} onClose={() => setViewId(null)} onSaved={load} />
+      )}
+    </div>
+  );
+}
+
+// ─── bookings for organizer events hosted at this venue (read-only) ─────────
+interface HostedEventBooking {
+  id: number; date: string; quantity: number; amount: string; checkedIn: boolean;
+  personName: string; phone: string; eventTitle: string; startTime: string;
+  organizerName: string; ticketName: string; buyerName: string;
+}
+
+function HostedEventBookingsPanel({ adminVendorId }: { adminVendorId?: number }) {
+  const vq = adminVendorId ? `?vendorId=${adminVendorId}` : "";
+  const [items, setItems] = useState<HostedEventBooking[]>([]);
+  useEffect(() => {
+    apiGet<HostedEventBooking[]>(`/api/partner/hosted-event-bookings${vq}`).then(setItems).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (items.length === 0) return null;
+  const checkedIn = items.filter((b) => b.checkedIn).length;
+  return (
+    <div className="rounded-3xl glass-card-strong p-6 space-y-4">
+      <p className="font-serif text-xl flex items-center gap-2">
+        <TicketIcon className="h-5 w-5 text-primary" /> Hosted event bookings
+        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white/8 text-white/60">{checkedIn}/{items.length} checked in</span>
+      </p>
+      <p className="text-sm text-muted-foreground -mt-2">Tickets booked for organizer events hosted at your venue. Your managers can scan these at entry.</p>
+      <div className="space-y-2">
+        {items.map((b) => (
+          <div key={b.id} className="rounded-xl border border-white/10 p-3 flex items-center gap-3 text-sm">
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-white truncate">{b.eventTitle}<span className="text-white/40 font-normal">{b.ticketName ? ` · ${b.ticketName}` : ""}</span></p>
+              <p className="text-xs text-white/50 truncate">{b.personName || b.buyerName || "Guest"}{b.phone ? ` · ${b.phone}` : ""} · {b.quantity} {b.quantity === 1 ? "guest" : "guests"} · {b.date}{b.startTime ? ` · ${b.startTime}` : ""}</p>
+              {b.organizerName && <p className="text-[11px] text-white/40">by {b.organizerName}</p>}
+            </div>
+            <div className="text-right shrink-0">
+              <p className="font-medium">₹{Number(b.amount || 0).toLocaleString("en-IN")}</p>
+              <span className={"text-xs " + (b.checkedIn ? "text-emerald-400" : "text-white/40")}>{b.checkedIn ? "Checked in" : "Not arrived"}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function AnnouncementsPanel({ adminVendorId }: { adminVendorId?: number } = {}) {
   const { toast } = useToast();
@@ -3440,17 +3606,17 @@ export function AnnouncementsPanel({ adminVendorId }: { adminVendorId?: number }
     setEditing(a);
     setImageFile(null);
     setImagePreview(a.imageUrl || "");
-    setForm({ title: a.title, body: a.body, announceDate: a.announceDate, announceTime: a.announceTime, imageUrl: a.imageUrl, genre: a.genre ?? "", eventType: a.eventType ?? "", price: a.price != null && Number(a.price) > 0 ? String(a.price) : "" });
+    setForm({ organizerName: a.organizerName ?? "", contactDetails: a.contactDetails ?? "", title: a.title, body: a.body, announceDate: a.announceDate, announceTime: a.announceTime, imageUrl: a.imageUrl, genre: a.genre ?? "", eventType: a.eventType ?? "", price: a.price != null && Number(a.price) > 0 ? String(a.price) : "" });
   };
 
   const applyFile = (file: File) => {
     const allowed = ["image/jpeg", "image/png", "image/webp", "image/avif"];
-    if (!allowed.includes(file.type)) {
+    if (!allowed.includes(resolveImageMime(file))) {
       toast({ title: "Only JPG, PNG, WebP or AVIF images are allowed", variant: "destructive" });
       return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-      toast({ title: "Image must be under 8 MB", variant: "destructive" });
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Image must be under 5 MB", variant: "destructive" });
       return;
     }
     setImageFile(file);
@@ -3481,14 +3647,14 @@ export function AnnouncementsPanel({ adminVendorId }: { adminVendorId?: number }
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: resolveImageMime(file) || "application/octet-stream" }),
     });
     if (!res.ok) throw new Error("Could not get upload URL");
     const { uploadURL, objectPath } = await res.json();
     const putRes = await fetch(uploadURL, {
       method: "PUT",
       body: file,
-      headers: { "Content-Type": file.type || "application/octet-stream" },
+      headers: { "Content-Type": resolveImageMime(file) || "application/octet-stream" },
     });
     if (!putRes.ok) throw new Error("Image upload failed");
     return `/api/storage${objectPath}`;
@@ -3541,12 +3707,23 @@ export function AnnouncementsPanel({ adminVendorId }: { adminVendorId?: number }
   };
 
   return (
+    <div className="space-y-6">
+    <OrganizerEventRequestsPanel adminVendorId={adminVendorId} />
+    <HostedEventBookingsPanel adminVendorId={adminVendorId} />
     <div className="grid lg:grid-cols-2 gap-6">
       <div className="rounded-3xl glass-card-strong p-6 space-y-4">
         <p className="font-serif text-xl flex items-center gap-2">
           <Megaphone className="h-5 w-5 text-primary" />
           {editing ? "Edit announcement" : "New announcement"}
         </p>
+        <div>
+          <Label htmlFor="ann-organizer">Organizer Name</Label>
+          <Input id="ann-organizer" value={form.organizerName} onChange={(e) => setForm((f) => ({ ...f, organizerName: e.target.value }))} placeholder="e.g. Skyline Events" className="bg-black/40 border-white/10 mt-1" />
+        </div>
+        <div>
+          <Label htmlFor="ann-contact">Contact Details</Label>
+          <Input id="ann-contact" value={form.contactDetails} onChange={(e) => setForm((f) => ({ ...f, contactDetails: e.target.value }))} placeholder="e.g. +91 98765 43210 / events@skyline.com" className="bg-black/40 border-white/10 mt-1" />
+        </div>
         <div>
           <Label htmlFor="ann-title">Title</Label>
           <Input id="ann-title" value={form.title} onChange={(e) => { setForm((f) => ({ ...f, title: e.target.value })); annFormErrors.clearField("title"); }} aria-invalid={!!annFormErrors.fieldError("title")} placeholder="What's happening?" className={fieldClass("bg-black/40 border-white/10 mt-1", annFormErrors.fieldError("title"))} />
@@ -3636,7 +3813,7 @@ export function AnnouncementsPanel({ adminVendorId }: { adminVendorId?: number }
             >
               <ImageIcon className="h-6 w-6 text-muted-foreground" />
               <span className="text-xs text-muted-foreground text-center leading-snug">
-                Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB
+                Click or drag &amp; drop<br />JPG, PNG or WebP · max 5 MB
               </span>
               <input id="ann-img-input" type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={handleFileChange} />
             </label>
@@ -3734,6 +3911,7 @@ export function AnnouncementsPanel({ adminVendorId }: { adminVendorId?: number }
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
@@ -4984,7 +5162,155 @@ export function LeadsPanel({ adminVendorId }: { adminVendorId?: number } = {}) {
           </div>
         )}
       </div>
+      <TopEventsLeads adminVendorId={adminVendorId} />
       <LeadBookingTable bookings={bookings} />
+    </div>
+  );
+}
+
+// ── Top events leads ──────────────────────────────────────────────────────────
+// Shows partners the 20 best-selling ticketed events (most tickets sold) in
+// their state and across the country, plus each organizer's contact details so
+// they can pitch to host the next one. Two tabs: State / Country.
+interface TopEventLead {
+  eventId: number;
+  title: string;
+  slug: string;
+  coverImageUrl: string;
+  venueName: string;
+  city: string;
+  state: string;
+  country: string;
+  startDate: string | null;
+  organizerId: number;
+  organizerName: string;
+  organizerSlug: string;
+  organizerCity: string;
+  organizerState: string;
+  supportEmail: string;
+  supportPhone: string;
+  website: string;
+  instagram: string;
+  verified: boolean;
+  ticketsSold: number;
+}
+interface TopEventsResult {
+  state: string;
+  country: string;
+  stateEvents: TopEventLead[];
+  countryEvents: TopEventLead[];
+}
+
+function TopEventsLeads({ adminVendorId }: { adminVendorId?: number }) {
+  const vq = adminVendorId ? `?vendorId=${adminVendorId}` : "";
+  const [scope, setScope] = useState<"state" | "country">("state");
+  const { data, isLoading } = useQuery<TopEventsResult>({
+    queryKey: ["leads-top-events", adminVendorId ?? "me"],
+    queryFn: () => apiGet<TopEventsResult>(`/api/partner/leads/top-events${vq}`),
+  });
+
+  const events = scope === "state" ? data?.stateEvents ?? [] : data?.countryEvents ?? [];
+  const stateLabel = data?.state || "your state";
+  const countryLabel = data?.country || "your country";
+
+  return (
+    <div className="rounded-3xl glass-card-strong p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
+        <p className="font-serif text-xl flex items-center gap-2">
+          <Trophy className="h-5 w-5 text-yellow-400" /> Top 20 events
+        </p>
+        <div className="inline-flex rounded-full bg-black/40 border border-white/10 p-1 text-xs">
+          <button
+            onClick={() => setScope("state")}
+            className={`px-3 py-1 rounded-full transition ${scope === "state" ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            In {stateLabel}
+          </button>
+          <button
+            onClick={() => setScope("country")}
+            className={`px-3 py-1 rounded-full transition ${scope === "country" ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            In {countryLabel}
+          </button>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground mb-4">
+        Best-selling ticketed events ranked by tickets sold — reach out to the organizer to host the next one.
+      </p>
+
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : events.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No ranked events yet for {scope === "state" ? stateLabel : countryLabel}.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {events.map((e, i) => (
+            <div
+              key={e.eventId}
+              className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-3"
+            >
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <span className={`flex-shrink-0 w-7 text-center font-bold tabular-nums ${i < 3 ? "text-yellow-400" : "text-muted-foreground"}`}>
+                  #{i + 1}
+                </span>
+                {e.coverImageUrl ? (
+                  <img src={e.coverImageUrl} alt="" className="h-12 w-12 rounded-lg object-cover flex-shrink-0" />
+                ) : (
+                  <div className="h-12 w-12 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
+                    <TicketIcon className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{e.title}</p>
+                  <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    {[e.venueName, e.city, e.state].filter(Boolean).join(" · ") || "—"}
+                  </p>
+                  <p className="text-xs mt-0.5 flex items-center gap-1.5 flex-wrap">
+                    <span className="text-muted-foreground">by</span>
+                    <span className="font-medium">{e.organizerName}</span>
+                    {e.verified && <Check className="h-3 w-3 text-green-400" />}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-start sm:items-end gap-1 sm:pl-3 sm:border-l border-white/10">
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-green-400">
+                  <TicketIcon className="h-3.5 w-3.5" />
+                  {e.ticketsSold.toLocaleString()} sold
+                </span>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  {e.supportPhone && (
+                    <a href={`tel:${e.supportPhone}`} className="inline-flex items-center gap-1 hover:text-primary">
+                      <Phone className="h-3 w-3" /> {e.supportPhone}
+                    </a>
+                  )}
+                  {e.supportEmail && (
+                    <a href={`mailto:${e.supportEmail}`} className="inline-flex items-center gap-1 hover:text-primary">
+                      <Mail className="h-3 w-3" /> {e.supportEmail}
+                    </a>
+                  )}
+                  {e.instagram && (
+                    <a href={e.instagram.startsWith("http") ? e.instagram : `https://instagram.com/${e.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-primary">
+                      <ArrowUpRight className="h-3 w-3" /> Instagram
+                    </a>
+                  )}
+                  {e.website && (
+                    <a href={e.website.startsWith("http") ? e.website : `https://${e.website}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-primary">
+                      <Globe className="h-3 w-3" /> Website
+                    </a>
+                  )}
+                  {!e.supportPhone && !e.supportEmail && !e.instagram && !e.website && (
+                    <span>No contact details</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -5758,7 +6084,7 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
                   onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setImageFile(f); setForm((prev) => ({ ...prev, imageUrl: "" })); setImagePreview(URL.createObjectURL(f)); }}
                 >
                   <ImageIcon className="h-7 w-7 text-white/25" />
-                  <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
+                  <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 5 MB</span>
                   <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                     onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setImageFile(f); setForm((prev) => ({ ...prev, imageUrl: "" })); setImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                 </label>
@@ -6427,7 +6753,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                         onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setFeImageFile(f); setFeImagePreview(URL.createObjectURL(f)); }}
                       >
                         <ImageIcon className="h-7 w-7 text-white/25" />
-                        <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
+                        <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 5 MB</span>
                         <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                           onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setFeImageFile(f); setFeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                       </label>
@@ -6509,7 +6835,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                         onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setTicketImageFile(f); setTicketImagePreview(URL.createObjectURL(f)); }}
                       >
                         <ImageIcon className="h-7 w-7 text-white/25" />
-                        <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
+                        <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 5 MB</span>
                         <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                           onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setTicketImageFile(f); setTicketImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                       </label>
@@ -6614,7 +6940,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                         onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setCoverChargeImageFile(f); setCoverChargeImagePreview(URL.createObjectURL(f)); }}
                       >
                         <ImageIcon className="h-7 w-7 text-white/25" />
-                        <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
+                        <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 5 MB</span>
                         <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                           onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setCoverChargeImageFile(f); setCoverChargeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                       </label>
@@ -6781,7 +7107,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                             onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setEditImageFile(f); setEditImageUrl(""); setEditImagePreview(URL.createObjectURL(f)); }}
                           >
                             <ImageIcon className="h-7 w-7 text-white/25" />
-                            <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
+                            <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 5 MB</span>
                             <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
                               onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setEditImageFile(f); setEditImageUrl(""); setEditImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
                           </label>

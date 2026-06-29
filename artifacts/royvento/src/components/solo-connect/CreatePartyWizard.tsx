@@ -4,6 +4,7 @@ import { useCreateParty } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { LocationSelect } from "@/components/LocationSelect";
 import { uploadImage } from "@/lib/uploadImage";
+import { resolveImageMime } from "@workspace/validators";
 import {
   Camera,
   MapPin,
@@ -206,7 +207,7 @@ export function CreatePartyWizard({ city, onClose }: { city: string; onClose: ()
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
   async function handleFile(file: File) {
-    if (!PARTY_IMAGE_TYPES.includes(file.type)) {
+    if (!PARTY_IMAGE_TYPES.includes(resolveImageMime(file))) {
       toast({ title: "Only JPG, PNG or AVIF images are supported.", variant: "destructive" });
       return;
     }
@@ -236,7 +237,7 @@ export function CreatePartyWizard({ city, onClose }: { city: string; onClose: ()
     setGalleryUploading(true);
     try {
       for (const file of picked) {
-        if (!PARTY_IMAGE_TYPES.includes(file.type)) {
+        if (!PARTY_IMAGE_TYPES.includes(resolveImageMime(file))) {
           toast({ title: `Skipped "${file.name}" — only JPG, PNG or AVIF.`, variant: "destructive" });
           continue;
         }

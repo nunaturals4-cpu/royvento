@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { apiGet, apiPost, formatINR } from "@/lib/api";
+
+function loadRazorpay(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if ((window as any).Razorpay) { resolve(true); return; }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -530,6 +541,8 @@ function BookingDialog({
   const [qty, setQty] = useState(1);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [nameError, setNameError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [coupon, setCoupon] = useState("");
   const [useCoins, setUseCoins] = useState(false);
   const [coupons, setCoupons] = useState<{ code: string; discountType: string; discountValue: string }[]>([]);
@@ -539,7 +552,7 @@ function BookingDialog({
 
   useEffect(() => {
     if (!ticket) return;
-    setQty(1); setName(""); setPhone(""); setCoupon(""); setUseCoins(false); setConfirmation(null);
+    setQty(1); setName(""); setPhone(""); setNameError(""); setPhoneError(""); setCoupon(""); setUseCoins(false); setConfirmation(null);
     apiGet<{ code: string; discountType: string; discountValue: string }[]>(`/api/organizer-events/${slug}/coupons`).then(setCoupons).catch(() => setCoupons([]));
     apiGet<{ points: number }>("/api/users/me/discounts").then((d) => setPoints(d.points ?? 0)).catch(() => setPoints(0));
   }, [ticket, slug]);
@@ -569,20 +582,80 @@ function BookingDialog({
   const pointsApplied = useCoins ? Math.min(points, maxPoints) : 0;
   const pointsValue = pointsApplied * POINTS_RUPEE_RATE;
   const total = Math.max(0, subtotal - couponDiscount - pointsValue);
+  const baseFee = price > 0 && total > 0 ? Math.round(total * 3.5 / 100) : 0;
+  const grandTotal = total + baseFee;
+
+  const PHONE_RE = /^(\+91|91|0)?[6-9]\d{9}$/;
+
+  const [, setLocation] = useLocation();
 
   async function submit() {
     if (!ticket) return;
-    if (!name.trim()) { toast({ title: "Please enter your name", variant: "destructive" }); return; }
+    let valid = true;
+    if (!name.trim()) { setNameError("Name is required"); valid = false; } else setNameError("");
+    if (!phone.trim()) { setPhoneError("Phone number is required"); valid = false; }
+    else if (!PHONE_RE.test(phone.trim().replace(/\s/g, ""))) { setPhoneError("Enter a valid 10-digit Indian mobile number"); valid = false; }
+    else setPhoneError("");
+    if (!valid) return;
     setSubmitting(true);
+    let razorpayOpen = false;
     try {
-      const res = await apiPost<{ ticketCode: string; total: number; bookingId: number }>(`/api/organizer-events/${slug}/book`, {
+      const res = await apiPost<{
+        ticketCode: string; total: number; bookingId: number;
+        paymentPending?: boolean; razorpayOrderId?: string; razorpayKeyId?: string; amountPaise?: number;
+      }>(`/api/organizer-events/${slug}/book`, {
         ticketId: ticket.id, name: name.trim(), phone: phone.trim(), quantity: qty,
         couponCode: coupon.trim(), pointsToUse: pointsApplied,
       });
+
+      // Paid ticket — open Razorpay checkout
+      if (res.paymentPending && res.razorpayOrderId) {
+        const loaded = await loadRazorpay();
+        if (!loaded) {
+          toast({ title: "Payment error", description: "Could not load payment gateway. Please try again.", variant: "destructive" });
+          return;
+        }
+        razorpayOpen = true;
+        const rzp = new (window as any).Razorpay({
+          key: res.razorpayKeyId,
+          amount: res.amountPaise,
+          currency: "INR",
+          order_id: res.razorpayOrderId,
+          name: "Royvento",
+          description: `${qty}× ${ticket.name} — ${eventTitle}`,
+          prefill: { name: name.trim(), contact: phone.trim() },
+          theme: { color: "#e8291c" },
+          handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+            try {
+              await apiPost("/api/payments/razorpay/verify", {
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpaySignature: response.razorpay_signature,
+                bookingId: res.bookingId,
+              });
+              setConfirmation({ ticketCode: res.ticketCode, total: res.total, bookingId: res.bookingId });
+              onBooked();
+            } catch {
+              toast({ title: "Payment verification failed", description: "Contact support with your booking ID.", variant: "destructive" });
+            } finally {
+              setSubmitting(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              toast({ title: "Payment cancelled", description: "Your booking is on hold. Try again.", variant: "destructive" });
+              setSubmitting(false);
+            },
+          },
+        });
+        rzp.open();
+        return;
+      }
+
+      // Free / COD booking
       setConfirmation({ ticketCode: res.ticketCode, total: res.total, bookingId: res.bookingId });
       onBooked();
     } catch (e: any) {
-      // Not logged in → send to login and return here afterwards.
       if (e?.status === 401) {
         const next = encodeURIComponent(`/organizer-events/${slug}`);
         window.location.href = `/login?next=${next}`;
@@ -590,7 +663,7 @@ function BookingDialog({
       }
       toast({ title: "Booking failed", description: e?.message, variant: "destructive" });
     } finally {
-      setSubmitting(false);
+      if (!razorpayOpen) setSubmitting(false);
     }
   }
 
@@ -647,15 +720,29 @@ function BookingDialog({
                   <Label className="text-white/60 text-[11px] uppercase tracking-wider">Attendee name *</Label>
                   <div className="relative mt-1">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
-                    <Input className="pl-9 bg-white/[0.04] border-white/10 text-white focus-visible:border-primary/50" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name on the ticket" />
+                    <Input
+                      className={`pl-9 bg-white/[0.04] text-white focus-visible:border-primary/50 ${nameError ? "border-red-500/70" : "border-white/10"}`}
+                      value={name}
+                      onChange={(e) => { setName(e.target.value); if (e.target.value.trim()) setNameError(""); }}
+                      placeholder="Name on the ticket"
+                    />
                   </div>
+                  {nameError && <p className="text-red-400 text-[11px] mt-1 flex items-center gap-1"><span>⚠</span>{nameError}</p>}
                 </div>
                 <div>
-                  <Label className="text-white/60 text-[11px] uppercase tracking-wider">Phone</Label>
+                  <Label className="text-white/60 text-[11px] uppercase tracking-wider">Phone *</Label>
                   <div className="relative mt-1">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
-                    <Input className="pl-9 bg-white/[0.04] border-white/10 text-white focus-visible:border-primary/50" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91…" />
+                    <Input
+                      className={`pl-9 bg-white/[0.04] text-white focus-visible:border-primary/50 ${phoneError ? "border-red-500/70" : "border-white/10"}`}
+                      value={phone}
+                      onChange={(e) => { setPhone(e.target.value); if (e.target.value.trim()) setPhoneError(""); }}
+                      placeholder="+91 9999999999"
+                      type="tel"
+                      inputMode="numeric"
+                    />
                   </div>
+                  {phoneError && <p className="text-red-400 text-[11px] mt-1 flex items-center gap-1"><span>⚠</span>{phoneError}</p>}
                 </div>
               </div>
 
@@ -706,26 +793,47 @@ function BookingDialog({
 
               {/* Price breakdown */}
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 space-y-2 text-sm">
-                {savings > 0 && (
-                  <>
-                    <div className="flex justify-between text-white/50"><span>Subtotal</span><span>{formatINR(subtotal)}</span></div>
-                    {couponDiscount > 0 && <div className="flex justify-between text-emerald-400"><span className="flex items-center gap-1"><Tag className="h-3.5 w-3.5" />{matchedCoupon?.code}</span><span>−{formatINR(couponDiscount)}</span></div>}
-                    {pointsValue > 0 && <div className="flex justify-between text-amber-300"><span className="flex items-center gap-1">⬢ Coins ×{pointsApplied}</span><span>−{formatINR(pointsValue)}</span></div>}
-                    <div className="border-t border-white/10 pt-2" />
-                  </>
+                {/* Always show subtotal line for paid tickets */}
+                {price > 0 && (
+                  <div className="flex justify-between text-white/50">
+                    <span>{ticket?.name} × {qty}</span>
+                    <span>{formatINR(subtotal)}</span>
+                  </div>
                 )}
+                {couponDiscount > 0 && (
+                  <div className="flex justify-between text-emerald-400">
+                    <span className="flex items-center gap-1"><Tag className="h-3.5 w-3.5" />{matchedCoupon?.code}</span>
+                    <span>−{formatINR(couponDiscount)}</span>
+                  </div>
+                )}
+                {pointsValue > 0 && (
+                  <div className="flex justify-between text-amber-300">
+                    <span className="flex items-center gap-1">⬢ Coins ×{pointsApplied}</span>
+                    <span>−{formatINR(pointsValue)}</span>
+                  </div>
+                )}
+                {baseFee > 0 && (
+                  <div className="flex justify-between text-white/40">
+                    <span>Platform fee (3.5%)</span>
+                    <span>+{formatINR(baseFee)}</span>
+                  </div>
+                )}
+                {price > 0 && <div className="border-t border-white/10 pt-2" />}
                 <div className="flex items-center justify-between">
                   <span className="text-white/55">Total payable</span>
-                  <span className="font-serif text-3xl leading-none">{total > 0 ? formatINR(total) : "Free"}</span>
+                  <span className="font-serif text-3xl leading-none">{grandTotal > 0 ? formatINR(grandTotal) : "Free"}</span>
                 </div>
-                {savings > 0 && <p className="text-emerald-400/80 text-[11px] text-right">You save {formatINR(savings)}</p>}
+                {(couponDiscount + pointsValue) > 0 && (
+                  <p className="text-emerald-400/80 text-[11px] text-right">You save {formatINR(couponDiscount + pointsValue)}</p>
+                )}
               </div>
 
               <Button className="w-full bg-primary hover:bg-primary-hover text-white h-12 text-base shadow-[0_14px_40px_-10px_rgba(232,41,28,0.7)]" disabled={submitting} onClick={submit}>
-                {submitting ? <Spinner /> : <>Confirm booking <ShieldCheck className="h-4 w-4 ml-2" /></>}
+                {submitting ? <Spinner /> : grandTotal > 0 ? <>Pay & Book <ShieldCheck className="h-4 w-4 ml-2" /></> : <>Confirm booking <ShieldCheck className="h-4 w-4 ml-2" /></>}
               </Button>
               <p className="text-white/35 text-[11px] text-center flex items-center justify-center gap-1.5">
-                <CheckCircle2 className="h-3 w-3 text-emerald-400/70" /> Instant confirmation · QR e-ticket · pay at venue
+                <CheckCircle2 className="h-3 w-3 text-emerald-400/70" />
+                {grandTotal > 0 ? "Secure payment via Razorpay · QR e-ticket" : "Instant confirmation · QR e-ticket · pay at venue"}
               </p>
             </div>
           </div>

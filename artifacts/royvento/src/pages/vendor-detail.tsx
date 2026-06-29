@@ -87,6 +87,13 @@ interface Announcement {
   imageUrl: string;
 }
 
+// Approved organizer events the venue partner co-listed (hosted at this venue).
+interface HostedOrganizerEvent {
+  id: number; title: string; slug: string; category: string; shortDescription: string;
+  coverImageUrl: string; bannerUrl: string; city: string;
+  startDate: string | null; startTime: string; organizerName: string; organizerVerified: boolean;
+}
+
 interface DrinkPlanLineItem { name: string; qty: number; discountedPrice: number; }
 
 interface DrinkPlan {
@@ -152,6 +159,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
   const { data: allEvents = [] } = useListEvents();
   const [drinkPlans, setDrinkPlans] = useState<DrinkPlan[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [hostedEvents, setHostedEvents] = useState<HostedOrganizerEvent[]>([]);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
@@ -172,6 +180,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
     if (!id) return;
     apiGet<DrinkPlan[]>(`/api/vendors/${id}/drink-plans`).then(setDrinkPlans).catch(() => {});
     apiGet<Announcement[]>(`/api/vendors/${id}/announcements`).then(setAnnouncements).catch(() => {});
+    apiGet<HostedOrganizerEvent[]>(`/api/vendors/${id}/organizer-events`).then(setHostedEvents).catch(() => {});
   }, [id]);
 
   const lastTrackedVendorIdRef = useRef<number | null>(null);
@@ -654,6 +663,29 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                 </div>
               </section>
             )}
+
+            {hostedEvents.length > 0 && (
+              <section>
+                <h2 className="font-serif text-2xl mb-5">Events hosted here</h2>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {hostedEvents.map((e) => (
+                    <Link key={e.id} href={`/organizer-events/${e.slug}`} className="group rounded-2xl overflow-hidden border border-border bg-card hover:border-primary/40 transition-colors">
+                      <div className="aspect-video bg-muted overflow-hidden">
+                        {(e.coverImageUrl || e.bannerUrl)
+                          ? <img src={e.coverImageUrl || e.bannerUrl} alt={e.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          : <div className="h-full w-full flex items-center justify-center"><Ticket className="h-8 w-8 text-muted-foreground/40" /></div>}
+                      </div>
+                      <div className="p-4 space-y-1">
+                        <p className="font-semibold line-clamp-1">{e.title}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-1">by {e.organizerName}{e.category ? ` · ${e.category}` : ""}</p>
+                        <p className="text-xs text-primary">{e.startDate || "Date TBA"}{e.startTime ? ` · ${e.startTime}` : ""}</p>
+                        <span className="inline-flex items-center gap-1 text-sm font-medium text-primary pt-1">Book tickets →</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
 
@@ -888,7 +920,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                         }}
                       />
                     </label>
-                    <span className="text-xs text-muted-foreground">{reviewImages.length}/5 · JPEG/PNG/WebP/GIF · max 8 MB each</span>
+                    <span className="text-xs text-muted-foreground">{reviewImages.length}/5 · JPEG/PNG/WebP/GIF · max 5 MB each</span>
                   </div>
                 </div>
                 <Button

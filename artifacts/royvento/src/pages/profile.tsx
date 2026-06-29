@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { pubDetailSlug } from "@/lib/seo-slug";
-import { getIndianPhoneError, normalizeIndianPhone, isAllowedImageMime, ALLOWED_IMAGE_MIME } from "@workspace/validators";
+import { getIndianPhoneError, normalizeIndianPhone, isAllowedImageMime, resolveImageMime, ALLOWED_IMAGE_MIME } from "@workspace/validators";
 import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,7 +88,7 @@ export function Profile() {
   const handleProfileFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (!isAllowedImageMime(f.type)) {
+    if (!isAllowedImageMime(resolveImageMime(f))) {
       toast({
         title: "Unsupported image type",
         description: `Please upload a ${ALLOWED_IMAGE_MIME.map((m) => m.replace("image/", "").toUpperCase()).join(", ")} image.`,

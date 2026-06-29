@@ -15,6 +15,7 @@ import {
   gameProfileViewsTable,
   bookingsTable,
   usersTable,
+  vendorRequestsTable,
   pointsLedgerTable,
 } from "@workspace/db";
 import type { GameManagerPermissions, GamePackageItem, GamePackageAddon } from "@workspace/db";
@@ -1384,10 +1385,14 @@ router.delete("/admin/game-organizers/:id", requireAuth(["admin"]), async (req, 
     await tx.delete(gameSettlementsTable).where(eq(gameSettlementsTable.gameOrganizerId, id));
     await tx.delete(gameProfileViewsTable).where(eq(gameProfileViewsTable.gameOrganizerId, id));
     await tx.delete(gameOrganizersTable).where(eq(gameOrganizersTable.id, id));
+    // Demote back to a regular user and wipe prior partner applications so the
+    // become-vendor form treats them as fresh — a stale "approved" request
+    // otherwise shows "You're already a partner!" and blocks re-applying.
     if (org.userId) {
       await tx.update(usersTable)
         .set({ role: "user" })
         .where(and(eq(usersTable.id, org.userId), eq(usersTable.role, "game_organizer")));
+      await tx.delete(vendorRequestsTable).where(eq(vendorRequestsTable.userId, org.userId));
     }
   });
 

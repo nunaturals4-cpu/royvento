@@ -714,6 +714,33 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "rejection_reason" text NOT NULL DEFAULT ''`);
     // Approve all existing announcements so they stay visible after deploy
     await db.execute(sql`UPDATE "announcements" SET "approval_status" = 'approved' WHERE "approval_status" = 'pending'`);
+    // Organizer name + contact details shown on the announcement.
+    await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "organizer_name" varchar(255) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "contact_details" varchar(255) NOT NULL DEFAULT ''`);
+    // ── vendor_requests.phone (partner application contact number) ──────────
+    // Collected on the Become a Partner form; seeds the new partner profile's
+    // contact phone on approval. Idempotent; mirrors lib/db/src/schema/index.ts.
+    await db.execute(sql`ALTER TABLE "vendor_requests" ADD COLUMN IF NOT EXISTS "phone" varchar(50) NOT NULL DEFAULT ''`);
+    // Backfill the contact phone onto already-approved organizer / game-organizer
+    // profiles whose support_phone is still blank, using the latest application
+    // that carried a phone. Lets the dashboard Profile tab show the submitted
+    // number for partners approved before phone seeding existed. Idempotent.
+    await db.execute(sql`
+      UPDATE "organizers" o SET "support_phone" = vr."phone"
+      FROM (
+        SELECT DISTINCT ON ("user_id") "user_id", "phone"
+        FROM "vendor_requests" WHERE "phone" <> ''
+        ORDER BY "user_id", "created_at" DESC
+      ) vr
+      WHERE o."user_id" = vr."user_id" AND o."support_phone" = ''`);
+    await db.execute(sql`
+      UPDATE "game_organizers" o SET "support_phone" = vr."phone"
+      FROM (
+        SELECT DISTINCT ON ("user_id") "user_id", "phone"
+        FROM "vendor_requests" WHERE "phone" <> ''
+        ORDER BY "user_id", "created_at" DESC
+      ) vr
+      WHERE o."user_id" = vr."user_id" AND o."support_phone" = ''`);
     // ── Event Organizer vertical (separate from vendors/events) ─────────────
     // Idempotent so a fresh deploy ships the whole organizer ecosystem without
     // a drizzle-kit step. Mirrors lib/db/src/schema/index.ts.
@@ -836,6 +863,29 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "organizer_id" integer`);
     await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "organizer_event_id" integer`);
     await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "event_ticket_id" integer`);
+    // Host venue for venue-linked organizer bookings, so the hosting pub/club can
+    // see them in its dashboard. NULL for standalone organizer / pub bookings.
+    await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "host_vendor_id" integer`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "bookings_host_vendor_idx" ON "bookings" ("host_vendor_id")`);
+    // Backfill host_vendor_id from the event's host venue for organizer bookings
+    // made before this column existed, so the host venue's report shows them.
+    await db.execute(sql`
+      UPDATE "bookings" b SET "host_vendor_id" = e."venue_id"
+      FROM "organizer_events" e
+      WHERE b."organizer_event_id" = e."id" AND b."kind" = 'organizer'
+        AND b."host_vendor_id" IS NULL AND e."venue_id" IS NOT NULL`);
+    // Backfill the platform base fee (incl. GST) on organizer bookings created
+    // before base-fee pricing existed, so ticket "Amount due" / reports show the
+    // total. Idempotent: only rows still at base_fee=0 with a positive price at a
+    // fee-enabled host venue are touched (already-priced rows have base_fee>0).
+    await db.execute(sql`
+      UPDATE "bookings" b
+      SET "base_fee" = ROUND(b."final_price" * COALESCE(v."base_fee_percent", 3.5) / 100)
+      FROM "organizer_events" e
+      LEFT JOIN "vendors" v ON v."id" = e."venue_id"
+      WHERE b."organizer_event_id" = e."id" AND b."kind" = 'organizer'
+        AND b."base_fee" = 0 AND b."final_price" > 0
+        AND COALESCE(v."base_fee_enabled", true) = true`);
     await db.execute(sql`ALTER TABLE "bookings" ALTER COLUMN "event_id" DROP NOT NULL`);
     await db.execute(sql`ALTER TABLE "bookings" ALTER COLUMN "vendor_id" DROP NOT NULL`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "bookings_organizer_idx" ON "bookings" ("organizer_id")`);
@@ -847,6 +897,14 @@ async function applyPendingSchemaChanges() {
     // Per-event commission + gateway fee (Phase C admin-set).
     await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "commission_pct" numeric(5,2) NOT NULL DEFAULT '8'`);
     await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "gateway_fee_percent" numeric(5,2) NOT NULL DEFAULT '2'`);
+    // ── Organizer event → host venue link (pub/club/bar/lounge) ─────────────
+    // venue_id points at the host vendor; that venue's partner approves the
+    // event (venue_approval_status) before it goes public. Idempotent.
+    await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "country" varchar(100) NOT NULL DEFAULT 'India'`);
+    await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "venue_id" integer`);
+    await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "venue_approval_status" varchar(20) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "venue_rejection_reason" text NOT NULL DEFAULT ''`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "organizer_events_venue_idx" ON "organizer_events" ("venue_id")`);
     // ── Phase 2B: Event Managers (mirror vendor_managers) ───────────────────
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS "organizer_managers" (

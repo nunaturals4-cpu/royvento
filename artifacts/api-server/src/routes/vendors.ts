@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, vendorsTable, usersTable, eventsTable, drinkPlansTable } from "@workspace/db";
+import { db, vendorsTable, usersTable, eventsTable, drinkPlansTable, organizerEventsTable } from "@workspace/db";
 import { eq, desc, and, ilike, inArray, or, sql } from "drizzle-orm";
 
 /** Returns today's date in IST (Asia/Kolkata) as "YYYY-MM-DD". */
@@ -284,6 +284,13 @@ router.post("/vendors/me", requireAuth(), async (req, res) => {
     respondInvalid(res, parsed.error);
     return;
   }
+  // City + state are mandatory so the venue is never invisible on
+  // city/state-filtered listings. Enforced here rather than in the generated
+  // request schema to avoid an openapi/orval round-trip.
+  if (!(parsed.data.state ?? "").trim() || !(parsed.data.city ?? "").trim()) {
+    res.status(400).json({ error: "City and state are required" });
+    return;
+  }
   const existing = await db
     .select()
     .from(vendorsTable)
@@ -337,6 +344,15 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
     respondInvalid(res, parsed.error);
     return;
   }
+  // Don't let an edit blank out city/state — that would silently drop the venue
+  // from city/state-filtered listings.
+  if (
+    (parsed.data.state !== undefined && !parsed.data.state.trim()) ||
+    (parsed.data.city !== undefined && !parsed.data.city.trim())
+  ) {
+    res.status(400).json({ error: "City and state cannot be empty" });
+    return;
+  }
   const updates: Record<string, unknown> = {};
   for (const k of [
     "businessName",
@@ -362,6 +378,11 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
   if (!v) {
     res.status(404).json({ error: "Vendor profile not found" });
     return;
+  }
+  // A venue rename must reflect everywhere — propagate to the denormalized copy
+  // on organizer events hosted at this venue.
+  if (updates["businessName"] !== undefined) {
+    await db.update(organizerEventsTable).set({ venueName: v.businessName }).where(eq(organizerEventsTable.venueId, v.id));
   }
   res.json(await serializeVendor(v));
 });

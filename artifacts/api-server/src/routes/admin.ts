@@ -906,6 +906,10 @@ router.patch("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
+  // Propagate a venue rename to the denormalized copy on hosted organizer events.
+  if (updates["businessName"] !== undefined) {
+    await db.update(organizerEventsTable).set({ venueName: v.businessName }).where(eq(organizerEventsTable.venueId, v.id));
+  }
   res.json({ ok: true, vendor: { id: v.id, businessName: v.businessName, status: v.status } });
 });
 
@@ -1223,6 +1227,12 @@ router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
   const title = (businessName ?? "").trim();
   if (!title) {
     res.status(400).json({ error: "Venue name is required" });
+    return;
+  }
+  // City + state are required so a venue can never end up invisible on
+  // city/state-filtered listings (which is how a venue silently "disappears").
+  if (!(state ?? "").trim() || !(city ?? "").trim()) {
+    res.status(400).json({ error: "City and state are required" });
     return;
   }
   const cat = (category ?? "Pub").trim() || "Pub";
@@ -1740,6 +1750,9 @@ router.patch("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
         menuUrls: menus,
         barMenuUrls: barMenus,
       }).where(eq(vendorsTable.id, id));
+
+      // Keep the denormalized venue name on hosted organizer events in sync.
+      await tx.update(organizerEventsTable).set({ venueName: title }).where(eq(organizerEventsTable.venueId, id));
 
       const [pub] = await tx
         .select({ id: eventsTable.id })

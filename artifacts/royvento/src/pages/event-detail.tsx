@@ -101,6 +101,14 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     queryFn: () => apiGet<any[]>(`/api/vendors/${vendorId}/offers`),
     enabled: (event as any)?.type === "pub" && !!vendorId,
   });
+  // Approved organizer events hosted at this venue — surfaced under the
+  // "Event Ticket" booking type so guests can book them from the venue page.
+  // Each links out to the organizer event's own booking flow.
+  const { data: hostedEvents = [] } = useQuery<any[]>({
+    queryKey: ["vendor-hosted-events", vendorId],
+    queryFn: () => apiGet<any[]>(`/api/vendors/${vendorId}/organizer-events`),
+    enabled: (event as any)?.type === "pub" && !!vendorId,
+  });
 
   const [date, setDate] = useState(() =>
     new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
@@ -147,6 +155,26 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const [occasion, setOccasion] = useState("");
   const [arrivalTime, setArrivalTime] = useState("");
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState("");
+  // Hosted organizer event picked under the "Event Ticket" type. Booking can be
+  // completed inline (via the organizer book endpoint) using the chosen tier.
+  const [selectedHostedEventId, setSelectedHostedEventId] = useState("");
+  const [selectedHostedTicketId, setSelectedHostedTicketId] = useState("");
+  // Ticket tiers for the selected hosted event (organizer events use tiers, not
+  // the pub W/M/C model).
+  const hostedSlug = (hostedEvents as any[]).find((e) => String(e.id) === selectedHostedEventId)?.slug as string | undefined;
+  const { data: hostedDetail } = useQuery<{ tickets: any[] } | null>({
+    queryKey: ["hosted-event-detail", hostedSlug],
+    queryFn: () => hostedSlug ? apiGet<{ tickets: any[] }>(`/api/organizer-events/${hostedSlug}`) : Promise.resolve(null),
+    enabled: !!hostedSlug,
+  });
+  const hostedTickets: any[] = hostedDetail?.tickets ?? [];
+  // Default the tier to the first active one when an event's tickets load.
+  useEffect(() => {
+    if (hostedTickets.length > 0 && !hostedTickets.some((tk) => String(tk.id) === selectedHostedTicketId)) {
+      setSelectedHostedTicketId(String(hostedTickets[0].id));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hostedDetail]);
   const [pointsToUse, setPointsToUse] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("online");
   const [hoursExpanded, setHoursExpanded] = useState(false);
@@ -171,6 +199,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     setOccasion("");
     setArrivalTime("");
     setSelectedAnnouncementId("");
+    setSelectedHostedEventId("");
+    setSelectedHostedTicketId("");
     setFieldErrors({});
     setBookStep(1);
   };
@@ -505,10 +535,12 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     .filter((a: any) => a.announceDate)
     .sort((a: any, b: any) => new Date(a.announceDate).getTime() - new Date(b.announceDate).getTime());
 
-  // Event bookings price strictly off the announcement's per-person ticket
-  // price. A price of 0 / null means the event is free entry — the pub's
-  // standard cover and the per-gender free-entry rules do NOT apply here.
-  const eventBookingPerPerson = Number(selectedAnnouncement?.price ?? 0);
+  // Event bookings price off the announcement's per-person price, or — for a
+  // hosted organizer event — the chosen ticket tier's price. 0 = free entry.
+  const selectedHostedTicket = hostedTickets.find((tk) => String(tk.id) === selectedHostedTicketId);
+  const eventBookingPerPerson = selectedHostedEventId
+    ? Number(selectedHostedTicket?.price ?? 0)
+    : Number(selectedAnnouncement?.price ?? 0);
   let subtotal = 0;
   if (isPub && pubMode === "ticket") {
     const pw = isTierFree("women") ? 0 : effectiveWomen;
@@ -529,7 +561,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   // rules (or the legacy whole-day-free case).
   const _ticketsCount = ticketWomen + ticketMen + ticketCouple;
   const bookingIsFullyFree = isPub && (
-    (pubMode === "event_booking" && !!selectedAnnouncement && subtotal === 0) ||
+    (pubMode === "event_booking" && (!!selectedAnnouncement || !!selectedHostedEventId) && subtotal === 0) ||
     (pubMode !== "event_booking" && isFreeEntryDay) ||
     (ferDayActive && pubMode === "ticket" && _ticketsCount > 0 && subtotal === 0)
   );
@@ -644,7 +676,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       if (!eventType) errs.eventType = t("events.required_field");
       if (!budget) errs.budget = t("events.required_field");
     }
-    if (isPub && pubMode === "event_booking" && !selectedAnnouncementId) {
+    if (isPub && pubMode === "event_booking" && !selectedAnnouncementId && !selectedHostedEventId) {
       errs.selectedPubEvent = "Please select an event to book";
     }
     if (isPub && pubMode === "cover_charge" && !coverChargePlanId) {
@@ -655,7 +687,10 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       toast({ title: t("events.required_field"), description: Object.values(errs)[0], variant: "destructive" });
       return;
     }
-    if (isSelectedDateBlocked) {
+    // Venue date restrictions (blocked dates / closed days) gate the venue's own
+    // table/ticket bookings — they don't apply to a hosted organizer event, which
+    // runs on the event's own date.
+    if (isSelectedDateBlocked && !selectedHostedEventId) {
       toast({ title: "Date not available", description: `${venueName} has blocked this date. Please select another date.`, variant: "destructive" });
       return;
     }
@@ -663,7 +698,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       toast({ title: "Date mismatch", description: "Selected booking date does not match the chosen event date. Please select the event date to continue.", variant: "destructive" });
       return;
     }
-    if (isClosedDay) {
+    if (isClosedDay && !selectedHostedEventId) {
       toast({ title: t("events.venue_closed", { venue: venueName, day: selectedDayName }), description: t("events.pick_open_day"), variant: "destructive" });
       return;
     }
@@ -673,6 +708,32 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     }
     if (isPub && !confirmedAge) {
       toast({ title: "Please confirm you are 18+ to continue.", variant: "destructive" });
+      return;
+    }
+    // Hosted organizer event → book via the organizer endpoint (ticket tiers,
+    // COD / instant-confirm). The booking still shows in My Bookings with a QR,
+    // and the host venue + organizer both see it on their dashboards.
+    if (isPub && pubMode === "event_booking" && selectedHostedEventId) {
+      if (!hostedSlug || !selectedHostedTicketId) {
+        toast({ title: "Please select a ticket", variant: "destructive" });
+        return;
+      }
+      setBooking(true);
+      try {
+        await apiPost(`/api/organizer-events/${hostedSlug}/book`, {
+          ticketId: Number(selectedHostedTicketId),
+          name: personName,
+          phone,
+          quantity: Math.max(1, guests),
+          couponCode: !bookingIsFullyFree && couponState?.valid ? couponState.code : "",
+        });
+        toast({ title: t("events.booking_confirmed"), description: t("events.booking_confirmed_desc") });
+        setLocation("/dashboard/bookings");
+      } catch (e: any) {
+        toast({ title: t("events.booking_failed"), description: e?.message ?? "Try again.", variant: "destructive" });
+      } finally {
+        setBooking(false);
+      }
       return;
     }
     setBooking(true);
@@ -783,7 +844,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       if (!date) { toast({ title: t("events.select_date"), variant: "destructive" }); return false; }
       const errs: Record<string, string> = {};
       if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) errs.ticketWomen = t("events.add_tickets");
-      if (isPub && pubMode === "event_booking" && !selectedAnnouncementId) errs.selectedPubEvent = "Please select an event to book";
+      if (isPub && pubMode === "event_booking" && !selectedAnnouncementId && !selectedHostedEventId) errs.selectedPubEvent = "Please select an event to book";
       if (isPub && pubMode === "cover_charge" && !coverChargePlanId) errs.coverChargePlanId = "Please select a cover charge package";
       if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && !arrivalTime) errs.arrivalTime = t("events.required_field");
       else if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && arrivalTime && date) {
@@ -795,9 +856,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       }
       setFieldErrors(errs);
       if (Object.keys(errs).length > 0) { toast({ title: t("events.required_field"), description: Object.values(errs)[0], variant: "destructive" }); return false; }
-      if (isSelectedDateBlocked) { toast({ title: "Date not available", description: `${venueName} has blocked this date. Please select another date.`, variant: "destructive" }); return false; }
+      if (isSelectedDateBlocked && !selectedHostedEventId) { toast({ title: "Date not available", description: `${venueName} has blocked this date. Please select another date.`, variant: "destructive" }); return false; }
       if (eventDateMismatch) { toast({ title: "Date mismatch", description: "Selected booking date does not match the chosen event date. Please select the event date to continue.", variant: "destructive" }); return false; }
-      if (isClosedDay) { toast({ title: t("events.venue_closed", { venue: venueName, day: selectedDayName }), description: t("events.pick_open_day"), variant: "destructive" }); return false; }
+      if (isClosedDay && !selectedHostedEventId) { toast({ title: t("events.venue_closed", { venue: venueName, day: selectedDayName }), description: t("events.pick_open_day"), variant: "destructive" }); return false; }
       return true;
     }
     if (step === 2) {
@@ -1860,27 +1921,29 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                         <p className="text-xs text-muted-foreground leading-tight mt-0.5">Choose what you'd like to book</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-2">
                       {[
-                        { value: "ticket", label: "Ticket Booking", desc: "Book your entry tickets for the night", icon: Ticket, badge: null },
-                        { value: "event", label: (event as any)?.vendorCategory === "Club" ? "VIP Table Booking" : "Table Booking", desc: (event as any)?.vendorCategory === "Club" ? "Premium tables & bottle service" : "Reserve a table for your group", icon: Crown, badge: (event as any)?.freeEntryForTable ? "Free Entry" : null },
-                        ...(hasCoverCharges ? [{ value: "cover_charge", label: "Cover Charges", desc: "Pre-paid entry packages with included offers", icon: Ticket, badge: null }] : []),
-                        ...(sortedAnnouncements.length > 0 ? [{ value: "event_booking", label: "Event Ticket", desc: "Special events & party tickets", icon: CalIcon, badge: null }] : []),
+                        ...(hasCoverCharges ? [{ value: "cover_charge", label: "Cover Charges", desc: "Pre-paid entry packages", icon: Ticket, badge: null }] : []),
+                        { value: "ticket", label: "Ticket Booking", desc: "Entry tickets for the night", icon: Ticket, badge: null },
+                        { value: "event", label: (event as any)?.vendorCategory === "Club" ? "VIP Table" : "Table Booking", desc: (event as any)?.vendorCategory === "Club" ? "Premium tables & bottle service" : "Reserve a table for your group", icon: Crown, badge: (event as any)?.freeEntryForTable ? "Free Entry" : null },
+                        ...((sortedAnnouncements.length > 0 || hostedEvents.length > 0) ? [{ value: "event_booking", label: "Event Ticket", desc: "Special events & parties", icon: CalIcon, badge: null }] : []),
                       ].map((opt: any) => {
                         const active = pubMode === opt.value;
                         const Icon = opt.icon;
                         return (
                           <button key={opt.value} type="button" onClick={() => changePubMode(opt.value)}
-                            className={`group relative text-left rounded-2xl border p-4 transition-all duration-300 ${active ? "border-primary bg-primary/10 shadow-[0_0_28px_-10px_hsl(var(--primary))]" : "border-white/10 bg-black/20 hover:border-white/25 hover:bg-black/30"}`}>
-                            <span className={`absolute top-3.5 right-3.5 h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors ${active ? "border-primary" : "border-muted-foreground/40"}`}>
-                              {active && <span className="h-2 w-2 rounded-full bg-primary" />}
+                            className={`group relative text-left rounded-xl border p-3 flex items-center gap-2.5 transition-all duration-200 ${active ? "border-primary bg-primary/10 shadow-[0_0_20px_-10px_hsl(var(--primary))]" : "border-white/10 bg-black/20 hover:border-white/25 hover:bg-black/30"}`}>
+                            <span className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-all ${active ? "bg-gradient-to-br from-primary to-primary/70 text-primary-foreground" : "bg-white/[0.04] border border-white/10 text-muted-foreground group-hover:text-foreground"}`}>
+                              <Icon className="h-3.5 w-3.5" />
                             </span>
-                            <span className={`h-9 w-9 rounded-lg flex items-center justify-center mb-2.5 transition-all ${active ? "bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-[0_0_16px_-4px_hsl(var(--primary))]" : "bg-white/[0.04] border border-white/10 text-muted-foreground group-hover:text-foreground"}`}>
-                              <Icon className="h-4 w-4" />
+                            <div className="flex-1 min-w-0 pr-3">
+                              <p className={`font-semibold text-xs leading-tight ${active ? "text-foreground" : "text-foreground/90"}`}>{opt.label}</p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug line-clamp-1">{opt.desc}</p>
+                              {opt.badge && <span className="mt-1 inline-block text-[9px] uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full px-1.5 py-0.5">{opt.badge}</span>}
+                            </div>
+                            <span className={`h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${active ? "border-primary" : "border-muted-foreground/40"}`}>
+                              {active && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
                             </span>
-                            <p className={`font-semibold text-sm leading-tight ${active ? "text-foreground" : "text-foreground/90"}`}>{opt.label}</p>
-                            <p className="text-xs text-muted-foreground mt-1 leading-snug">{opt.desc}</p>
-                            {opt.badge && <span className="mt-2 inline-block text-[10px] uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full px-2 py-0.5">{opt.badge}</span>}
                           </button>
                         );
                       })}
@@ -1967,10 +2030,10 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       </div>
                     )}
                     {pubMode === "cover_charge" && (
-                      <div className="space-y-4 mt-2">
+                      <div className="space-y-3 mt-2">
                         <div>
-                          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2.5">Select Package <span className="text-primary normal-case">*</span></p>
-                          <div className={`grid grid-cols-1 gap-3 ${coverChargePlans.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Select Package <span className="text-primary normal-case">*</span></p>
+                          <div className="grid grid-cols-1 gap-2">
                             {coverChargePlans.map((p: any) => {
                               const active = String(p.id) === coverChargePlanId;
                               const offers = (p.lineItems ?? []).filter((it: any) => it.name);
@@ -1979,92 +2042,188 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                                   key={p.id}
                                   type="button"
                                   onClick={() => setCoverChargePlanId(String(p.id))}
-                                  className={`group relative overflow-hidden text-left rounded-2xl border p-4 transition-all duration-300 ${
+                                  className={`group relative text-left rounded-xl border p-3 flex items-center gap-3 transition-all duration-200 ${
                                     active
-                                      ? "border-primary bg-gradient-to-br from-primary/15 via-primary/5 to-transparent shadow-[0_0_30px_-10px_hsl(var(--primary))]"
+                                      ? "border-primary bg-primary/10 shadow-[0_0_20px_-10px_hsl(var(--primary))]"
                                       : "border-white/10 bg-black/20 hover:border-primary/40 hover:bg-black/30"
                                   }`}
                                 >
-                                  {/* Ambient corner glow */}
-                                  <span aria-hidden className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full blur-2xl transition-opacity duration-300 ${active ? "bg-primary/25 opacity-100" : "bg-primary/10 opacity-0 group-hover:opacity-100"}`} />
-                                  {/* Selection check */}
-                                  <span className={`absolute top-3 right-3 z-10 flex h-5 w-5 items-center justify-center rounded-full border transition-all ${active ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40 text-transparent group-hover:border-primary/50"}`}>
-                                    <Check className="h-3 w-3" />
+                                  <span className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-all ${active ? "bg-gradient-to-br from-primary to-primary/70 text-primary-foreground" : "bg-white/[0.04] border border-white/10 text-primary"}`}>
+                                    <Crown className="h-3.5 w-3.5" />
                                   </span>
-                                  <div className="relative flex items-center gap-2.5 mb-2.5 pr-6">
-                                    <span className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-all ${active ? "bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-[0_0_16px_-4px_hsl(var(--primary))]" : "bg-white/[0.04] border border-white/10 text-primary"}`}>
-                                      <Crown className="h-4 w-4" />
-                                    </span>
-                                    <p className="font-bold text-sm tracking-wide text-foreground uppercase truncate">{p.productName || "Package"}</p>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-xs text-foreground uppercase tracking-wide truncate">{p.productName || "Package"}</p>
+                                    {(p.peoplePerPackage ?? 0) > 0 && (
+                                      <p className="text-[11px] text-primary mt-0.5 flex items-center gap-1"><Users className="h-3 w-3 shrink-0" />{p.peoplePerPackage === 1 ? "For 1 person" : `For ${p.peoplePerPackage} people`}</p>
+                                    )}
+                                    {offers.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {offers.slice(0, 3).map((it: any, i: number) => (
+                                          <span key={i} className="inline-flex items-center rounded-full bg-white/[0.06] border border-white/10 px-2 py-0.5 text-[10px] text-white/70">{it.name}</span>
+                                        ))}
+                                        {offers.length > 3 && <span className="text-[10px] text-muted-foreground self-center">+{offers.length - 3}</span>}
+                                      </div>
+                                    )}
                                   </div>
-                                  {(p.peoplePerPackage ?? 0) > 0 && (
-                                    <div className="relative mb-2.5">
-                                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 border border-primary/30 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
-                                        <Users className="h-3 w-3" /> {p.peoplePerPackage === 1 ? "Made just for you 🎉" : `Bring your squad of ${p.peoplePerPackage} 🎉`}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {offers.length > 0 && (
-                                    <div className="relative flex flex-wrap gap-1.5 mb-3">
-                                      {offers.slice(0, 4).map((it: any, i: number) => (
-                                        <span key={i} className="inline-flex items-center rounded-full bg-white/[0.06] border border-white/10 px-2.5 py-0.5 text-[11px] font-medium text-white/75">{it.name}</span>
-                                      ))}
-                                      {offers.length > 4 && <span className="self-center text-[11px] text-muted-foreground">+{offers.length - 4} more</span>}
-                                    </div>
-                                  )}
-                                  {p.description && <p className="relative text-[11px] text-muted-foreground/70 italic line-clamp-1 mb-2.5">{p.description}</p>}
-                                  <div className="relative flex items-baseline gap-1.5">
-                                    <span className="font-serif text-2xl leading-none text-gradient-red">{formatINR(Number(p.price) / 100)}</span>
-                                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">/ package</span>
+                                  <div className="shrink-0 text-right">
+                                    <p className="font-bold text-sm text-foreground">{formatINR(Number(p.price) / 100)}</p>
+                                    <p className="text-[10px] text-muted-foreground">/ pkg</p>
                                   </div>
+                                  <span className={`h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${active ? "border-primary" : "border-muted-foreground/40"}`}>
+                                    {active && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                                  </span>
                                 </button>
                               );
                             })}
                           </div>
                           {fieldErrors.coverChargePlanId && <p className="text-xs text-destructive mt-1.5">{fieldErrors.coverChargePlanId}</p>}
                         </div>
-                        <div>
-                          <Label className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">Number of packages</Label>
-                          <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-black/40 p-1">
+                        <div className="flex items-center gap-3">
+                          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Qty</Label>
+                          <div className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-black/40 p-0.5">
                             <button type="button" aria-label="Decrease packages" onClick={() => setCoverChargeQty((n) => Math.max(1, n - 1))}
-                              className="h-9 w-9 rounded-lg flex items-center justify-center text-xl font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors select-none">−</button>
-                            <span className="w-12 text-center font-bold text-lg tabular-nums">{coverChargeQty}</span>
+                              className="h-7 w-7 rounded-md flex items-center justify-center text-base font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors select-none">−</button>
+                            <span className="w-8 text-center font-bold text-sm tabular-nums">{coverChargeQty}</span>
                             <button type="button" aria-label="Increase packages" onClick={() => setCoverChargeQty((n) => n + 1)}
-                              className="h-9 w-9 rounded-lg flex items-center justify-center text-xl font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors select-none">+</button>
+                              className="h-7 w-7 rounded-md flex items-center justify-center text-base font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors select-none">+</button>
                           </div>
                         </div>
                         {selectedCoverChargePlan && (
-                          <div className="rounded-2xl border border-primary/25 bg-gradient-to-r from-primary/10 to-transparent px-4 py-3.5 flex items-center justify-between gap-4">
+                          <div className="rounded-xl border border-primary/25 bg-primary/8 px-3 py-2.5 flex items-center justify-between gap-4">
                             <div className="min-w-0">
                               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total</p>
                               <p className="text-xs text-white/60 mt-0.5 truncate">
                                 {formatINR(Number(selectedCoverChargePlan.price) / 100)} × {Math.max(1, coverChargeQty)} {Math.max(1, coverChargeQty) === 1 ? "package" : "packages"}
-                                {(selectedCoverChargePlan.peoplePerPackage ?? 0) > 0 ? ` · gets your crew of ${selectedCoverChargePlan.peoplePerPackage * Math.max(1, coverChargeQty)} in` : ""}
                               </p>
                             </div>
-                            <span className="font-serif text-2xl leading-none text-gradient-red shrink-0">{formatINR((Number(selectedCoverChargePlan.price) / 100) * Math.max(1, coverChargeQty))}</span>
+                            <span className="font-bold text-base text-foreground shrink-0">{formatINR((Number(selectedCoverChargePlan.price) / 100) * Math.max(1, coverChargeQty))}</span>
                           </div>
                         )}
                       </div>
                     )}
                     {pubMode === "event_booking" && (
                       <div className="space-y-3 mt-2">
-                        <div>
-                          <Label className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">Select Event <span className="text-primary">*</span></Label>
-                          <Select value={selectedAnnouncementId || ""} onValueChange={(v) => { setSelectedAnnouncementId(v); const a = sortedAnnouncements.find((x: any) => String(x.id) === v); if (a?.announceDate) setDate(a.announceDate); }}>
-                            <SelectTrigger className="bg-black/40 border-white/10 h-11 rounded-xl w-full"><SelectValue placeholder="— choose an event —" /></SelectTrigger>
-                            <SelectContent>{sortedAnnouncements.map((a: any) => (<SelectItem key={a.id} value={String(a.id)}><span className="flex items-center gap-2.5">{a.imageUrl ? <img src={a.imageUrl} alt="" className="h-8 w-8 rounded-md object-cover shrink-0" /> : <span className="h-8 w-8 rounded-md bg-white/10 shrink-0" />}<span className="flex flex-col items-start"><span className="text-sm font-medium leading-tight">{a.title}</span><span className="text-xs text-muted-foreground leading-tight">{new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}{a.announceTime ? ` · ${a.announceTime}` : ""}</span></span></span></SelectItem>))}</SelectContent>
-                          </Select>
+                        <div className="flex items-center gap-2">
+                          <span className="h-6 w-6 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
+                            <CalIcon className="h-3.5 w-3.5 text-primary" />
+                          </span>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ticketed events at this venue</p>
                         </div>
-                        <div>
-                          <Label htmlFor="ev-guests" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.guests_field")}</Label>
-                          <Input id="ev-guests" type="number" min={1} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 h-11 rounded-xl" />
+                        <div className="grid sm:grid-cols-2 gap-2.5">
+                          {sortedAnnouncements.map((a: any) => {
+                            const selected = selectedAnnouncementId === String(a.id);
+                            return (
+                              <div
+                                key={`ann-${a.id}`}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => {
+                                  if (selected) {
+                                    setSelectedAnnouncementId("");
+                                  } else {
+                                    setSelectedAnnouncementId(String(a.id));
+                                    setSelectedHostedEventId("");
+                                    setSelectedHostedTicketId("");
+                                    if (a.announceDate) setDate(a.announceDate);
+                                  }
+                                }}
+                                className={`group cursor-pointer flex items-center gap-3 rounded-xl border p-3 transition-colors ${selected ? "border-primary bg-primary/10" : "border-white/10 bg-black/20 hover:border-primary/40"}`}
+                              >
+                                <div className="h-12 w-16 rounded-lg overflow-hidden bg-white/5 shrink-0 flex items-center justify-center">
+                                  {a.imageUrl ? <img src={a.imageUrl} alt={a.title} className="h-full w-full object-cover" /> : <CalIcon className="h-4 w-4 text-white/30" />}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium truncate">{a.title}</p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {a.vendorName}{a.announceDate ? ` · ${new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}
+                                    {a.announceTime ? ` · ${a.announceTime}` : ""}
+                                  </p>
+                                </div>
+                                <span className={`h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center ${selected ? "border-primary" : "border-muted-foreground/40"}`}>
+                                  {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          {(hostedEvents as any[]).map((e: any) => {
+                            const selected = selectedHostedEventId === String(e.id);
+                            return (
+                              <div
+                                key={`he-${e.id}`}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => {
+                                  if (selected) {
+                                    setSelectedHostedEventId("");
+                                    setSelectedHostedTicketId("");
+                                  } else {
+                                    setSelectedHostedEventId(String(e.id));
+                                    setSelectedHostedTicketId("");
+                                    setSelectedAnnouncementId("");
+                                    if (e.startDate) setDate(String(e.startDate).slice(0, 10));
+                                  }
+                                }}
+                                className={`group cursor-pointer flex items-center gap-3 rounded-xl border p-3 transition-colors ${selected ? "border-primary bg-primary/10" : "border-white/10 bg-black/20 hover:border-primary/40"}`}
+                              >
+                                <div className="h-12 w-16 rounded-lg overflow-hidden bg-white/5 shrink-0 flex items-center justify-center">
+                                  {(e.coverImageUrl || e.bannerUrl) ? <img src={e.coverImageUrl || e.bannerUrl} alt={e.title} className="h-full w-full object-cover" /> : <CalIcon className="h-4 w-4 text-white/30" />}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium truncate">{e.title}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{e.organizerName ? `by ${e.organizerName} · ` : ""}{e.startDate || "Date TBA"}{e.startTime ? ` · ${e.startTime}` : ""}</p>
+                                  <Link href={`/organizer-events/${e.slug}`} onClick={(ev) => ev.stopPropagation()} className="text-xs text-primary hover:underline">View details →</Link>
+                                </div>
+                                <span className={`h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center ${selected ? "border-primary" : "border-muted-foreground/40"}`}>
+                                  {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
-                        {selectedAnnouncement && (
-                          <div className="rounded-xl border border-primary/20 bg-primary/8 px-4 py-3 text-sm text-primary space-y-1">
-                            {selectedAnnouncement.announceTime && <p>Event time: {selectedAnnouncement.announceTime}</p>}
-                            <div className="flex items-center justify-between"><span>{formatINR(eventBookingPerPerson)} × {Math.max(1, guests)} {Math.max(1, guests) === 1 ? "guest" : "guests"}</span><span className="font-semibold">{formatINR(eventBookingPerPerson * Math.max(1, guests))}</span></div>
-                          </div>
+
+                        {selectedAnnouncementId && selectedAnnouncement && (
+                          <>
+                            <div>
+                              <Label htmlFor="ev-guests" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.guests_field")}</Label>
+                              <Input id="ev-guests" type="number" min={1} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 h-11 rounded-xl" />
+                            </div>
+                            <div className="rounded-xl border border-primary/20 bg-primary/8 px-4 py-3 text-sm text-primary space-y-1">
+                              {selectedAnnouncement.announceTime && <p>Event time: {selectedAnnouncement.announceTime}</p>}
+                              <div className="flex items-center justify-between"><span>{formatINR(eventBookingPerPerson)} × {Math.max(1, guests)} {Math.max(1, guests) === 1 ? "guest" : "guests"}</span><span className="font-semibold">{formatINR(eventBookingPerPerson * Math.max(1, guests))}</span></div>
+                            </div>
+                          </>
+                        )}
+
+                        {selectedHostedEventId && (
+                          hostedTickets.length > 0 ? (
+                            <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-3 space-y-3">
+                              <div>
+                                <Label className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">Select ticket</Label>
+                                <Select value={selectedHostedTicketId || ""} onValueChange={setSelectedHostedTicketId}>
+                                  <SelectTrigger className="bg-black/40 border-white/10 h-11 rounded-xl w-full"><SelectValue placeholder="Choose a ticket" /></SelectTrigger>
+                                  <SelectContent>
+                                    {hostedTickets.map((tk: any) => (
+                                      <SelectItem key={tk.id} value={String(tk.id)}>
+                                        {tk.name} — {Number(tk.price) > 0 ? formatINR(Number(tk.price)) : "Free"}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label htmlFor="he-guests" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.guests_field")}</Label>
+                                <Input id="he-guests" type="number" min={1} max={20} value={guests} onChange={(e) => setGuests(Math.max(1, Number(e.target.value) || 1))} className="bg-black/40 border-white/10 h-11 rounded-xl" />
+                              </div>
+                              {selectedHostedTicket && (
+                                <div className="rounded-lg border border-primary/20 bg-primary/8 px-4 py-3 text-sm text-primary flex items-center justify-between">
+                                  <span>{eventBookingPerPerson > 0 ? `${formatINR(eventBookingPerPerson)} × ${Math.max(1, guests)}` : "Free entry"}</span>
+                                  <span className="font-semibold">{eventBookingPerPerson > 0 ? formatINR(eventBookingPerPerson * Math.max(1, guests)) : "₹0"}</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">This event has no tickets available to book yet.</p>
+                          )
                         )}
                       </div>
                     )}

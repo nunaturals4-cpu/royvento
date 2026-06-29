@@ -346,7 +346,17 @@ export class ObjectStorageService {
     );
   }
 
-  async uploadBuffer(uuid: string, buffer: Buffer, contentType: string): Promise<void> {
+  async uploadBuffer(
+    uuid: string,
+    buffer: Buffer,
+    contentType: string,
+    opts?: { enhancedVersion?: number; originalUuid?: string },
+  ): Promise<void> {
+    const enhancedVersion = opts?.enhancedVersion ?? 0;
+    // The uuid of the untouched original this object was enhanced FROM. Lets the
+    // optimiser re-enhance from the pristine source after a pipeline change
+    // instead of stacking effects on an already-enhanced copy.
+    const originalUuid = opts?.originalUuid ?? "";
     if (this.s3) {
       await this.s3.client.send(
         new PutObjectCommand({
@@ -357,6 +367,8 @@ export class ObjectStorageService {
           // CacheControl baked into the object so any direct/CDN access
           // (not just the proxied /objects/ route) gets long-lived caching.
           CacheControl: "public, max-age=31536000, immutable",
+          // S3 lower-cases user metadata keys; read it back the same way.
+          Metadata: { enhancedversion: String(enhancedVersion), originaluuid: originalUuid },
         }),
       );
       return;
@@ -366,7 +378,10 @@ export class ObjectStorageService {
       const uploadsDir = path.join(this.localDir, "uploads");
       await mkdir(uploadsDir, { recursive: true });
       await writeFile(path.join(uploadsDir, uuid), buffer);
-      await writeFile(path.join(uploadsDir, `${uuid}.meta`), JSON.stringify({ contentType }));
+      await writeFile(
+        path.join(uploadsDir, `${uuid}.meta`),
+        JSON.stringify({ contentType, enhancedVersion, originalUuid }),
+      );
       return;
     }
 
@@ -376,6 +391,52 @@ export class ObjectStorageService {
     const bucket = objectStorageClient.bucket(bucketName);
     const file = bucket.file(objectName);
     await file.save(buffer, { contentType, resumable: false });
+  }
+
+  /**
+   * Read the lightweight sidecar metadata for an uploaded object: its
+   * content-type and the enhancement-pipeline version it was last processed
+   * with (0 / absent = never enhanced). Used by the "Optimise images" tool to
+   * skip images that already carry the current look. Best-effort — returns
+   * `enhancedVersion: 0` when no marker is available (e.g. GCS).
+   */
+  async getUploadInfo(
+    uuid: string,
+  ): Promise<{ contentType?: string; enhancedVersion: number; originalUuid: string }> {
+    if (this.s3) {
+      try {
+        const out = await this.s3.client.send(
+          new HeadObjectCommand({ Bucket: this.s3.bucket, Key: `uploads/${uuid}` }),
+        );
+        const raw = out.Metadata?.["enhancedversion"];
+        const v = raw != null ? Number(raw) : 0;
+        return {
+          contentType: out.ContentType,
+          enhancedVersion: Number.isFinite(v) ? v : 0,
+          originalUuid: out.Metadata?.["originaluuid"] ?? "",
+        };
+      } catch {
+        return { enhancedVersion: 0, originalUuid: "" };
+      }
+    }
+
+    if (this.localDir) {
+      try {
+        const meta = JSON.parse(
+          await readFile(path.join(this.localDir, "uploads", `${uuid}.meta`), "utf8"),
+        );
+        const v = Number(meta?.enhancedVersion);
+        return {
+          contentType: typeof meta?.contentType === "string" ? meta.contentType : undefined,
+          enhancedVersion: Number.isFinite(v) ? v : 0,
+          originalUuid: typeof meta?.originalUuid === "string" ? meta.originalUuid : "",
+        };
+      } catch {
+        return { enhancedVersion: 0, originalUuid: "" };
+      }
+    }
+
+    return { enhancedVersion: 0, originalUuid: "" };
   }
 
   normalizeObjectEntityPath(rawPath: string): string {

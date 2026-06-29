@@ -13,19 +13,11 @@ export interface SliderAnnouncement {
   eventId: number;
   vendorId: number;
   imageUrl?: string;
-  // When set (e.g. organizer events), the CTA links here instead of the
-  // default event/vendor URL derived from eventId/vendorId.
   href?: string;
 }
 
-const AUTOPLAY_MS = 5000;
+const AUTOPLAY_MS = 5500;
 
-/**
- * Auto-playing announcement slider. Admin-controlled featured announcements are
- * served by GET /api/announcements/slider (falls back to recent), so the same
- * "Announcement Slider rules" the admin sets in the panel drive whatever shows
- * here — used on the Events page.
- */
 export function AnnouncementSlider({ announcements }: { announcements: SliderAnnouncement[] }) {
   const { t } = useTranslation();
   const [current, setCurrent] = useState(0);
@@ -48,90 +40,152 @@ export function AnnouncementSlider({ announcements }: { announcements: SliderAnn
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [startTimer]);
 
-  // Keep the index valid if the list shrinks.
   useEffect(() => {
-    if (current > announcements.length - 1) setCurrent(0);
+    if (current >= announcements.length) setCurrent(0);
   }, [announcements.length, current]);
 
   const goTo = useCallback((idx: number) => { setCurrent(idx); startTimer(); }, [startTimer]);
-  const prev = useCallback(() => goTo((current - 1 + announcements.length) % announcements.length), [current, announcements.length, goTo]);
-  const next = useCallback(() => goTo((current + 1) % announcements.length), [current, announcements.length, goTo]);
+  const goPrev = useCallback(() => goTo((current - 1 + announcements.length) % announcements.length), [current, announcements.length, goTo]);
+  const goNext = useCallback(() => goTo((current + 1) % announcements.length), [current, announcements.length, goTo]);
 
-  if (announcements.length === 0) return null;
+  if (!announcements.length) return null;
   const a = announcements[current];
   if (!a) return null;
+
   const href = a.href ?? (a.eventId ? `/events/${a.eventId}?book=event&aid=${a.id}` : `/vendors/${a.vendorId}`);
 
   return (
     <div
-      className="relative overflow-hidden rounded-3xl border border-white/10 mb-8 bg-gradient-to-br from-zinc-900 via-[#131313] to-black shadow-[0_24px_70px_-24px_rgba(0,0,0,0.85)]"
+      className="relative overflow-hidden rounded-3xl mb-8 group"
+      style={{
+        minHeight: "clamp(400px, 48vw, 480px)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "0 24px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
+      }}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      {/* Soft themed accent glow — a radial gradient (no blur filter, so it
-          renders on every theme) for a premium, lit feel behind the poster. */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{ background: "radial-gradient(720px 340px at 6% 0%, rgba(var(--theme-glow-rgb),0.13), transparent 65%)" }}
-      />
-
-      <div className="relative flex flex-col md:flex-row items-stretch md:min-h-[340px]">
-        {a.imageUrl && (
-          // The FULL uploaded poster, framed & lifted — object-contain so it's
-          // never cropped, centered on the gradient (no black bars, no duplicate
-          // backdrop). A ring + drop-shadow make it read like a premium poster.
-          <div className="relative w-full md:w-[44%] lg:w-[40%] shrink-0 flex items-center justify-center p-5 md:p-7">
-            <img
-              src={a.imageUrl}
-              alt={a.title}
-              className="max-h-72 md:max-h-[320px] w-auto max-w-full rounded-xl object-contain ring-1 ring-white/10 shadow-[0_16px_50px_-12px_rgba(0,0,0,0.9)]"
-            />
-          </div>
+      {/* Background image — keyed so it fades when slide changes */}
+      <div key={a.id} className="absolute inset-0 animate-fadeIn">
+        {a.imageUrl ? (
+          <img
+            src={a.imageUrl}
+            alt={a.title}
+            className="h-full w-full object-cover object-center"
+          />
+        ) : (
+          <div className="h-full w-full bg-gradient-to-br from-zinc-900 via-zinc-950 to-black" />
         )}
-        <div className="flex flex-col justify-center gap-3.5 p-6 md:p-8 md:pl-2 flex-1">
-          <span className="inline-flex items-center gap-1.5 self-start rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
-            <Megaphone className="h-3 w-3" />{a.vendorName}
+      </div>
+
+      {/* Cinematic gradient overlays */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/10 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/20 to-transparent pointer-events-none" />
+      <div className="absolute top-0 inset-x-0 h-20 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
+
+      {/* Content */}
+      <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-9">
+        <div className="max-w-2xl space-y-3">
+
+          {/* Venue badge */}
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-black/50 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+            <Megaphone className="h-2.5 w-2.5 shrink-0" />
+            {a.vendorName}
           </span>
-          <h2 className="font-serif text-2xl md:text-4xl tracking-tight text-white leading-[1.1]">{a.title}</h2>
-          {a.body && <p className="text-sm md:text-[15px] text-white/60 leading-relaxed line-clamp-3 max-w-xl">{a.body}</p>}
+
+          {/* Title */}
+          <h2
+            className="font-serif text-2xl md:text-[2.1rem] tracking-tight text-white leading-snug"
+            style={{ textShadow: "0 2px 24px rgba(0,0,0,0.8)" }}
+          >
+            {a.title}
+          </h2>
+
+          {/* Body */}
+          {a.body && (
+            <p className="text-sm md:text-base text-white/65 leading-relaxed line-clamp-2 max-w-lg">
+              {a.body}
+            </p>
+          )}
+
+          {/* Date & time */}
           {(a.announceDate || a.announceTime) && (
-            <div className="flex flex-wrap items-center gap-2.5 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
               {a.announceDate && (
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 text-white/75">
-                  <Calendar className="h-3.5 w-3.5 text-primary" />
-                  {new Date(a.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.07] backdrop-blur-sm px-3 py-1 text-xs font-medium text-white/80">
+                  <Calendar className="h-3.5 w-3.5 text-primary shrink-0" />
+                  {new Date(a.announceDate).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
                 </span>
               )}
               {a.announceTime && (
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 text-white/75">
-                  <Clock className="h-3.5 w-3.5 text-primary" />{a.announceTime}
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.07] backdrop-blur-sm px-3 py-1 text-xs font-medium text-white/80">
+                  <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+                  {a.announceTime}
                 </span>
               )}
             </div>
           )}
-          <Link
-            href={href}
-            className="mt-1 inline-flex items-center gap-2 self-start rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_8px_24px_-8px_rgba(var(--theme-glow-rgb),0.6)] transition-all hover:bg-primary-hover"
-          >
-            {t("pub_offers.book_now")} <ArrowRight className="h-4 w-4" />
-          </Link>
+
+          {/* CTA */}
+          <div className="pt-1">
+            <Link
+              href={href}
+              className="inline-flex items-center gap-2.5 rounded-xl bg-primary px-7 py-3 text-sm font-bold text-primary-foreground shadow-[0_8px_32px_-8px_rgba(var(--theme-glow-rgb),0.7)] transition-all duration-200 hover:brightness-110 hover:gap-3.5"
+            >
+              {t("pub_offers.book_now")}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
       </div>
+
+      {/* Navigation */}
       {announcements.length > 1 && (
         <>
-          <button onClick={prev} aria-label={t("pub_offers.prev_slide")} className="absolute left-3 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-black/60 border border-white/15 flex items-center justify-center hover:bg-black/80 transition-colors">
+          <button
+            onClick={goPrev}
+            aria-label={t("pub_offers.prev_slide")}
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-10 h-9 w-9 rounded-full border border-white/20 bg-black/50 backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/75"
+          >
             <ChevronLeft className="h-4 w-4 text-white" />
           </button>
-          <button onClick={next} aria-label={t("pub_offers.next_slide")} className="absolute right-3 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-black/60 border border-white/15 flex items-center justify-center hover:bg-black/80 transition-colors">
+          <button
+            onClick={goNext}
+            aria-label={t("pub_offers.next_slide")}
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 h-9 w-9 rounded-full border border-white/20 bg-black/50 backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/75"
+          >
             <ChevronRight className="h-4 w-4 text-white" />
           </button>
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+
+          {/* Dots */}
+          <div className="absolute bottom-5 right-6 flex items-center gap-1.5 z-10">
             {announcements.map((_, i) => (
-              <button key={i} onClick={() => goTo(i)} aria-label={`Go to slide ${i + 1}`} className={`rounded-full transition-all duration-300 ${i === current ? "w-5 h-1.5 bg-primary" : "w-1.5 h-1.5 bg-white/25 hover:bg-white/50"}`} />
+              <button
+                key={i}
+                onClick={() => goTo(i)}
+                className={`rounded-full transition-all duration-300 ${i === current ? "w-6 h-1.5 bg-primary" : "w-1.5 h-1.5 bg-white/30 hover:bg-white/60"}`}
+              />
             ))}
           </div>
+
+          {/* Progress bar */}
+          {!isPaused && (
+            <div className="absolute bottom-0 inset-x-0 h-[2px] bg-white/10">
+              <div
+                key={current}
+                className="h-full bg-primary origin-left"
+                style={{ animation: `slideProgress ${AUTOPLAY_MS}ms linear forwards` }}
+              />
+            </div>
+          )}
         </>
       )}
+
+      <style>{`
+        @keyframes slideProgress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fadeIn { animation: fadeIn 0.5s ease forwards; }
+      `}</style>
     </div>
   );
 }

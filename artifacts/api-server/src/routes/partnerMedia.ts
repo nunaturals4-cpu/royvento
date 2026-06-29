@@ -223,7 +223,25 @@ const ALLOWED_MENU_IMAGE_TYPES = new Set([
   "image/avif",
 ]);
 const ALLOWED_MENU_TYPES = ["application/pdf", ...ALLOWED_MENU_IMAGE_TYPES];
-const MAX_MENU_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB — same cap as managed proxy
+
+// Filename-extension fallback for clients that report an empty/`octet-stream`
+// content type (e.g. Windows browsers don't know the `.avif` MIME type).
+const MENU_EXT_TO_TYPE: Record<string, string> = {
+  pdf: "application/pdf",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  avif: "image/avif",
+};
+
+function resolveMenuType(name: string, contentType: string): string {
+  if (ALLOWED_MENU_TYPES.includes(contentType)) return contentType;
+  const ext = (name.split(".").pop() ?? "").toLowerCase();
+  return MENU_EXT_TO_TYPE[ext] ?? contentType;
+}
+const MAX_MENU_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB — same cap as managed proxy
 const MAX_MENU_BYTES = 20 * 1024 * 1024; // 20 MB — PDF cap
 
 const MenuUploadRequestBody = z.object({
@@ -239,7 +257,7 @@ const MenuUploadRequestBody = z.object({
  * Only accessible by authenticated vendors.
  *
  * - Image files (JPEG, PNG, WebP) are routed through the server-side proxy
- *   so they get compressed to WebP before storage.
+ *   and stored as-is (max 5 MB, no compression).
  * - PDF files receive a direct GCS presigned URL and are stored as-is.
  */
 router.post(
@@ -255,7 +273,8 @@ router.post(
     const parsed = MenuUploadRequestBody.safeParse(req.body);
     if (!parsed.success) return respondInvalid(res, parsed.error);
 
-    const { name, size, contentType } = parsed.data;
+    const { name, size } = parsed.data;
+    const contentType = resolveMenuType(name, parsed.data.contentType);
 
     if (!ALLOWED_MENU_TYPES.includes(contentType))
       return res
@@ -266,7 +285,7 @@ router.post(
     const maxBytes = isImage ? MAX_MENU_IMAGE_BYTES : MAX_MENU_BYTES;
     if (size > maxBytes)
       return res.status(400).json({
-        error: isImage ? "Image must be under 8 MB" : "Menu file must be under 20 MB",
+        error: isImage ? "Image must be under 5 MB" : "Menu file must be under 20 MB",
       });
 
     try {

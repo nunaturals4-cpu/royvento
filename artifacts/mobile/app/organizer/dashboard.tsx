@@ -549,16 +549,20 @@ function ScannerTab({ colors, insets }: { colors: Pal; insets: { bottom: number 
       <PrimaryBtn colors={colors} label="Verify ticket" onPress={() => lookup(code, false)} />
 
       {error && <Text style={{ color: colors.redLight, marginTop: 12 }}>{error}</Text>}
-      {result && (
-        <View style={[styles.rowCard, { backgroundColor: colors.card, borderColor: result.status === "ALREADY_CHECKED_IN" ? colors.red : "#16a34a", marginTop: 14 }]}>
-          <Text style={[styles.rowTitle, { color: colors.foreground }]}>{result.ticket.attendee}</Text>
-          <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{result.ticket.eventTitle} · {result.ticket.ticketType} ×{result.ticket.quantity}</Text>
-          <Text style={{ color: result.status === "ALREADY_CHECKED_IN" ? colors.redLight : "#4ade80", marginTop: 6, fontFamily: "Inter_600SemiBold" }}>
-            {result.status === "ALREADY_CHECKED_IN" ? "Already checked in" : result.status === "CHECKED_IN" ? "Checked in ✓" : "Valid ticket"}
-          </Text>
-          {result.status === "VALID" && <PrimaryBtn colors={colors} label="Confirm check-in" onPress={() => lookup(code || String(result.ticket.bookingId), true)} />}
-        </View>
-      )}
+      {result && (() => {
+        const ended = result.status === "EVENT_ENDED";
+        const already = result.status === "ALREADY_CHECKED_IN";
+        return (
+          <View style={[styles.rowCard, { backgroundColor: colors.card, borderColor: ended || already ? colors.red : "#16a34a", marginTop: 14 }]}>
+            <Text style={[styles.rowTitle, { color: colors.foreground }]}>{ended ? "Event has ended" : result.ticket.attendee}</Text>
+            <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{result.ticket.eventTitle}{ended ? "" : ` · ${result.ticket.ticketType} ×${result.ticket.quantity}`}</Text>
+            <Text style={{ color: ended || already ? colors.redLight : "#4ade80", marginTop: 6, fontFamily: "Inter_600SemiBold" }}>
+              {ended ? "Tickets can no longer be scanned." : already ? "Already checked in" : result.status === "CHECKED_IN" ? "Checked in ✓" : "Valid ticket"}
+            </Text>
+            {result.status === "VALID" && <PrimaryBtn colors={colors} label="Confirm check-in" onPress={() => lookup(code || String(result.ticket.bookingId), true)} />}
+          </View>
+        );
+      })()}
     </ScrollView>
   );
 }

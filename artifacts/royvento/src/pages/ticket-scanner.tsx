@@ -5,7 +5,7 @@ import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell, Camera, CameraOff, Zap, ZapOff, Plus, Minus, IndianRupee, Banknote, LogOut, Search, ClipboardList } from "lucide-react";
+import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell, Camera, CameraOff, Zap, ZapOff, Plus, Minus, IndianRupee, Banknote, LogOut, Search, ClipboardList, CalendarX2, Clock } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 import {
   useGetMe,
@@ -134,8 +134,26 @@ interface ScanError {
   message: string;
 }
 
-type ScanResult = ScanReady | ScanAlreadyFinalized | ScanFinalized | ScanError;
+// Organizer-event ticket scanned at the host venue. The /partner/scan-ticket
+// endpoint routes these to the shared organizer scan flow and returns this
+// simpler shape (status + ticket) instead of the pub booking shape.
+interface OrgTicketData {
+  bookingId: number; eventTitle: string; organizerName: string; ticketType: string;
+  attendee: string; quantity: number; date: string; time: string; venue: string;
+  checkedIn: boolean; checkedInAt: string | null;
+}
+interface ScanOrganizer {
+  code: "ORG_TICKET";
+  status: "VALID" | "ALREADY_CHECKED_IN" | "CHECKED_IN" | "EVENT_ENDED";
+  message: string;
+  ticket: OrgTicketData;
+}
 
+type ScanResult = ScanReady | ScanAlreadyFinalized | ScanFinalized | ScanError | ScanOrganizer;
+
+function isScanOrganizer(r: ScanResult): r is ScanOrganizer {
+  return r.code === "ORG_TICKET";
+}
 function isScanReady(r: ScanResult): r is ScanReady {
   return r.code === "READY";
 }
@@ -663,6 +681,9 @@ export function TicketScanner() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
+  // The exact code that produced the current result, so organizer-ticket
+  // check-in can re-post it even when scanned by camera (input stays empty).
+  const [lastCode, setLastCode] = useState("");
   const [scanMode, setScanMode] = useState<ScanMode>("camera");
   const { toast } = useToast();
   const { accessStatus, managedVendors } = useAccessCheck();
@@ -672,6 +693,7 @@ export function TicketScanner() {
     if (!code || loading) return;
     setLoading(true);
     setResult(null);
+    setLastCode(code);
     // Haptic feedback on scan start
     if ("vibrate" in navigator) navigator.vibrate(40);
     try {
@@ -687,6 +709,15 @@ export function TicketScanner() {
       });
       const json = (await res.json()) as Record<string, unknown>;
       if (res.ok) {
+        // Organizer-event ticket (hosted at this venue): server returns
+        // { status, message, ticket } instead of the pub booking shape.
+        const orgStatus = typeof json["status"] === "string" ? (json["status"] as string) : "";
+        const orgTicket = json["ticket"] as OrgTicketData | undefined;
+        if (orgStatus && orgTicket) {
+          setResult({ code: "ORG_TICKET", status: orgStatus as ScanOrganizer["status"], message: typeof json["message"] === "string" ? (json["message"] as string) : "", ticket: orgTicket });
+          if ("vibrate" in navigator) navigator.vibrate(orgStatus === "EVENT_ENDED" || orgStatus === "ALREADY_CHECKED_IN" ? [200, 60, 200] : [80, 40, 80]);
+          return;
+        }
         const lookupCode = typeof json["code"] === "string" ? (json["code"] as string) : "";
         const booking = json["booking"] as BookingData | undefined;
         const checkedInAt = typeof json["checkedInAt"] === "string" ? (json["checkedInAt"] as string) : null;
@@ -719,6 +750,32 @@ export function TicketScanner() {
       setResult(scanErr);
       if ("vibrate" in navigator) navigator.vibrate(300);
       toast({ title: "Scan failed", description: scanErr.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Confirm check-in for an organizer-event ticket (re-posts with confirm:true).
+  const confirmOrganizer = async () => {
+    if (loading || !lastCode) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/partner/scan-ticket", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: lastCode, confirm: true }),
+      });
+      const json = (await res.json()) as Record<string, unknown>;
+      const orgTicket = json["ticket"] as OrgTicketData | undefined;
+      const orgStatus = typeof json["status"] === "string" ? (json["status"] as string) : "";
+      if (res.ok && orgStatus && orgTicket) {
+        setResult({ code: "ORG_TICKET", status: orgStatus as ScanOrganizer["status"], message: typeof json["message"] === "string" ? (json["message"] as string) : "", ticket: orgTicket });
+        if (orgStatus === "CHECKED_IN") toast({ title: "Checked in ✓", description: orgTicket.attendee });
+      } else {
+        toast({ title: "Check-in failed", description: typeof json["message"] === "string" ? (json["message"] as string) : "Please try again.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Network error", description: "Check your connection.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -837,7 +894,15 @@ export function TicketScanner() {
       {result && (
         <div
           className={`mt-5 rounded-3xl overflow-hidden border ${
-            isScanFinalized(result)
+            isScanOrganizer(result)
+              ? (result.status === "CHECKED_IN"
+                  ? "border-green-500/50 bg-gradient-to-b from-green-950/60 to-green-950/30"
+                  : result.status === "VALID"
+                  ? "border-primary/40 bg-gradient-to-b from-primary/10 to-black/40"
+                  : result.status === "ALREADY_CHECKED_IN"
+                  ? "border-amber-500/50 bg-gradient-to-b from-amber-950/60 to-amber-950/30"
+                  : "border-red-500/40 bg-gradient-to-b from-red-950/60 to-red-950/30")
+              : isScanFinalized(result)
               ? "border-green-500/50 bg-gradient-to-b from-green-950/60 to-green-950/30"
               : isScanReady(result)
               ? "border-primary/40 bg-gradient-to-b from-primary/10 to-black/40"
@@ -847,7 +912,44 @@ export function TicketScanner() {
           }`}
           style={{ animation: "resultSlideIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both" }}
         >
-          {isScanReady(result) ? (
+          {isScanOrganizer(result) ? (
+            result.status === "EVENT_ENDED" ? (
+              <div className="p-6 flex flex-col items-center text-center">
+                <div className="h-16 w-16 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mb-3">
+                  <CalendarX2 className="h-8 w-8 text-red-400" />
+                </div>
+                <p className="text-red-200 font-bold text-xl">Event has ended</p>
+                <p className="text-muted-foreground text-sm mt-1 max-w-xs">This ticket is for <span className="text-foreground">{result.ticket.eventTitle || "an event"}</span> which is over. Tickets can no longer be scanned.</p>
+                <p className="text-muted-foreground text-xs mt-3">Booking #{result.ticket.bookingId} · {result.ticket.date}</p>
+                <button onClick={() => { setResult(null); setInput(""); }} className="mt-4 rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-xs text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors">Clear</button>
+              </div>
+            ) : (
+              <div className="p-5 space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className={`rounded-2xl p-3 shrink-0 border ${result.status === "CHECKED_IN" ? "bg-green-500/20 border-green-500/40" : result.status === "ALREADY_CHECKED_IN" ? "bg-amber-500/20 border-amber-500/40" : "bg-primary/20 border-primary/40"}`}>
+                    {result.status === "CHECKED_IN" ? <CheckCircle2 className="h-8 w-8 text-green-400" /> : result.status === "ALREADY_CHECKED_IN" ? <Clock className="h-8 w-8 text-amber-400" /> : <TicketIcon className="h-8 w-8 text-primary" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-foreground font-bold text-xl tracking-tight">{result.status === "CHECKED_IN" ? "Checked in" : result.status === "ALREADY_CHECKED_IN" ? "Already checked in" : "Valid ticket"}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{result.ticket.eventTitle}{result.ticket.organizerName ? ` · by ${result.ticket.organizerName}` : ""}</p>
+                  </div>
+                  <button onClick={() => { setResult(null); setInput(""); }} className="ml-auto shrink-0 rounded-xl border border-white/10 bg-black/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors">Next →</button>
+                </div>
+                <div className="h-px bg-white/10" />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div><p className="text-muted-foreground text-[11px] uppercase tracking-wider">Attendee</p><p className="text-foreground">{result.ticket.attendee || "—"}</p></div>
+                  <div><p className="text-muted-foreground text-[11px] uppercase tracking-wider">Ticket</p><p className="text-foreground">{result.ticket.ticketType}{result.ticket.quantity > 1 ? ` ×${result.ticket.quantity}` : ""}</p></div>
+                  <div><p className="text-muted-foreground text-[11px] uppercase tracking-wider">Date</p><p className="text-foreground">{result.ticket.date}{result.ticket.time ? ` · ${result.ticket.time}` : ""}</p></div>
+                  <div><p className="text-muted-foreground text-[11px] uppercase tracking-wider">Booking</p><p className="text-foreground">#{result.ticket.bookingId}</p></div>
+                </div>
+                {result.status === "VALID" && (
+                  <button disabled={loading} onClick={confirmOrganizer} className="w-full rounded-xl bg-green-600 hover:bg-green-500 text-white font-semibold py-3 flex items-center justify-center gap-2 disabled:opacity-60">
+                    <CheckCircle2 className="h-5 w-5" /> Confirm check-in
+                  </button>
+                )}
+              </div>
+            )
+          ) : isScanReady(result) ? (
             <div className="p-5 space-y-4">
               {/* Ready-to-finalize header — scan validated the ticket but
                   nothing has been written yet. Manager edits counts, then

@@ -55,6 +55,8 @@ const AnnouncementBody = z.object({
   imageUrl: z.string().optional().default(""),
   genre: z.string().optional().default(""),
   eventType: z.string().optional().default(""),
+  organizerName: z.string().max(255).optional().default(""),
+  contactDetails: z.string().max(255).optional().default(""),
   price: z.coerce.number().min(0).max(99999.99).optional().default(0),
 });
 
@@ -89,6 +91,8 @@ router.post("/partner/announcements", requireAuth(["vendor", "admin"]), async (r
       imageUrl: parsed.data.imageUrl,
       genre: parsed.data.genre,
       eventType: parsed.data.eventType,
+      organizerName: parsed.data.organizerName,
+      contactDetails: parsed.data.contactDetails,
       price: String(parsed.data.price ?? 0),
       approvalStatus: user.role === "admin" ? "approved" : "pending",
     })

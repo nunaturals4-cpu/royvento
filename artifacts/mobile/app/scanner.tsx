@@ -91,6 +91,14 @@ function bookingFerState(b: Pick<BookingData, "bookingDate" | "freeEntryRules">)
   };
 }
 
+// Organizer-event ticket scanned at the host venue. /partner/scan-ticket routes
+// these to the shared organizer scan flow and returns { status, message, ticket }.
+interface OrgTicket {
+  bookingId: number; eventTitle: string; organizerName: string; ticketType: string;
+  attendee: string; quantity: number; date: string; time: string; venue: string;
+  checkedIn: boolean; checkedInAt: string | null;
+}
+
 interface ScanResult {
   // READY            : lookup hit a valid, not-yet-finalized booking. The
   //                    actuals sheet is auto-opened so the manager can adjust
@@ -107,7 +115,14 @@ interface ScanResult {
     | "already_finalized"
     | "ready_to_check_out"
     | "checked_out"
-    | "already_checked_out";
+    | "already_checked_out"
+    // Organizer-event ticket statuses (present alongside `ticket`):
+    | "VALID"
+    | "ALREADY_CHECKED_IN"
+    | "CHECKED_IN"
+    | "EVENT_ENDED";
+  // Present only for organizer-event tickets hosted at this venue.
+  ticket?: OrgTicket;
   checkedOutAt?: string | null;
   justCheckedOut?: boolean;
   // True only when this exact Save Actual Entry request burned the ticket.
@@ -144,6 +159,9 @@ export default function ScannerScreen() {
   }, [result?.code, result?.booking?.id]);
   const [torchOn, setTorchOn] = useState(false);
   const scanLock = useRef(false);
+  // Last code that produced a result, so an organizer-ticket check-in can re-post
+  // it even when scanned by camera (no manual input).
+  const lastCodeRef = useRef("");
   const manualInputRef = useRef<TextInput>(null);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -153,6 +171,7 @@ export default function ScannerScreen() {
     const trimmed = code.trim();
     if (!trimmed) return;
     scanLock.current = true;
+    lastCodeRef.current = trimmed;
     setLoading(true);
     setResult(null);
     try {
@@ -184,6 +203,25 @@ export default function ScannerScreen() {
     setResult(null);
     setManualCode("");
     scanLock.current = false;
+  };
+
+  // Confirm check-in for an organizer-event ticket (re-posts with confirm:true).
+  const confirmOrganizer = async () => {
+    if (loading || !lastCodeRef.current) return;
+    setLoading(true);
+    try {
+      const res = await customFetch<ScanResult>("/api/partner/scan-ticket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: lastCodeRef.current, confirm: true }),
+      });
+      setResult(res);
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setResult({ code: "ERROR", message: err.message ?? "Check-in failed. Try again." });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Check-out flow (Task #581): re-POST to /partner/checkout-ticket with
@@ -354,8 +392,75 @@ export default function ScannerScreen() {
           </View>
         )}
 
+        {/* Organizer-event ticket result (hosted at this venue) */}
+        {result && result.ticket && (() => {
+          const t = result.ticket;
+          const ended = result.status === "EVENT_ENDED";
+          const checkedIn = result.status === "CHECKED_IN";
+          const already = result.status === "ALREADY_CHECKED_IN";
+          const orgColor = ended ? "#ef4444" : checkedIn ? "#22c55e" : already ? "#f97316" : colors.primary;
+          return (
+            <View style={[styles.resultCard, { backgroundColor: colors.card, borderColor: orgColor + "60" }]}>
+              <View style={styles.resultHeader}>
+                <View style={[styles.resultIcon, { backgroundColor: orgColor + "20" }]}>
+                  <Ionicons
+                    name={ended ? "calendar-clear-outline" : checkedIn ? "checkmark-circle" : already ? "time-outline" : "ticket-outline"}
+                    size={28}
+                    color={orgColor}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.resultTitle, { color: orgColor }]}>
+                    {ended ? "Event has ended" : checkedIn ? "Checked in" : already ? "Already checked in" : "Valid ticket"}
+                  </Text>
+                  <Text style={[styles.resultSub, { color: colors.mutedForeground }]} numberOfLines={2}>
+                    {ended ? "Tickets can no longer be scanned." : `${t.eventTitle}${t.organizerName ? ` · by ${t.organizerName}` : ""}`}
+                  </Text>
+                </View>
+              </View>
+
+              {!ended && (
+                <View style={[styles.bookingInfo, { borderTopColor: colors.border }]}>
+                  <Text style={[styles.bookingTitle, { color: colors.foreground }]}>{t.eventTitle}</Text>
+                  <View style={styles.bookingRow}>
+                    <Text style={[styles.bookingLabel, { color: colors.mutedForeground }]}>Attendee</Text>
+                    <Text style={[styles.bookingValue, { color: colors.foreground }]}>{t.attendee || "—"}</Text>
+                  </View>
+                  <View style={styles.bookingRow}>
+                    <Text style={[styles.bookingLabel, { color: colors.mutedForeground }]}>Ticket</Text>
+                    <Text style={[styles.bookingValue, { color: colors.foreground }]}>{t.ticketType}{t.quantity > 1 ? ` ×${t.quantity}` : ""}</Text>
+                  </View>
+                  <View style={styles.bookingRow}>
+                    <Text style={[styles.bookingLabel, { color: colors.mutedForeground }]}>Date</Text>
+                    <Text style={[styles.bookingValue, { color: colors.foreground }]}>{t.date}{t.time ? ` · ${t.time}` : ""}</Text>
+                  </View>
+                  <View style={styles.bookingRow}>
+                    <Text style={[styles.bookingLabel, { color: colors.mutedForeground }]}>Booking</Text>
+                    <Text style={[styles.bookingValue, { color: colors.foreground }]}>#{t.bookingId}</Text>
+                  </View>
+                </View>
+              )}
+
+              {result.status === "VALID" && (
+                <TouchableOpacity
+                  onPress={confirmOrganizer}
+                  disabled={loading}
+                  style={{ margin: 14, backgroundColor: "#22c55e", borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8, opacity: loading ? 0.6 : 1 }}
+                >
+                  {loading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="checkmark-circle" size={20} color="#fff" />}
+                  <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#fff" }}>Confirm check-in</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity onPress={reset} style={{ borderTopWidth: 1, borderTopColor: colors.border, padding: 12, alignItems: "center" }}>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>Scan next</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })()}
+
         {/* Scan result card */}
-        {result && (
+        {result && !result.ticket && (
           <View style={[styles.resultCard, { backgroundColor: colors.card, borderColor: resultColor + "60" }]}>
             <View style={styles.resultHeader}>
               <View style={[styles.resultIcon, { backgroundColor: resultColor + "20" }]}>

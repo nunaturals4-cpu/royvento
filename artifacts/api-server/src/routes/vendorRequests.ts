@@ -73,11 +73,12 @@ async function uniqueOrganizerSlug(base: string): Promise<string> {
 
 const CreateBody = z.object({
   businessName: z.string().min(1).max(255),
+  phone: z.string().min(7, "A valid phone number is required").max(20),
   category: z.string().min(1).max(100),
-  message: z.string().max(2000).optional().default(""),
-  country: z.string().max(100).optional().default(""),
-  state: z.string().max(100).optional().default(""),
-  city: z.string().max(100).optional().default(""),
+  message: z.string().min(1, "Tell us about your business").max(2000),
+  country: z.string().min(1, "Country is required").max(100),
+  state: z.string().min(1, "State is required").max(100),
+  city: z.string().min(1, "City is required").max(100),
 });
 
 async function joinUser(rows: { userId: number }[]) {
@@ -128,6 +129,7 @@ router.post("/vendor-requests", requireAuth(), async (req, res) => {
     .values({
       userId: user.id,
       businessName: parsed.data.businessName,
+      phone: parsed.data.phone,
       category: parsed.data.category,
       message: fullMessage,
       status: "pending",
@@ -225,11 +227,20 @@ router.post(
           userId: r.userId,
           name: r.businessName,
           slug,
+          supportPhone: r.phone,
           status: "approved",
           approvedAt: new Date(),
           ticketPrefix,
           ticketSalt,
         });
+      } else if (r.phone) {
+        // Profile already existed (e.g. re-approval) — the newly submitted
+        // application phone is authoritative, so always refresh the contact
+        // number to the latest one the partner provided.
+        await db
+          .update(gameOrganizersTable)
+          .set({ supportPhone: r.phone })
+          .where(eq(gameOrganizersTable.id, existingGameOrg[0].id));
       }
     } else if (isOrganizer) {
       // Promote to organizer role and auto-create the organizer profile so the
@@ -256,11 +267,20 @@ router.post(
           userId: r.userId,
           name: r.businessName,
           slug,
+          supportPhone: r.phone,
           status: "approved",
           approvedAt: new Date(),
           ticketPrefix,
           ticketSalt,
         });
+      } else if (r.phone) {
+        // Profile already existed (e.g. re-approval) — the newly submitted
+        // application phone is authoritative, so always refresh the contact
+        // number to the latest one the partner provided.
+        await db
+          .update(organizersTable)
+          .set({ supportPhone: r.phone })
+          .where(eq(organizersTable.id, existingOrg[0].id));
       }
     } else {
       // Promote the user to vendor role

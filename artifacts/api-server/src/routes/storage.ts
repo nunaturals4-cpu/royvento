@@ -9,7 +9,6 @@ import {
 } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { respondInvalid } from "../lib/validationError";
-import { compressImage } from "../lib/imageCompressor";
 import { requireAuth, type AuthedRequest } from "../lib/auth";
 import { verifyUploadToken, buildServerUploadUrl } from "../lib/uploadToken";
 
@@ -33,8 +32,27 @@ const uploadUrlLimiter = rateLimit({
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]);
 const ALLOWED_VIDEO_TYPES = new Set(["video/mp4"]);
 const ALLOWED_UPLOAD_TYPES = new Set([...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES]);
-const MAX_IMAGE_UPLOAD_BYTES = 8 * 1024 * 1024;
+const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_VIDEO_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+// Filename-extension fallback for clients that report an empty/`octet-stream`
+// content type — notably browsers on Windows, which don't know the `.avif`
+// (and sometimes `.webp`) MIME type. Lets the upload succeed with the real type.
+const EXT_TO_UPLOAD_TYPE: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  avif: "image/avif",
+  mp4: "video/mp4",
+};
+
+function resolveUploadType(name: string, contentType: string): string {
+  if (ALLOWED_UPLOAD_TYPES.has(contentType)) return contentType;
+  const ext = (name.split(".").pop() ?? "").toLowerCase();
+  return EXT_TO_UPLOAD_TYPE[ext] ?? contentType;
+}
 
 
 /**
@@ -42,7 +60,7 @@ const MAX_VIDEO_UPLOAD_BYTES = 4 * 1024 * 1024;
  *
  * Request an upload URL for file upload. Requires any authenticated user.
  * Returns a short-lived HMAC-signed server-side upload URL instead of a
- * presigned GCS URL, allowing the server to compress images before storing.
+ * presigned GCS URL. Images and videos are stored as-is (max 5 MB images).
  */
 router.post("/storage/uploads/request-url", requireAuth(), uploadUrlLimiter, async (req: Request, res: Response) => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
@@ -51,7 +69,8 @@ router.post("/storage/uploads/request-url", requireAuth(), uploadUrlLimiter, asy
     return;
   }
 
-  const { name, size, contentType } = parsed.data;
+  const { name, size } = parsed.data;
+  const contentType = resolveUploadType(name, parsed.data.contentType);
 
   if (!ALLOWED_UPLOAD_TYPES.has(contentType)) {
     res.status(400).json({ error: "Only JPEG, PNG, WebP, GIF, AVIF images and MP4 videos are allowed" });
@@ -60,7 +79,7 @@ router.post("/storage/uploads/request-url", requireAuth(), uploadUrlLimiter, asy
   const isVideo = ALLOWED_VIDEO_TYPES.has(contentType);
   const cap = isVideo ? MAX_VIDEO_UPLOAD_BYTES : MAX_IMAGE_UPLOAD_BYTES;
   if (size > cap) {
-    res.status(400).json({ error: isVideo ? "Video must be under 4 MB" : "Image must be under 8 MB" });
+    res.status(400).json({ error: isVideo ? "Video must be under 4 MB" : "Image must be under 5 MB" });
     return;
   }
 
@@ -86,7 +105,7 @@ router.post("/storage/uploads/request-url", requireAuth(), uploadUrlLimiter, asy
  * PUT /storage/uploads/file/:uuid
  *
  * Receive raw image bytes, verify the HMAC-signed token issued by request-url,
- * compress to WebP, and store in object storage under uploads/{uuid}.
+ * and store as-is in object storage under uploads/{uuid} (no compression).
  *
  * Token carries: uuid, max allowed size, allowed content-type, expiry.
  * No authentication header required — the signed token is the credential.
@@ -143,20 +162,13 @@ router.put(
     }
 
     try {
-      if (ALLOWED_VIDEO_TYPES.has(allowedType)) {
-        await objectStorageService.uploadBuffer(uuid, rawBody, allowedType);
-        req.log.info(
-          { uuid, inputBytes: rawBody.length, contentType: allowedType },
-          "Video uploaded",
-        );
-      } else {
-        const { buffer, contentType, compressed } = await compressImage(rawBody, allowedType);
-        await objectStorageService.uploadBuffer(uuid, buffer, contentType);
-        req.log.info(
-          { uuid, inputBytes: rawBody.length, outputBytes: buffer.length, compressed },
-          "Image uploaded and compressed",
-        );
-      }
+      // Images and videos are both stored as-is — no server-side compression.
+      // The 5 MB cap is enforced at request-url time and re-checked above.
+      await objectStorageService.uploadBuffer(uuid, rawBody, allowedType);
+      req.log.info(
+        { uuid, inputBytes: rawBody.length, contentType: allowedType },
+        ALLOWED_VIDEO_TYPES.has(allowedType) ? "Video uploaded" : "Image uploaded",
+      );
       res.status(200).json({ ok: true });
     } catch (error) {
       req.log.error({ err: error }, "Error uploading file");

@@ -319,7 +319,7 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
               </Text>
             </TouchableOpacity>
             <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
-              {images.length}/5 · JPEG/PNG/WebP/GIF · max 8 MB
+              {images.length}/5 · JPEG/PNG/WebP/GIF · max 5 MB
             </Text>
           </View>
 
