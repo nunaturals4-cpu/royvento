@@ -717,6 +717,7 @@ router.get("/vendors/:vendorId/organizer-events", async (req, res) => {
     WHERE e.venue_id = ${vendorId}
       AND e.approval_status = 'approved'
       AND e.venue_approval_status = 'approved'
+      AND o.hidden IS NOT TRUE
     ORDER BY e.start_date ASC NULLS LAST, e.created_at DESC
   `);
   return res.json(rows.rows);
@@ -917,7 +918,7 @@ router.get("/organizer-events", async (_req, res) => {
       o.name AS "organizerName", o.verified AS "organizerVerified"
     FROM organizer_events e
     JOIN organizers o ON o.id = e.organizer_id
-    WHERE e.approval_status = 'approved'
+    WHERE e.approval_status = 'approved' AND o.hidden IS NOT TRUE
     ORDER BY e.start_date ASC NULLS LAST, e.created_at DESC
   `);
   return res.json(rows.rows);
@@ -937,7 +938,7 @@ router.get("/organizer-events/slider", async (_req, res) => {
       '/organizer-events/' || e.slug AS "href"
     FROM organizer_events e
     JOIN organizers o ON o.id = e.organizer_id
-    WHERE e.approval_status = 'approved' AND e.is_featured_slider = true
+    WHERE e.approval_status = 'approved' AND e.is_featured_slider = true AND o.hidden IS NOT TRUE
     ORDER BY e.created_at DESC
     LIMIT 10
   `);
@@ -1879,6 +1880,18 @@ router.patch("/admin/organizers/:id/status", requireAuth(["admin"]), async (req,
     .set({ status, approvedAt: status === "approved" ? new Date() : null })
     .where(eq(organizersTable.id, id))
     .returning();
+  if (!row) return res.status(404).json({ error: "Not found" });
+  return res.json(row);
+});
+
+router.patch("/admin/organizers/:id/hide", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const { hidden } = req.body as { hidden?: boolean };
+  const hiddenVal = hidden !== false;
+  await db.execute(sql`UPDATE organizers SET hidden = ${hiddenVal} WHERE id = ${id}`);
+  const rows = (await db.execute(sql`SELECT id, name, status, hidden FROM organizers WHERE id = ${id}`)) as unknown as any[];
+  const row = rows[0];
   if (!row) return res.status(404).json({ error: "Not found" });
   return res.json(row);
 });

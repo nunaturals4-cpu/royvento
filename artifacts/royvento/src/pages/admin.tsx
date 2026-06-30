@@ -9793,7 +9793,7 @@ function VenueReviewsAdmin({ venueId }: { venueId: number }) {
 
 interface AdminOrganizer {
   id: number; name: string; slug: string; city: string; state: string;
-  verified: boolean; status: string; ownerEmail: string | null; eventCount: number;
+  verified: boolean; status: string; ownerEmail: string | null; eventCount: number; hidden?: boolean;
 }
 interface PendingOrganizerEvent {
   id: number; title: string; slug: string; category: string; shortDescription: string;
@@ -10098,6 +10098,10 @@ function OrganizerAccountsAdmin() {
     try { await apiPatch(`/api/admin/organizers/${id}/verify`, { verified }); toast({ title: verified ? "Verified" : "Unverified" }); load(); }
     catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
   };
+  const setHidden = async (id: number, hidden: boolean) => {
+    try { await apiPatch(`/api/admin/organizers/${id}/hide`, { hidden }); toast({ title: hidden ? "Organizer hidden — all events removed from public" : "Organizer visible" }); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+  };
   const remove = async (o: AdminOrganizer) => {
     if (!window.confirm(`Delete organizer "${o.name}"? This permanently removes the organizer and all ${o.eventCount} event${o.eventCount !== 1 ? "s" : ""} they organize, along with related tickets and bookings. This cannot be undone.`)) return;
     try {
@@ -10125,11 +10129,12 @@ function OrganizerAccountsAdmin() {
   return (
     <div className="space-y-3">
       {items.map((o) => (
-        <div key={o.id} className="rounded-2xl glass-card p-4 flex flex-wrap items-center gap-4">
+        <div key={o.id} className={`rounded-2xl glass-card p-4 flex flex-wrap items-center gap-4 ${o.hidden ? "opacity-60 border border-white/5" : ""}`}>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-medium truncate">{o.name}</p>
               {o.verified && <ShieldCheck className="h-4 w-4 text-amber-400" />}
+              {o.hidden && <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border text-red-300 border-red-500/30 bg-red-500/10">Hidden</span>}
               <span className={
                 "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border " +
                 (o.status === "approved" ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10"
@@ -10139,9 +10144,10 @@ function OrganizerAccountsAdmin() {
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">{o.ownerEmail ?? "—"} · {[o.city, o.state].filter(Boolean).join(", ") || "—"} · {o.eventCount} event{o.eventCount !== 1 ? "s" : ""}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {o.slug && <Button size="sm" variant="outline" asChild><a href={`/organizers/${o.slug}`} target="_blank" rel="noreferrer">View</a></Button>}
             <Button size="sm" variant="outline" onClick={() => setVerified(o.id, !o.verified)}>{o.verified ? "Unverify" : "Verify"}</Button>
+            <Button size="sm" variant="outline" className={o.hidden ? "text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/10" : "text-orange-300 border-orange-500/30 hover:bg-orange-500/10"} onClick={() => setHidden(o.id, !o.hidden)}>{o.hidden ? "Show" : "Hide"}</Button>
             {o.status !== "approved" && <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setStatus(o.id, "approved")}>Approve</Button>}
             {o.status !== "rejected" && <Button size="sm" variant="outline" className="text-red-300 border-red-500/30" onClick={() => setStatus(o.id, "rejected")}>Reject</Button>}
             <Button size="sm" variant="outline" className="text-red-400 border-red-500/30 hover:bg-red-500/10" onClick={() => remove(o)}><Trash2 className="h-4 w-4" /></Button>

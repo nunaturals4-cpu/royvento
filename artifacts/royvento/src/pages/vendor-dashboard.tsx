@@ -3709,7 +3709,6 @@ export function AnnouncementsPanel({ adminVendorId }: { adminVendorId?: number }
   return (
     <div className="space-y-6">
     <OrganizerEventRequestsPanel adminVendorId={adminVendorId} />
-    <HostedEventBookingsPanel adminVendorId={adminVendorId} />
     <div className="grid lg:grid-cols-2 gap-6">
       <div className="rounded-3xl glass-card-strong p-6 space-y-4">
         <p className="font-serif text-xl flex items-center gap-2">
@@ -5182,7 +5181,9 @@ interface TopEventLead {
   state: string;
   country: string;
   startDate: string | null;
-  organizerId: number;
+  category: string;
+  sourceType: "organizer" | "venue";
+  organizerId: number | null;
   organizerName: string;
   organizerSlug: string;
   organizerCity: string;
@@ -5201,23 +5202,64 @@ interface TopEventsResult {
   countryEvents: TopEventLead[];
 }
 
+interface OrganizerHistory {
+  organizer: {
+    id: number;
+    name: string;
+    slug: string;
+    logoUrl: string;
+    city: string;
+    state: string;
+    verified: boolean;
+    supportEmail: string;
+    supportPhone: string;
+    website: string;
+    instagram: string;
+  };
+  events: {
+    id: number;
+    title: string;
+    slug: string;
+    coverImageUrl: string;
+    venueName: string;
+    city: string;
+    state: string;
+    startDate: string | null;
+    category: string;
+    approvalStatus: string;
+  }[];
+}
+
 function TopEventsLeads({ adminVendorId }: { adminVendorId?: number }) {
   const vq = adminVendorId ? `?vendorId=${adminVendorId}` : "";
   const [scope, setScope] = useState<"state" | "country">("state");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [selectedOrganizerId, setSelectedOrganizerId] = useState<number | null>(null);
+
   const { data, isLoading } = useQuery<TopEventsResult>({
     queryKey: ["leads-top-events", adminVendorId ?? "me"],
     queryFn: () => apiGet<TopEventsResult>(`/api/partner/leads/top-events${vq}`),
   });
 
-  const events = scope === "state" ? data?.stateEvents ?? [] : data?.countryEvents ?? [];
+  const { data: historyData, isLoading: historyLoading } = useQuery<OrganizerHistory>({
+    queryKey: ["organizer-history", selectedOrganizerId],
+    queryFn: () => apiGet<OrganizerHistory>(`/api/partner/organizer-history/${selectedOrganizerId}`),
+    enabled: selectedOrganizerId != null,
+  });
+
+  const allEvents = scope === "state" ? data?.stateEvents ?? [] : data?.countryEvents ?? [];
+  const events = categoryFilter
+    ? allEvents.filter((e) => e.category === categoryFilter)
+    : allEvents;
   const stateLabel = data?.state || "your state";
   const countryLabel = data?.country || "your country";
 
   return (
+    <>
     <div className="rounded-3xl glass-card-strong p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
         <p className="font-serif text-xl flex items-center gap-2">
-          <Trophy className="h-5 w-5 text-yellow-400" /> Top 20 events
+          <Trophy className="h-5 w-5 text-yellow-400" /> Top 20 Events
         </p>
         <div className="inline-flex rounded-full bg-black/40 border border-white/10 p-1 text-xs">
           <button
@@ -5234,84 +5276,232 @@ function TopEventsLeads({ adminVendorId }: { adminVendorId?: number }) {
           </button>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground mb-4">
-        Best-selling ticketed events ranked by tickets sold — reach out to the organizer to host the next one.
+      <p className="text-xs text-muted-foreground mb-3">
+        Top events ranked by bookings — click an organizer name to see their last 12 months.
       </p>
+
+      {/* Event type filter pills */}
+      <div className="flex gap-2 overflow-x-auto scrollbar-none pb-3 -mx-1 px-1">
+        {["All", ...ANNOUNCEMENT_CATEGORIES].map((cat) => {
+          const active = cat === "All" ? categoryFilter === "" : categoryFilter === cat;
+          return (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat === "All" ? "" : (categoryFilter === cat ? "" : cat))}
+              className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                active
+                  ? "border-amber-400 text-amber-400"
+                  : "border-white/15 text-white/60 hover:border-white/30 hover:text-white/80"
+              }`}
+            >
+              {cat}
+            </button>
+          );
+        })}
+      </div>
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : events.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No ranked events yet for {scope === "state" ? stateLabel : countryLabel}.
+          No ranked events yet{categoryFilter ? ` for ${categoryFilter}` : ""} in {scope === "state" ? stateLabel : countryLabel}.
         </p>
       ) : (
         <div className="space-y-2">
           {events.map((e, i) => (
             <div
-              key={e.eventId}
-              className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-3"
+              key={`${e.sourceType}-${e.eventId}`}
+              className="grid grid-cols-1 sm:grid-cols-[1fr_140px_110px_auto] gap-0 rounded-xl border border-white/10 bg-black/20 overflow-hidden"
             >
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <span className={`flex-shrink-0 w-7 text-center font-bold tabular-nums ${i < 3 ? "text-yellow-400" : "text-muted-foreground"}`}>
+              {/* Col 1: rank + image + event title + location */}
+              <div className="flex items-center gap-2.5 p-3 min-w-0">
+                <span className={`flex-shrink-0 w-6 text-center text-sm font-bold tabular-nums ${i < 3 ? "text-yellow-400" : "text-muted-foreground"}`}>
                   #{i + 1}
                 </span>
                 {e.coverImageUrl ? (
-                  <img src={e.coverImageUrl} alt="" className="h-12 w-12 rounded-lg object-cover flex-shrink-0" />
+                  <img src={e.coverImageUrl} alt="" className="h-10 w-10 rounded-lg object-cover flex-shrink-0" />
                 ) : (
-                  <div className="h-12 w-12 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
-                    <TicketIcon className="h-5 w-5 text-muted-foreground" />
+                  <div className="h-10 w-10 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
+                    <TicketIcon className="h-4 w-4 text-muted-foreground" />
                   </div>
                 )}
                 <div className="min-w-0">
-                  <p className="font-medium truncate">{e.title}</p>
-                  <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
+                  <p className="font-medium text-sm text-white truncate leading-tight">{e.title}</p>
+                  <p className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                    <MapPin className="h-3 w-3 shrink-0" />
                     {[e.venueName, e.city, e.state].filter(Boolean).join(" · ") || "—"}
-                  </p>
-                  <p className="text-xs mt-0.5 flex items-center gap-1.5 flex-wrap">
-                    <span className="text-muted-foreground">by</span>
-                    <span className="font-medium">{e.organizerName}</span>
-                    {e.verified && <Check className="h-3 w-3 text-green-400" />}
                   </p>
                 </div>
               </div>
 
-              <div className="flex flex-col items-start sm:items-end gap-1 sm:pl-3 sm:border-l border-white/10">
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-green-400">
-                  <TicketIcon className="h-3.5 w-3.5" />
-                  {e.ticketsSold.toLocaleString()} sold
-                </span>
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                  {e.supportPhone && (
-                    <a href={`tel:${e.supportPhone}`} className="inline-flex items-center gap-1 hover:text-primary">
-                      <Phone className="h-3 w-3" /> {e.supportPhone}
-                    </a>
-                  )}
-                  {e.supportEmail && (
-                    <a href={`mailto:${e.supportEmail}`} className="inline-flex items-center gap-1 hover:text-primary">
-                      <Mail className="h-3 w-3" /> {e.supportEmail}
-                    </a>
-                  )}
-                  {e.instagram && (
-                    <a href={e.instagram.startsWith("http") ? e.instagram : `https://instagram.com/${e.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-primary">
-                      <ArrowUpRight className="h-3 w-3" /> Instagram
-                    </a>
-                  )}
-                  {e.website && (
-                    <a href={e.website.startsWith("http") ? e.website : `https://${e.website}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-primary">
-                      <Globe className="h-3 w-3" /> Website
-                    </a>
-                  )}
-                  {!e.supportPhone && !e.supportEmail && !e.instagram && !e.website && (
-                    <span>No contact details</span>
-                  )}
-                </div>
+              {/* Col 2: organizer name */}
+              <div className="flex flex-col justify-center px-3 py-2 sm:border-l border-t sm:border-t-0 border-white/10 gap-0.5">
+                <p className="text-[10px] text-white/40 uppercase tracking-wide font-medium mb-0.5">Organizer</p>
+                {e.sourceType === "organizer" && e.organizerId ? (
+                  <button
+                    onClick={() => setSelectedOrganizerId(e.organizerId as number)}
+                    className="text-left text-xs font-semibold text-white hover:text-white/70 truncate flex items-center gap-1"
+                  >
+                    {e.organizerName}
+                    {e.verified && <Check className="h-3 w-3 text-green-400 shrink-0" />}
+                  </button>
+                ) : (
+                  <span className="text-xs font-semibold text-white truncate flex items-center gap-1">
+                    {e.organizerName}
+                    <span className="text-[9px] border border-white/20 rounded px-1 text-white/50 shrink-0">Venue</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Col 3: event type */}
+              <div className="flex flex-col justify-center px-3 py-2 sm:border-l border-t sm:border-t-0 border-white/10 gap-0.5">
+                <p className="text-[10px] text-white/40 uppercase tracking-wide font-medium mb-0.5">Event Type</p>
+                {e.category ? (
+                  <span className="text-xs font-semibold text-white truncate">{e.category}</span>
+                ) : (
+                  <span className="text-xs text-white/40">—</span>
+                )}
+              </div>
+
+              {/* Col 4: contact details */}
+              <div className="flex flex-col justify-center px-3 py-2 sm:border-l border-t sm:border-t-0 border-white/10 gap-0.5 text-xs text-muted-foreground min-w-[120px]">
+                {e.supportPhone && (
+                  <a href={`tel:${e.supportPhone}`} className="inline-flex items-center gap-1 hover:text-white truncate">
+                    <Phone className="h-3 w-3 shrink-0" /> {e.supportPhone}
+                  </a>
+                )}
+                {e.supportEmail && (
+                  <a href={`mailto:${e.supportEmail}`} className="inline-flex items-center gap-1 hover:text-white truncate">
+                    <Mail className="h-3 w-3 shrink-0" /> {e.supportEmail}
+                  </a>
+                )}
+                {e.instagram && (
+                  <a href={e.instagram.startsWith("http") ? e.instagram : `https://instagram.com/${e.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-white">
+                    <ArrowUpRight className="h-3 w-3 shrink-0" /> Instagram
+                  </a>
+                )}
+                {e.website && (
+                  <a href={e.website.startsWith("http") ? e.website : `https://${e.website}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-white">
+                    <Globe className="h-3 w-3 shrink-0" /> Website
+                  </a>
+                )}
+                {!e.supportPhone && !e.supportEmail && !e.instagram && !e.website && (
+                  <span className="text-white/30">No contact</span>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
     </div>
+
+    {/* Organizer history modal */}
+    <Dialog open={selectedOrganizerId != null} onOpenChange={(o) => { if (!o) setSelectedOrganizerId(null); }}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-black border-white/10 text-white">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Trophy className="h-4 w-4 text-yellow-400" />
+            Organizer — Last 12 Months
+          </DialogTitle>
+        </DialogHeader>
+
+        {historyLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : historyData ? (
+          <div className="space-y-5">
+            {/* Organizer profile strip */}
+            <div className="flex items-start gap-3 rounded-xl bg-white/5 border border-white/10 p-4">
+              {historyData.organizer.logoUrl ? (
+                <img src={historyData.organizer.logoUrl} alt="" className="h-14 w-14 rounded-xl object-cover shrink-0" />
+              ) : (
+                <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <Users className="h-6 w-6 text-primary" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold flex items-center gap-1.5">
+                  {historyData.organizer.name}
+                  {historyData.organizer.verified && <Check className="h-3.5 w-3.5 text-green-400" />}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {[historyData.organizer.city, historyData.organizer.state].filter(Boolean).join(", ") || "—"}
+                </p>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
+                  {historyData.organizer.supportPhone && (
+                    <a href={`tel:${historyData.organizer.supportPhone}`} className="inline-flex items-center gap-1 hover:text-primary">
+                      <Phone className="h-3 w-3" /> {historyData.organizer.supportPhone}
+                    </a>
+                  )}
+                  {historyData.organizer.supportEmail && (
+                    <a href={`mailto:${historyData.organizer.supportEmail}`} className="inline-flex items-center gap-1 hover:text-primary">
+                      <Mail className="h-3 w-3" /> {historyData.organizer.supportEmail}
+                    </a>
+                  )}
+                  {historyData.organizer.instagram && (
+                    <a href={historyData.organizer.instagram.startsWith("http") ? historyData.organizer.instagram : `https://instagram.com/${historyData.organizer.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-primary">
+                      <ArrowUpRight className="h-3 w-3" /> Instagram
+                    </a>
+                  )}
+                  {historyData.organizer.website && (
+                    <a href={historyData.organizer.website.startsWith("http") ? historyData.organizer.website : `https://${historyData.organizer.website}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-primary">
+                      <Globe className="h-3 w-3" /> Website
+                    </a>
+                  )}
+                </div>
+              </div>
+              <span className="shrink-0 text-xs font-semibold text-primary bg-primary/10 border border-primary/20 rounded-full px-2.5 py-1">
+                {historyData.events.length} event{historyData.events.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {/* Events list */}
+            {historyData.events.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No events in the last 12 months.</p>
+            ) : (
+              <div className="space-y-2">
+                {historyData.events.map((ev) => (
+                  <div key={ev.id} className="flex items-center gap-3 rounded-lg border border-white/8 bg-white/3 p-3">
+                    {ev.coverImageUrl ? (
+                      <img src={ev.coverImageUrl} alt="" className="h-10 w-10 rounded-lg object-cover shrink-0" />
+                    ) : (
+                      <div className="h-10 w-10 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                        <CalIcon className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{ev.title}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {ev.category && (
+                          <span className="text-[10px] font-medium text-primary/80 bg-primary/10 rounded px-1.5 py-0.5">
+                            {ev.category}
+                          </span>
+                        )}
+                        {ev.venueName && (
+                          <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                            <MapPin className="h-2.5 w-2.5" />{ev.venueName}{ev.city ? `, ${ev.city}` : ""}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      {ev.startDate && (
+                        <p className="text-xs text-muted-foreground">{new Date(ev.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                      )}
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${ev.approvalStatus === "approved" ? "text-green-400 bg-green-400/10" : "text-amber-400 bg-amber-400/10"}`}>
+                        {ev.approvalStatus}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 

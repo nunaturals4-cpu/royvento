@@ -59,7 +59,7 @@ interface TicketTier {
   salesStartAt: string | null; salesEndAt: string | null; active: boolean;
 }
 
-const EVENT_CATEGORIES = ["Concert", "Festival", "Comedy", "Conference", "Workshop", "Sports", "Theatre", "Exhibition", "Party", "Other"];
+const EVENT_CATEGORIES = ["Ladies Night", "DJ Night", "Live Music", "Karaoke", "Theme Party", "Pool Party", "Open Mics", "Standup Shows", "Concert", "Festival", "Sports", "Other"];
 const HIGHLIGHT_OPTIONS = ["Free Drinks", "VIP Access", "Complimentary Entry", "Food Included", "Meet & Greet", "Special Benefits"];
 const TICKET_TYPES = [
   { value: "free", label: "Free" }, { value: "paid", label: "Paid" },

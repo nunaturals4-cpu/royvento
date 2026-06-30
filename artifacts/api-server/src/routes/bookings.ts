@@ -157,6 +157,7 @@ interface BookingRow {
   ticketMen: number;
   ticketCouple: number;
   selectedPubEvent: string;
+  announcementId?: number | null;
   personName: string;
   phone: string;
   pointsUsed: number;
@@ -186,13 +187,15 @@ async function serializeBookings(rows: BookingRow[]) {
   const orgIds = nums(rows.map((r) => r.organizerId));
   const orgEventIds = nums(rows.map((r) => r.organizerEventId));
   const ticketIds = nums(rows.map((r) => r.eventTicketId));
-  const [events, users, vendors, organizers, orgEvents, eventTickets] = await Promise.all([
+  const announcementIds = nums(rows.map((r) => r.announcementId));
+  const [events, users, vendors, organizers, orgEvents, eventTickets, announcements] = await Promise.all([
     eventIds.length ? db.select().from(eventsTable).where(inArray(eventsTable.id, eventIds)) : Promise.resolve([]),
     db.select().from(usersTable).where(inArray(usersTable.id, userIds)),
     vendorIds.length ? db.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)) : Promise.resolve([]),
     orgIds.length ? db.select().from(organizersTable).where(inArray(organizersTable.id, orgIds)) : Promise.resolve([]),
     orgEventIds.length ? db.select().from(organizerEventsTable).where(inArray(organizerEventsTable.id, orgEventIds)) : Promise.resolve([]),
     ticketIds.length ? db.select().from(eventTicketsTable).where(inArray(eventTicketsTable.id, ticketIds)) : Promise.resolve([]),
+    announcementIds.length ? db.select({ id: announcementsTable.id, title: announcementsTable.title, announceDate: announcementsTable.announceDate, eventType: announcementsTable.eventType, imageUrl: announcementsTable.imageUrl }).from(announcementsTable).where(inArray(announcementsTable.id, announcementIds)) : Promise.resolve([]),
   ]);
   const eMap = new Map(events.map((e) => [e.id, e]));
   const uMap = new Map(users.map((u) => [u.id, u]));
@@ -200,6 +203,7 @@ async function serializeBookings(rows: BookingRow[]) {
   const orgMap = new Map(organizers.map((o) => [o.id, o]));
   const oeMap = new Map(orgEvents.map((e) => [e.id, e]));
   const etMap = new Map(eventTickets.map((t) => [t.id, t]));
+  const aMap = new Map((announcements as { id: number; title: string; announceDate: string | null; eventType: string | null; imageUrl: string | null }[]).map((a) => [a.id, a]));
   return rows.map((b) => {
     const e = b.eventId != null ? eMap.get(b.eventId) : undefined;
     const u = uMap.get(b.userId);
@@ -207,9 +211,11 @@ async function serializeBookings(rows: BookingRow[]) {
     // Organizer-ticket overlay (kind='organizer'): resolve organizer/event/tier
     // and a QR code signed with the organizer's prefix/salt.
     const isOrg = b.kind === "organizer";
+    const isEventBooking = b.pubMode === "event_booking";
     const oe = b.organizerEventId != null ? oeMap.get(b.organizerEventId) : undefined;
     const org = b.organizerId != null ? orgMap.get(b.organizerId) : undefined;
     const et = b.eventTicketId != null ? etMap.get(b.eventTicketId) : undefined;
+    const ann = b.announcementId != null ? aMap.get(b.announcementId) : undefined;
     const orgTicketCode = isOrg && org && org.ticketPrefix && org.ticketSalt
       ? generateTicketCode(b.id, { ticketPrefix: org.ticketPrefix, ticketSalt: org.ticketSalt })
       : null;
@@ -287,9 +293,11 @@ async function serializeBookings(rows: BookingRow[]) {
       freeEntryRules: e?.freeEntryRules ?? null,
       createdAt: b.createdAt.toISOString(),
       kind: b.kind ?? "pub",
-      eventTitle: isOrg ? (oe?.title ?? "") : (e?.title ?? ""),
-      eventImage: isOrg ? (oe?.coverImageUrl ?? "") : (e?.imageUrl ?? ""),
+      eventTitle: isOrg ? (oe?.title ?? "") : isEventBooking ? (ann?.title || b.selectedPubEvent || "") : (e?.title ?? ""),
+      eventImage: isOrg ? (oe?.coverImageUrl ?? "") : isEventBooking ? (ann?.imageUrl || e?.imageUrl || "") : (e?.imageUrl ?? ""),
       eventType_: isOrg ? "organizer" : (e?.type ?? ""),
+      announcementEventType: isEventBooking ? (ann?.eventType || null) : null,
+      announcementDate: isEventBooking ? (ann?.announceDate || b.bookingDate || null) : null,
       eventCity: isOrg ? (oe?.city ?? "") : (e?.city ?? ""),
       eventState: isOrg ? (oe?.state ?? "") : (e?.state ?? ""),
       eventCountry: e?.country ?? "India",

@@ -1230,6 +1230,7 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "date_night" boolean NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "disabled_genders" text[] NOT NULL DEFAULT '{}'`);
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "hidden" boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE "organizers" ADD COLUMN IF NOT EXISTS "hidden" boolean NOT NULL DEFAULT false`);
 
     // ── Razorpay payment gateway columns ──────────────────────────────────
     await db.execute(sql`ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "razorpay_order_id" varchar(100) NOT NULL DEFAULT ''`);

@@ -1189,6 +1189,9 @@ export const organizersTable = pgTable(
     // Settlement wallet (Phase C). Net ticket revenue accrues here.
     onlineBalance: numeric("online_balance", { precision: 14, scale: 2 }).notNull().default("0"),
     commissionOwed: numeric("commission_owed", { precision: 14, scale: 2 }).notNull().default("0"),
+    // Admin hide lever — when true, the organizer and all their events are removed
+    // from every public surface without deleting data. Flipping back restores them.
+    hidden: boolean("hidden").notNull().default(false),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

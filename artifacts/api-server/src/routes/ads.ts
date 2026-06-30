@@ -11,6 +11,7 @@ import {
   organizerEventsTable,
   organizersTable,
   eventTicketsTable,
+  announcementsTable,
 } from "@workspace/db";
 import { eq, desc, and, inArray, sql, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -386,54 +387,107 @@ router.get(
 // Surfaces the most successful ticketed events (ranked by total tickets sold)
 // so a pub/club/bar/lounge partner can find high-performing organizers to host.
 // Two buckets: events in the partner's own state, and events across the country.
-const soldExpr = sql<number>`coalesce(sum(${eventTicketsTable.soldCount}), 0)::int`;
+// Includes both organizer events (ranked by ticket sold_count) and venue
+// announcements (ranked by booking count). Results are merged and sorted.
+//
+// Uses raw SQL via db.execute() to avoid Drizzle ORM sql-fragment stitching
+// issues that caused the state filter to silently drop.
+function extractRows(result: unknown): Record<string, unknown>[] {
+  if (Array.isArray(result)) return result as Record<string, unknown>[];
+  const r = result as any;
+  if (r?.rows && Array.isArray(r.rows)) return r.rows as Record<string, unknown>[];
+  return [];
+}
 
 async function topEventsByLocation(field: "state" | "country", value: string) {
   if (!value) return [];
-  const col =
-    field === "state" ? organizerEventsTable.state : organizerEventsTable.country;
-  return db
-    .select({
-      eventId: organizerEventsTable.id,
-      title: organizerEventsTable.title,
-      slug: organizerEventsTable.slug,
-      coverImageUrl: organizerEventsTable.coverImageUrl,
-      venueName: organizerEventsTable.venueName,
-      city: organizerEventsTable.city,
-      state: organizerEventsTable.state,
-      country: organizerEventsTable.country,
-      startDate: organizerEventsTable.startDate,
-      organizerId: organizersTable.id,
-      organizerName: organizersTable.name,
-      organizerSlug: organizersTable.slug,
-      organizerCity: organizersTable.city,
-      organizerState: organizersTable.state,
-      supportEmail: organizersTable.supportEmail,
-      supportPhone: organizersTable.supportPhone,
-      website: organizersTable.website,
-      instagram: organizersTable.instagram,
-      verified: organizersTable.verified,
-      ticketsSold: soldExpr.as("tickets_sold"),
-    })
-    .from(organizerEventsTable)
-    .innerJoin(
-      organizersTable,
-      eq(organizersTable.id, organizerEventsTable.organizerId),
-    )
-    .leftJoin(
-      eventTicketsTable,
-      eq(eventTicketsTable.eventId, organizerEventsTable.id),
-    )
-    .where(
-      and(
-        eq(organizerEventsTable.approvalStatus, "approved"),
-        eq(col, value),
-      ),
-    )
-    .groupBy(organizerEventsTable.id, organizersTable.id)
-    .having(sql`coalesce(sum(${eventTicketsTable.soldCount}), 0) > 0`)
-    .orderBy(desc(soldExpr))
-    .limit(20);
+
+  const orgLocSql =
+    field === "state"
+      ? sql`(e.state ILIKE ${value} OR TRIM(e.state) = '' OR e.state IS NULL)`
+      : sql`e.country ILIKE ${value}`;
+
+  const venLocSql =
+    field === "state"
+      ? sql`v.state ILIKE ${value}`
+      : sql`v.country ILIKE ${value}`;
+
+  const [orgResult, venResult] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        e.id                                AS "eventId",
+        e.title,
+        e.slug,
+        e.cover_image_url                   AS "coverImageUrl",
+        e.venue_name                        AS "venueName",
+        e.city,
+        e.state,
+        e.country,
+        e.start_date::text                  AS "startDate",
+        e.category,
+        'organizer'                         AS "sourceType",
+        o.id                                AS "organizerId",
+        o.name                              AS "organizerName",
+        o.slug                              AS "organizerSlug",
+        o.city                              AS "organizerCity",
+        o.state                             AS "organizerState",
+        o.support_email                     AS "supportEmail",
+        o.support_phone                     AS "supportPhone",
+        o.website,
+        o.instagram,
+        o.verified,
+        COALESCE(SUM(t.sold_count), 0)::int AS "ticketsSold"
+      FROM organizer_events e
+      JOIN organizers o ON o.id = e.organizer_id
+      LEFT JOIN event_tickets t ON t.event_id = e.id
+      WHERE e.approval_status <> 'rejected'
+        AND ${orgLocSql}
+        AND (o.hidden IS NOT TRUE)
+      GROUP BY e.id, o.id
+      HAVING COALESCE(SUM(t.sold_count), 0) > 0
+      ORDER BY "ticketsSold" DESC
+      LIMIT 20
+    `),
+    db.execute(sql`
+      SELECT
+        a.id                    AS "eventId",
+        a.title,
+        ''                      AS slug,
+        a.image_url             AS "coverImageUrl",
+        v.business_name         AS "venueName",
+        v.city,
+        v.state,
+        v.country,
+        a.announce_date         AS "startDate",
+        a.event_type            AS category,
+        'venue'                 AS "sourceType",
+        NULL::int               AS "organizerId",
+        v.business_name         AS "organizerName",
+        ''                      AS "organizerSlug",
+        v.city                  AS "organizerCity",
+        v.state                 AS "organizerState",
+        ''                      AS "supportEmail",
+        ''                      AS "supportPhone",
+        ''                      AS website,
+        ''                      AS instagram,
+        false                   AS verified,
+        COUNT(b.id)::int        AS "ticketsSold"
+      FROM announcements a
+      JOIN vendors v ON v.id = a.vendor_id
+      LEFT JOIN bookings b ON b.announcement_id = a.id
+      WHERE a.approval_status <> 'rejected'
+        AND ${venLocSql}
+        AND v.hidden = false
+      GROUP BY a.id, v.id
+      HAVING COUNT(b.id) > 0
+      ORDER BY "ticketsSold" DESC
+      LIMIT 20
+    `),
+  ]);
+
+  const combined = [...extractRows(orgResult), ...extractRows(venResult)];
+  combined.sort((a, b) => (Number(b.ticketsSold) || 0) - (Number(a.ticketsSold) || 0));
+  return combined.slice(0, 20);
 }
 
 router.get(
@@ -446,10 +500,14 @@ router.get(
     if (!vendor) {
       return res.json({ state: "", country: "", stateEvents: [], countryEvents: [] });
     }
-    const stateName = vendor.state ?? "";
-    const countryName = vendor.country ?? "";
+    const stateName = (vendor.state ?? "").trim();
+    const countryName = ((vendor.country ?? "").trim()) || "India";
+    // If the vendor has no state set, fall back to country-level events for the
+    // state tab so the partner still sees ranked events rather than an empty list.
     const [stateEvents, countryEvents] = await Promise.all([
-      topEventsByLocation("state", stateName),
+      stateName
+        ? topEventsByLocation("state", stateName)
+        : topEventsByLocation("country", countryName),
       topEventsByLocation("country", countryName),
     ]);
     return res.json({
@@ -458,6 +516,70 @@ router.get(
       stateEvents,
       countryEvents,
     });
+  },
+);
+
+// ── Organizer history (for Leads "click organizer name" drill-down) ──────────
+// Returns the organizer's profile + their last 12 months of events.
+// Available to venue partners and admins so they can evaluate who to host.
+router.get(
+  "/partner/organizer-history/:organizerId",
+  requireAuth(["vendor", "admin"]),
+  async (req, res) => {
+    const id = Number(req.params["organizerId"]);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const cutoff = oneYearAgo.toISOString().split("T")[0]; // "YYYY-MM-DD"
+
+    const [orgRows, eventRows] = await Promise.all([
+      db
+        .select({
+          id: organizersTable.id,
+          name: organizersTable.name,
+          slug: organizersTable.slug,
+          logoUrl: organizersTable.logoUrl,
+          city: organizersTable.city,
+          state: organizersTable.state,
+          verified: organizersTable.verified,
+          supportEmail: organizersTable.supportEmail,
+          supportPhone: organizersTable.supportPhone,
+          website: organizersTable.website,
+          instagram: organizersTable.instagram,
+        })
+        .from(organizersTable)
+        .where(eq(organizersTable.id, id))
+        .limit(1),
+
+      db
+        .select({
+          id: organizerEventsTable.id,
+          title: organizerEventsTable.title,
+          slug: organizerEventsTable.slug,
+          coverImageUrl: organizerEventsTable.coverImageUrl,
+          venueName: organizerEventsTable.venueName,
+          city: organizerEventsTable.city,
+          state: organizerEventsTable.state,
+          startDate: organizerEventsTable.startDate,
+          category: organizerEventsTable.category,
+          approvalStatus: organizerEventsTable.approvalStatus,
+        })
+        .from(organizerEventsTable)
+        .where(
+          and(
+            eq(organizerEventsTable.organizerId, id),
+            sql`${organizerEventsTable.approvalStatus} <> 'rejected'`,
+            sql`(${organizerEventsTable.startDate} IS NULL OR ${organizerEventsTable.startDate} >= ${cutoff}::date)`,
+          ),
+        )
+        .orderBy(desc(organizerEventsTable.startDate))
+        .limit(50),
+    ]);
+
+    const organizer = orgRows[0];
+    if (!organizer) return res.status(404).json({ error: "Organizer not found" });
+    return res.json({ organizer, events: eventRows });
   },
 );
 

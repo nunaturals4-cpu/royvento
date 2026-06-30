@@ -86,6 +86,11 @@ export function Events() {
     return true;
   });
 
+  const filteredOrganizerEvents = useMemo(() => {
+    if (!eventTypeFilter) return organizerEvents;
+    return organizerEvents.filter((e) => e.category === eventTypeFilter);
+  }, [organizerEvents, eventTypeFilter]);
+
   const hasAnnouncements = announcements.length > 0;
 
   // Clicking a category tile drives the same event-type filter the What's On
@@ -144,10 +149,42 @@ export function Events() {
         {/* ── Announcement slider (admin-controlled featured first) ── */}
         {heroSlides.length > 0 && <AnnouncementSlider announcements={heroSlides} />}
 
-        {/* ── Event Categories — hidden ── */}
+        {/* ── Event Category tiles ── */}
+        <section className="py-4">
+          <div className="flex gap-3 overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 pb-1">
+            {[{ label: "All", img: "", icon: Sparkles }, ...EVENT_CATEGORIES.map((c) => ({ label: c, img: EVENT_CATEGORY_IMAGES[c] ?? "", icon: CATEGORY_ICONS[c] ?? Sparkles }))].map(({ label, img, icon: Icon }) => {
+              const active = label === "All" ? eventTypeFilter === "" : eventTypeFilter === label;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => {
+                    setEventTypeFilter(label === "All" ? "" : (eventTypeFilter === label ? "" : label));
+                    if (label !== "All") setTimeout(() => whatsOnRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+                  }}
+                  className={`group relative shrink-0 w-[110px] sm:w-[120px] aspect-[4/5] overflow-hidden rounded-2xl border transition-all duration-300 ${active ? "border-primary shadow-[0_0_20px_-6px_hsl(var(--primary))]" : "border-white/8 hover:border-white/20"}`}
+                >
+                  {img ? (
+                    <img src={img} alt={label} loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-black" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/15" />
+                  {active && <div className="absolute inset-0 bg-primary/20" />}
+                  <div className="absolute inset-0 flex flex-col items-center justify-end text-center p-3">
+                    <span className={`mb-2 flex h-9 w-9 items-center justify-center rounded-xl border backdrop-blur-sm transition-colors ${active ? "border-primary bg-primary/30 text-primary" : "border-primary/40 bg-black/40 text-primary"}`}>
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="text-xs font-semibold text-white leading-tight">{label}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         {/* ── Live Events — ticketed events from Event Organizers ── */}
-        {organizerEvents.length > 0 && (
+        {filteredOrganizerEvents.length > 0 && (
           <section className="py-6 md:py-8">
             <div className="flex items-center gap-3 mb-5">
               <div className="flex items-center gap-2">
@@ -157,7 +194,7 @@ export function Events() {
               <div className="flex-1 h-px bg-white/[0.06]" />
             </div>
             <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
-              {organizerEvents.map((e) => (
+              {filteredOrganizerEvents.map((e) => (
                 <Link key={e.id} href={`/organizer-events/${e.slug}`} className="snap-start flex-shrink-0 cursor-pointer">
                   <div className="group w-[260px] sm:w-[280px] flex-shrink-0 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111] hover:border-primary/25 transition-colors">
                     <div className="relative h-36 bg-black/40 overflow-hidden">
