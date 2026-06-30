@@ -1713,10 +1713,10 @@ const ADMIN_CROWD_LEVELS = [
 // category here re-files the venue into the matching section. Keep these values
 // in sync with PUB_CATEGORY_SECTIONS in pages/pubs.tsx.
 const ADMIN_PUB_CATEGORIES = [
-  { value: "Pub", label: "Pubs & Bars", color: "text-violet-300", bg: "bg-violet-500/15 border-violet-500/30" },
+  { value: "Pub", label: "Pubs", color: "text-violet-300", bg: "bg-violet-500/15 border-violet-500/30" },
   { value: "Club", label: "Nightclubs", color: "text-fuchsia-300", bg: "bg-fuchsia-500/15 border-fuchsia-500/30" },
-  { value: "Lounge", label: "Lounges", color: "text-sky-300", bg: "bg-sky-500/15 border-sky-500/30" },
-  { value: "Rooftop", label: "Rooftop Bars", color: "text-amber-300", bg: "bg-amber-500/15 border-amber-500/30" },
+  { value: "Pub & Club", label: "Pub & Club", color: "text-sky-300", bg: "bg-sky-500/15 border-sky-500/30" },
+  { value: "Pub & Bar", label: "Pub & Bar", color: "text-amber-300", bg: "bg-amber-500/15 border-amber-500/30" },
   { value: "Other", label: "Other", color: "text-white/70", bg: "bg-white/10 border-white/20" },
 ] as const;
 
@@ -4875,7 +4875,7 @@ function ImportPubFromGoogle() {
   const [googleUrl, setGoogleUrl] = useState("");
   const [partnerEmail, setPartnerEmail] = useState("");
   const [pubMode, setPubMode] = useState("both");
-  const [category, setCategory] = useState("bar");
+  const [category, setCategory] = useState("Pub");
   const [preview, setPreview] = useState<GooglePubPreview | null>(null);
   const [result, setResult] = useState<ImportGooglePubResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -5092,12 +5092,10 @@ function ImportPubFromGoogle() {
               <Select value={category} onValueChange={setCategory} disabled={step === "importing"}>
                 <SelectTrigger id="categoryConfirm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="bar">Bar</SelectItem>
-                  <SelectItem value="club">Club</SelectItem>
-                  <SelectItem value="lounge">Lounge</SelectItem>
-                  <SelectItem value="pub">Pub</SelectItem>
-                  <SelectItem value="rooftop">Rooftop</SelectItem>
-                  <SelectItem value="restaurant">Restaurant</SelectItem>
+                  <SelectItem value="Pub">Pub</SelectItem>
+                  <SelectItem value="Club">Club</SelectItem>
+                  <SelectItem value="Pub & Club">Pub & Club</SelectItem>
+                  <SelectItem value="Pub & Bar">Pub & Bar</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -8398,7 +8396,7 @@ type LookupResult = {
   blockReason: string | null;
 };
 
-type VenueCategory = "Pub" | "Club" | "Pub & Club" | "Bar & Club";
+type VenueCategory = "Pub" | "Club" | "Pub & Club" | "Pub & Bar" | "Event Organizer" | "Game Organizer";
 
 // Shape accepted by both POST /admin/create-venue and PATCH /admin/venues/:id.
 interface VenuePayload {
@@ -8469,7 +8467,8 @@ function VenueForm({
 
   const [title, setTitle] = useState(initial?.businessName ?? "");
   const [category, setCategory] = useState<VenueCategory>(
-    initial?.category === "Club" || initial?.category === "Pub & Club" || initial?.category === "Bar & Club"
+    initial?.category === "Club" || initial?.category === "Pub & Club" || initial?.category === "Pub & Bar"
+      || initial?.category === "Event Organizer" || initial?.category === "Game Organizer"
       ? initial.category
       : "Pub",
   );
@@ -8729,7 +8728,9 @@ function VenueForm({
                     <SelectItem value="Pub">Pub</SelectItem>
                     <SelectItem value="Club">Club</SelectItem>
                     <SelectItem value="Pub & Club">Pub & Club</SelectItem>
-                    <SelectItem value="Bar & Club">Bar & Club</SelectItem>
+                    <SelectItem value="Pub & Bar">Pub & Bar</SelectItem>
+                    <SelectItem value="Event Organizer">Event Organizer</SelectItem>
+                    <SelectItem value="Game Organizer">Game Organizer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

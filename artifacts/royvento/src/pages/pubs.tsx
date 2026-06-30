@@ -72,18 +72,22 @@ const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // the vendor's `category` field (set by admins), so re-categorising a pub from
 // the admin panel moves it into the matching section here. Venues whose
 // category doesn't match any known value fall into the "Other" section.
+// Keep these values in sync with the venue "category" dropdowns in
+// pages/become-vendor.tsx (VENUE_CATEGORIES) and pages/admin.tsx
+// (ADMIN_PUB_CATEGORIES + the Venues create/edit form). The `value` must match
+// the vendor's stored `category` exactly, or the venue falls into "Other".
 const PUB_CATEGORY_SECTIONS = [
-  { value: "Pub",     label: "Pubs & Bars",  icon: Wine   },
-  { value: "Club",    label: "Nightclubs",   icon: Music  },
-  { value: "Lounge",  label: "Lounges",      icon: Coffee },
-  { value: "Rooftop", label: "Rooftop Bars", icon: Sunset },
-  { value: "Other",   label: "Other",        icon: Store  },
+  { value: "Pub",        label: "Pubs",       icon: Wine   },
+  { value: "Club",       label: "Nightclubs", icon: Music  },
+  { value: "Pub & Club", label: "Pub & Club", icon: Sunset },
+  { value: "Pub & Bar",  label: "Pub & Bar",  icon: Coffee },
+  { value: "Other",      label: "Other",      icon: Store  },
 ] as const;
 
 type PubCategory = typeof PUB_CATEGORY_SECTIONS[number]["value"];
 type VenueTab = "All" | PubCategory;
 
-const KNOWN_PUB_CATEGORIES = new Set<string>(["Pub", "Club", "Lounge", "Rooftop"]);
+const KNOWN_PUB_CATEGORIES = new Set<string>(["Pub", "Club", "Pub & Club", "Pub & Bar"]);
 // Map a venue to its section value, bucketing anything unknown into "Other".
 const sectionOf = (p: PublicEvent): PubCategory =>
   KNOWN_PUB_CATEGORIES.has(p.vendorCategory ?? "") ? (p.vendorCategory as PubCategory) : "Other";

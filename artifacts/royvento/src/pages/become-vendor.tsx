@@ -30,6 +30,7 @@ const VENUE_CATEGORIES = [
   "Pub",
   "Club",
   "Pub & Club",
+  "Pub & Bar",
   "Event Organizer",
   "Game Organizer",
 ] as const;

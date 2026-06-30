@@ -55,7 +55,10 @@ import {
 const router: IRouter = Router();
 
 // Venue categories selectable from the admin Venues tab create/edit form.
-const VENUE_CATEGORIES = ["Pub", "Club", "Pub & Club", "Bar & Club"] as const;
+// Must stay in sync with VENUE_CATEGORIES in pages/become-vendor.tsx and the
+// Venues form / ADMIN_PUB_CATEGORIES in pages/admin.tsx, plus PUB_CATEGORY_SECTIONS
+// in pages/pubs.tsx (which buckets venues into public sections by this value).
+const VENUE_CATEGORIES = ["Pub", "Club", "Pub & Club", "Pub & Bar", "Event Organizer", "Game Organizer"] as const;
 
 const _istFmt = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Kolkata",
@@ -2997,7 +3000,7 @@ router.post("/admin/pubs/import-google", requireAuth(["admin"]), async (req, res
   const googleUrl = typeof body["googleUrl"] === "string" ? body["googleUrl"].trim() : "";
   const partnerEmail = typeof body["partnerEmail"] === "string" ? body["partnerEmail"].trim().toLowerCase() : "";
   const pubMode = typeof body["pubMode"] === "string" ? body["pubMode"] : "entry";
-  const category = typeof body["category"] === "string" && body["category"].trim() ? body["category"].trim() : "bar";
+  const category = typeof body["category"] === "string" && body["category"].trim() ? body["category"].trim() : "Pub";
   // Optional placeId from a prior preview call — skips the text search step
   const placeIdFromPreview = typeof body["placeId"] === "string" ? body["placeId"].trim() : "";
 
