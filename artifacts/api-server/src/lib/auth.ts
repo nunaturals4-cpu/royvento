@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { createHash } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -42,10 +43,21 @@ export interface AuthUser {
 export interface JwtPayload {
   userId: number;
   role: Role;
+  /** Session-revocation counter; must match the user's current token_version. */
+  tokenVersion?: number;
 }
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
+}
+
+/**
+ * Hash a password-reset token for storage. We email the raw token but only keep
+ * its SHA-256 in the DB, so a leaked DB snapshot can't be used to reset
+ * passwords. Lookups hash the incoming token and compare.
+ */
+export function hashResetToken(rawToken: string): string {
+  return createHash("sha256").update(rawToken).digest("hex");
 }
 
 export async function comparePassword(
@@ -107,6 +119,11 @@ export async function loadUserFromRequest(
     .limit(1);
   const u = rows[0];
   if (!u) return null;
+  // Reject tokens whose version is behind the user's current token_version
+  // (bumped on password reset / logout-all). Tokens issued before this claim
+  // existed carry `undefined`, which equals the default 0 — so they stay valid
+  // until an explicit bump, avoiding a mass logout on deploy.
+  if ((payload.tokenVersion ?? 0) !== (u.tokenVersion ?? 0)) return null;
   return userToPublic(u);
 }
 

@@ -39,6 +39,9 @@ export const usersTable = pgTable(
     webPushSubscription: text("web_push_subscription"),
     gender: varchar("gender", { length: 10 }),
     genderCompleted: boolean("gender_completed").notNull().default(false),
+    // Session-revocation counter. Embedded in issued JWTs; bumped on password
+    // reset / logout-all so previously-issued tokens stop authenticating.
+    tokenVersion: integer("token_version").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

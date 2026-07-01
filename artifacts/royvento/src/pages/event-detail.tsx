@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, Link, useLocation, useSearch } from "wouter";
 import { SEO, buildBreadcrumbList } from "@/components/SEO";
+import { RichText } from "@/components/RichText";
 import { eventDetailSlug, pubDetailSlug } from "@/lib/seo-slug";
 import {
   useGetEvent,
@@ -1145,7 +1146,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
           {event.description && (
             <div className="rounded-xl border border-white/[0.06] bg-[#111] p-4 space-y-2">
               <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">About Venue</h3>
-              <div className="text-[13px] text-white/70 leading-relaxed [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4" dangerouslySetInnerHTML={{ __html: event.description }} />
+              <RichText className="text-[13px] text-white/70 leading-relaxed [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4" html={event.description} />
             </div>
           )}
 

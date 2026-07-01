@@ -10,6 +10,7 @@ import cron from "node-cron";
 import { db, usersTable, vendorsTable, eventsTable, wishlistsTable, organizersTable } from "@workspace/db";
 import { eq, or, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import { generateUniqueTicketPrefix, generateTicketSalt } from "./lib/ticketCode";
 import { ensureEmailSchema } from "./lib/emailService";
 import { runInboundSync } from "./routes/emails";
@@ -209,45 +210,72 @@ async function removeLegacyDemoVendor() {
   }
 }
 
-// Admin bootstrap credentials. Overridable via env so production can use a
-// strong secret that never lives in source/the bundle. Falls back to the
-// historical defaults when the env vars are absent, so existing deployments
-// keep working with no behavioural change until they set ADMIN_PASSWORD.
+// Admin bootstrap. The email is just an identifier (not a secret); the password
+// MUST come from the ADMIN_PASSWORD env var. There is deliberately NO weak
+// production default anymore, and we NEVER silently reset an existing admin's
+// password on boot — so a rotated password survives redeploys. Local dev keeps
+// a convenience default so `pnpm dev` still has a working admin login.
 const ADMIN_EMAIL = process.env["ADMIN_EMAIL"] || "royvento56@gmail.com";
-const ADMIN_PASSWORD = process.env["ADMIN_PASSWORD"] || "admin123@";
+const IS_PROD = process.env["NODE_ENV"] === "production";
+// Empty in production unless explicitly set. Dev falls back for convenience.
+const ADMIN_PASSWORD = process.env["ADMIN_PASSWORD"] || (IS_PROD ? "" : "admin123@");
+const MIN_ADMIN_PASSWORD_LEN = 12;
 
 async function ensureAdminAccount() {
   try {
     const target = await db.select().from(usersTable).where(eq(usersTable.email, ADMIN_EMAIL)).limit(1);
-    const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+
+    // Reject a weak explicit password in production rather than applying it.
+    const passwordProvided = ADMIN_PASSWORD.length > 0;
+    const passwordUsable =
+      passwordProvided && (!IS_PROD || ADMIN_PASSWORD.length >= MIN_ADMIN_PASSWORD_LEN);
+    if (passwordProvided && !passwordUsable) {
+      logger.error(
+        `ADMIN_PASSWORD is set but shorter than ${MIN_ADMIN_PASSWORD_LEN} chars — refusing to apply it. Admin password left unchanged.`,
+      );
+    }
+
     if (target[0]) {
-      await db
-        .update(usersTable)
-        .set({ role: "admin", passwordHash, emailVerified: true })
-        .where(eq(usersTable.id, target[0].id));
-      logger.info("Admin account refreshed (password + verified)");
+      // Existing admin: ensure role/verified. Only touch the password hash when
+      // a usable ADMIN_PASSWORD is explicitly provided (an intentional rotation)
+      // — never overwrite it with a default on every boot.
+      const patch: Record<string, unknown> = { role: "admin", emailVerified: true };
+      if (passwordUsable) patch["passwordHash"] = await bcrypt.hash(ADMIN_PASSWORD, 10);
+      await db.update(usersTable).set(patch).where(eq(usersTable.id, target[0].id));
+      logger.info(
+        passwordUsable
+          ? "Admin account ensured (password rotated from ADMIN_PASSWORD)"
+          : "Admin account ensured (role/verified only; password left unchanged)",
+      );
+      if (!passwordProvided && IS_PROD) {
+        logger.warn(
+          "ADMIN_PASSWORD is not set in production. The existing admin password was left as-is. Set ADMIN_PASSWORD to rotate it.",
+        );
+      }
       return;
     }
-    // Migrate from old email if present
-    const old = await db.select().from(usersTable).where(eq(usersTable.email, "admin@admin.com")).limit(1);
-    if (old[0]) {
-      await db
-        .update(usersTable)
-        .set({ email: ADMIN_EMAIL, role: "admin", passwordHash, emailVerified: true })
-        .where(eq(usersTable.id, old[0].id));
-      logger.info("Admin email migrated to royvento56@gmail.com");
-      return;
-    }
-    // Create fresh admin account
+
+    // No admin exists yet. Create one with a usable password if provided,
+    // otherwise a random unguessable one (recover via the password-reset flow).
+    // This removes the old weak `admin123@` default from production entirely.
+    const initialPassword = passwordUsable
+      ? ADMIN_PASSWORD
+      : randomBytes(24).toString("base64url");
     await db.insert(usersTable).values({
       email: ADMIN_EMAIL,
-      passwordHash,
+      passwordHash: await bcrypt.hash(initialPassword, 10),
       name: "Royvento Admin",
       role: "admin",
       emailVerified: true,
       phone: "+91 9000000000",
     });
-    logger.info("Admin account created");
+    if (passwordUsable) {
+      logger.info("Admin account created from ADMIN_PASSWORD");
+    } else {
+      logger.warn(
+        "Admin account created with a RANDOM password because ADMIN_PASSWORD is not set. Use the password-reset flow (or set ADMIN_PASSWORD and redeploy) to gain access.",
+      );
+    }
   } catch (err) {
     logger.error({ err }, "Failed to ensure admin account on startup");
   }
@@ -257,6 +285,9 @@ async function applyPendingSchemaChanges() {
   try {
     await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "gender" varchar(10)`);
     await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "gender_completed" boolean NOT NULL DEFAULT false`);
+    // Session-revocation counter. Embedded in issued JWTs; bumped on password
+    // reset / logout-all so previously-issued tokens stop authenticating.
+    await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "token_version" integer NOT NULL DEFAULT 0`);
     // ── Solo Connect vertical (Phase 1) ────────────────────────────────────
     // Verified, single-gender, same-city activity groups. Idempotent so a fresh
     // deploy ships the whole vertical without a drizzle-kit step. Mirrors

@@ -51,6 +51,35 @@ function getComponent(components: AddressComponent[], types: string[]): string {
   return "";
 }
 
+/**
+ * Reject hosts that resolve to private / loopback / link-local space (incl. the
+ * cloud metadata endpoint 169.254.169.254) or non-http(s) schemes. Prevents a
+ * shortlink redirect from being used to reach internal services (SSRF).
+ */
+function isPublicHttpUrl(value: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(value);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal")) return false;
+  // IPv4 literal in a private / loopback / link-local range.
+  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (a === 10 || a === 127 || a === 0) return false;
+    if (a === 169 && b === 254) return false; // link-local + cloud metadata
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a === 192 && b === 168) return false;
+  }
+  // IPv6 loopback / unique-local / link-local.
+  if (host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80")) return false;
+  return true;
+}
+
 async function resolveUrl(url: string): Promise<string> {
   try {
     const parsed = new URL(url);
@@ -63,7 +92,9 @@ async function resolveUrl(url: string): Promise<string> {
         redirect: "follow",
         signal: AbortSignal.timeout(10_000),
       });
-      return resp.url || url;
+      const finalUrl = resp.url || url;
+      // Never let a shortlink redirect us onto a private/internal target.
+      return isPublicHttpUrl(finalUrl) ? finalUrl : url;
     }
   } catch {
     // not a URL or fetch failed — return as-is

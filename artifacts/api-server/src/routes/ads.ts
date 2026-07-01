@@ -15,12 +15,20 @@ import {
 } from "@workspace/db";
 import { eq, desc, and, inArray, sql, isNull } from "drizzle-orm";
 import { z } from "zod";
+import { randomInt } from "crypto";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
 
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function randomCode(len: number): string {
+  let out = "";
+  for (let i = 0; i < len; i++) out += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
+  return out;
+}
+
 async function genUniqueCode(prefix: string, maxAttempts = 8): Promise<string> {
   for (let i = 0; i < maxAttempts; i++) {
-    const code = `${prefix}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
+    const code = `${prefix}-${randomCode(8)}`;
     const existing = await db.select({ id: couponsTable.id }).from(couponsTable).where(eq(couponsTable.code, code)).limit(1);
     if (!existing.length) return code;
   }

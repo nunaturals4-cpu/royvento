@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import rateLimit from "express-rate-limit";
 import { db, usersTable, referralsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import {
@@ -12,8 +12,42 @@ import {
   clearAuthCookie,
   loadUserFromRequest,
   userToPublic,
+  hashResetToken,
   type Role,
 } from "../lib/auth";
+
+const IS_PROD = process.env["NODE_ENV"] === "production";
+
+// ─── Per-account login throttling (complements the per-IP loginLimiter) ────────
+// Distributed credential-stuffing spreads across many IPs, defeating an IP-only
+// limiter. Track consecutive failures per email and lock briefly after a burst.
+// In-memory per instance (same model as express-rate-limit here); cleared on a
+// successful login.
+const LOGIN_MAX_FAILS = 8;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_LOCK_MS = 15 * 60 * 1000;
+const loginFails = new Map<string, { count: number; resetAt: number; lockedUntil: number }>();
+
+function loginLockRemainingMs(email: string): number {
+  const e = loginFails.get(email.toLowerCase());
+  if (!e) return 0;
+  const now = Date.now();
+  return e.lockedUntil > now ? e.lockedUntil - now : 0;
+}
+function recordLoginFail(email: string): void {
+  const key = email.toLowerCase();
+  const now = Date.now();
+  const e = loginFails.get(key);
+  if (!e || now > e.resetAt) {
+    loginFails.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS, lockedUntil: 0 });
+    return;
+  }
+  e.count += 1;
+  if (e.count >= LOGIN_MAX_FAILS) e.lockedUntil = now + LOGIN_LOCK_MS;
+}
+function clearLoginFails(email: string): void {
+  loginFails.delete(email.toLowerCase());
+}
 import { respondInvalid } from "../lib/validationError";
 import {
   sendPasswordResetEmail,
@@ -204,6 +238,16 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
     return;
   }
   const { email, password } = parsed.data;
+
+  const lockMs = loginLockRemainingMs(email);
+  if (lockMs > 0) {
+    res.status(429).json({
+      error: `Too many failed attempts for this account. Try again in about ${Math.ceil(lockMs / 60000)} minute(s).`,
+      code: "ACCOUNT_LOCKED",
+    });
+    return;
+  }
+
   const rows = await db
     .select()
     .from(usersTable)
@@ -223,6 +267,7 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
   }
   const ok = await comparePassword(password, u.passwordHash);
   if (!ok) {
+    recordLoginFail(email);
     res.status(401).json({ error: "Incorrect password. Please try again.", code: "INVALID_PASSWORD" });
     return;
   }
@@ -233,7 +278,8 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
     });
     return;
   }
-  const token = signToken({ userId: u.id, role: u.role as Role });
+  clearLoginFails(email);
+  const token = signToken({ userId: u.id, role: u.role as Role, tokenVersion: u.tokenVersion });
   setAuthCookie(res, token);
   res.json({ token, user: userToPublic(u) });
 });
@@ -273,14 +319,13 @@ router.get("/auth/verify-email", async (req, res) => {
     .where(eq(usersTable.id, user.id));
 
   // Issue auth session so user is logged in immediately
-  const jwtToken = signToken({ userId: user.id, role: user.role as Role });
+  const jwtToken = signToken({ userId: user.id, role: user.role as Role, tokenVersion: user.tokenVersion });
   setAuthCookie(res, jwtToken);
 
-
-  // Redirect back to app with success flag
-  const base = req.headers.origin ?? "";
-  const redirectBase = base || "";
-  res.redirect(`${redirectBase}/?verified=1`);
+  // Same-origin relative redirect. Pinning it (instead of echoing the
+  // client-supplied Origin header) prevents a forged Origin from bouncing the
+  // freshly-authenticated session to an attacker-controlled host.
+  res.redirect(`/?verified=1`);
 });
 
 const ResendVerificationBody = z.object({ email: z.string().email() });
@@ -535,7 +580,7 @@ router.get("/auth/google/callback", async (req, res) => {
       user = created;
     }
 
-    const token = signToken({ userId: user.id, role: user.role as Role });
+    const token = signToken({ userId: user.id, role: user.role as Role, tokenVersion: user.tokenVersion });
     setAuthCookie(res, token);
     res.redirect(nextPath);
   } catch (err) {
@@ -568,17 +613,19 @@ router.post("/auth/forgot-password", forgotPasswordLimiter, async (req, res) => 
     res.json({ ok: true, message: "If that email is registered, a reset link has been sent." });
     return;
   }
-  const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  // Cryptographically-random, single-use token. We email the raw token but only
+  // persist its SHA-256, so a DB leak can't be replayed to reset passwords.
+  const rawToken = randomBytes(32).toString("hex");
   const expiry = new Date(Date.now() + 3600 * 1000);
   await db
     .update(usersTable)
-    .set({ resetToken: token, resetTokenExpiry: expiry })
+    .set({ resetToken: hashResetToken(rawToken), resetTokenExpiry: expiry })
     .where(eq(usersTable.id, rows[0].id));
   try {
     await sendPasswordResetEmail({
       to: rows[0].email,
       toName: rows[0].name,
-      token,
+      token: rawToken,
     });
   } catch (err) {
     req.log.error({ err }, "Failed to send password reset email");
@@ -601,7 +648,7 @@ router.post("/auth/reset-password", async (req, res) => {
   const rows = await db
     .select()
     .from(usersTable)
-    .where(eq(usersTable.resetToken, token))
+    .where(eq(usersTable.resetToken, hashResetToken(token)))
     .limit(1);
   const user = rows[0];
   if (!user || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
@@ -609,9 +656,16 @@ router.post("/auth/reset-password", async (req, res) => {
     return;
   }
   const hash = await hashPassword(newPassword);
+  // Bump token_version so every previously-issued session token for this account
+  // stops authenticating — a password reset should log out other sessions.
   await db
     .update(usersTable)
-    .set({ passwordHash: hash, resetToken: "", resetTokenExpiry: null })
+    .set({
+      passwordHash: hash,
+      resetToken: "",
+      resetTokenExpiry: null,
+      tokenVersion: sql`${usersTable.tokenVersion} + 1`,
+    })
     .where(eq(usersTable.id, user.id));
   res.json({ ok: true, message: "Password reset successfully. You can now log in." });
 });
@@ -651,7 +705,14 @@ router.post("/auth/google/mobile", async (req, res) => {
     }
 
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
-    if (googleClientId) {
+    if (!googleClientId) {
+      // In production the audience check is mandatory: without it, an ID token
+      // minted for any other Google OAuth client would be accepted.
+      if (IS_PROD) {
+        res.status(500).json({ error: "Google sign-in is not configured" });
+        return;
+      }
+    } else {
       const aud = info.aud ?? "";
       const azp = info.azp ?? "";
       if (aud !== googleClientId && azp !== googleClientId) {
@@ -719,7 +780,7 @@ router.post("/auth/google/mobile", async (req, res) => {
       user = created;
     }
 
-    const token = signToken({ userId: user.id, role: user.role as Role });
+    const token = signToken({ userId: user.id, role: user.role as Role, tokenVersion: user.tokenVersion });
     setAuthCookie(res, token);
     res.json({ token, user: userToPublic(user) });
   } catch (err) {

@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Response } from "express";
-import { randomBytes } from "crypto";
+import { randomBytes, randomInt } from "crypto";
 import {
   db,
   usersTable,
@@ -40,9 +40,10 @@ function slugify(name: string): string {
 }
 
 function genBookingCode(): string {
+  // CSPRNG-backed so a party check-in code can't be guessed from other codes.
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let out = "";
-  for (let i = 0; i < 8; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  for (let i = 0; i < 8; i++) out += alphabet[randomInt(alphabet.length)];
   return out;
 }
 

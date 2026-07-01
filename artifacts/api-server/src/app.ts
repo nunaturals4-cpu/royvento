@@ -62,6 +62,29 @@ function buildAllowedOrigins(): Set<string> {
 
 const allowedOrigins = buildAllowedOrigins();
 
+// ─── Content-Security-Policy (Report-Only) ────────────────────────────────────
+//
+// Shipped in Report-Only mode first so it NEVER blocks a resource — browsers
+// only report violations. This lets us confirm the allow-list covers Razorpay
+// checkout, Google/Firebase auth and Google Fonts before switching the header
+// name to `Content-Security-Policy` to enforce. Crawlers ignore CSP entirely
+// and `application/ld+json` is non-executable data, so structured data, meta
+// tags and canonical URLs are unaffected — no SEO/AEO impact.
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'self'",
+  "script-src 'self' https://checkout.razorpay.com https://www.google.com https://www.gstatic.com",
+  "script-src-attr 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://maps.googleapis.com",
+  "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com https://www.google.com https://accounts.google.com",
+  "worker-src 'self' blob:",
+].join("; ");
+
 const corsOptions: cors.CorsOptions = {
   credentials: true,
   origin(origin, callback) {
@@ -147,6 +170,9 @@ app.use((_req, res, next) => {
       "Strict-Transport-Security",
       "max-age=15552000; includeSubDomains",
     );
+    // Report-Only: measures violations without blocking anything. Flip the
+    // header name to "Content-Security-Policy" to enforce once reports are clean.
+    res.setHeader("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY);
   }
   next();
 });
@@ -154,14 +180,17 @@ app.use((_req, res, next) => {
 app.use(cors(corsOptions));
 app.use(
   express.json({
-    limit: "50mb",
+    // 1 MB is ample for every JSON endpoint (image/video bytes go through the
+    // dedicated raw upload route, not JSON). A large limit here is a cheap
+    // memory-amplification DoS vector.
+    limit: "1mb",
     // Stash the raw request body for webhook signature verification.
     verify: (req, _res, buf) => {
       (req as unknown as { rawBody?: Buffer }).rawBody = buf;
     },
   }),
 );
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(cookieParser(SESSION_SECRET));
 
 // ─── Global API rate limiter ─────────────────────────────────────────────────

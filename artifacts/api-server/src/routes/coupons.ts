@@ -4,19 +4,26 @@ import { eq, desc, and, isNull, or, gt } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
+import { randomInt } from "crypto";
 
 const router: IRouter = Router();
 
+// Unambiguous alphabet (no 0/O/1/I) drawn from a CSPRNG so discount codes can't
+// be predicted from prior values (Math.random is not cryptographically secure).
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function randomCode(len: number): string {
+  let out = "";
+  for (let i = 0; i < len; i++) out += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
+  return out;
+}
+
 function genCode(prefix = "RV"): string {
-  return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  return `${prefix}-${randomCode(6)}`;
 }
 
 /** Generate a random 5-character alphanumeric code (uppercase). */
 function genVendorCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
-  return code;
+  return randomCode(5);
 }
 
 // ─── User coupon routes ───────────────────────────────────────────────────────

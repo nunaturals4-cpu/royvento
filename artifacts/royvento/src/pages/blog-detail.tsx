@@ -2,6 +2,7 @@ import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api";
 import { SEO, buildBreadcrumbList, buildFAQPage } from "@/components/SEO";
+import { RichText } from "@/components/RichText";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, BookOpen } from "lucide-react";
@@ -141,9 +142,9 @@ export function BlogDetail() {
         </div>
       </div>
 
-      <div
+      <RichText
         className="prose prose-invert max-w-none prose-headings:font-serif prose-headings:tracking-tight prose-p:text-muted-foreground prose-p:leading-relaxed prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-3"
-        dangerouslySetInnerHTML={{ __html: blog.content }}
+        html={blog.content}
       />
 
       <div className="mt-12 pt-8 border-t border-border text-center">

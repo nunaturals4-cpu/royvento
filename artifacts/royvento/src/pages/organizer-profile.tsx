@@ -13,6 +13,7 @@ function loadRazorpay(): Promise<boolean> {
   });
 }
 import { SEO } from "@/components/SEO";
+import { RichText } from "@/components/RichText";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
@@ -129,7 +130,7 @@ export function OrganizerProfile() {
               <h1 className="font-serif text-3xl md:text-5xl mt-1.5 leading-tight">{o.name}</h1>
               <p className="text-white/55 text-sm mt-2 flex items-center gap-2"><MapPin className="h-4 w-4" /> {[o.city, o.state].filter(Boolean).join(", ") || "India"}</p>
             </div>
-            <div className="flex items-center gap-2 md:pb-1">
+            <div className="flex flex-col items-start gap-2 md:pb-1">
               <FollowButton targetType="organizer" targetId={o.id} name={o.name} />
               <Button variant="outline" className="border-white/15 text-white/80" onClick={share}><Share2 className="h-4 w-4" /></Button>
             </div>
@@ -139,9 +140,8 @@ export function OrganizerProfile() {
 
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-12">
         {/* Stats strip */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Stat icon={<CalendarDays className="h-4 w-4" />} label="Events hosted" value={String(stats.totalEvents)} />
-          <Stat icon={<Ticket className="h-4 w-4" />} label="Tickets sold" value={stats.ticketsSold.toLocaleString("en-IN")} />
           <Stat icon={<Star className="h-4 w-4" />} label="Rating" value={stats.avgRating ? stats.avgRating.toFixed(1) : "New"} />
           <Stat icon={<Users className="h-4 w-4" />} label="Reviews" value={String(stats.reviewCount)} />
         </div>
@@ -341,7 +341,7 @@ export function OrganizerEventDetail() {
           {e.description && (
             <section>
               <SectionHead icon={<Sparkles className="h-4 w-4" />}>About the event</SectionHead>
-              <div className="text-white/70 leading-relaxed text-[15px] [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1" dangerouslySetInnerHTML={{ __html: e.description }} />
+              <RichText className="text-white/70 leading-relaxed text-[15px] [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1" html={e.description} />
             </section>
           )}
 

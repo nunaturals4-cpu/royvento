@@ -146,7 +146,7 @@ export function GameOrganizerProfile() {
               <h1 className="font-serif text-3xl md:text-5xl mt-1.5 leading-tight">{o.name}</h1>
               <p className="text-white/55 text-sm mt-2 flex items-center gap-2"><MapPin className="h-4 w-4" /> {[o.city, o.state].filter(Boolean).join(", ") || "India"}</p>
             </div>
-            <div className="flex items-center gap-2 md:pb-1">
+            <div className="flex flex-col items-start gap-2 md:pb-1">
               <FollowButton targetType="game_organizer" targetId={o.id} name={o.name} />
               <Button variant="outline" className="border-white/15 text-white/80" onClick={share}><Share2 className="h-4 w-4" /></Button>
             </div>

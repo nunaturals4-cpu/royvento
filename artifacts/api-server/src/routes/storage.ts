@@ -54,6 +54,38 @@ function resolveUploadType(name: string, contentType: string): string {
   return EXT_TO_UPLOAD_TYPE[ext] ?? contentType;
 }
 
+/**
+ * Verify the actual file bytes match the declared content-type by checking the
+ * magic-number signature. Prevents a caller from storing HTML/SVG/script
+ * content under an image content-type (a stored-XSS / content-sniffing vector),
+ * independent of the `X-Content-Type-Options: nosniff` header we already send.
+ * Permissive within each real format so legitimate uploads never break.
+ */
+function magicBytesMatch(buf: Buffer, type: string): boolean {
+  if (buf.length < 12) return false;
+  const hex = buf.subarray(0, 12).toString("hex");
+  const ascii4 = buf.subarray(4, 8).toString("latin1"); // "ftyp" for ISO-BMFF
+  switch (type) {
+    case "image/jpeg":
+      return hex.startsWith("ffd8ff");
+    case "image/png":
+      return hex.startsWith("89504e470d0a1a0a");
+    case "image/gif":
+      return hex.startsWith("474946383761") || hex.startsWith("474946383961");
+    case "image/webp":
+      return (
+        buf.subarray(0, 4).toString("latin1") === "RIFF" &&
+        buf.subarray(8, 12).toString("latin1") === "WEBP"
+      );
+    case "image/avif":
+      return ascii4 === "ftyp"; // AVIF is an ISO-BMFF (ftyp) container
+    case "video/mp4":
+      return ascii4 === "ftyp"; // MP4 is an ISO-BMFF (ftyp) container
+    default:
+      return false;
+  }
+}
+
 
 /**
  * POST /storage/uploads/request-url
@@ -161,6 +193,14 @@ router.put(
       return;
     }
 
+    // Verify the bytes actually match the declared image/video type. Blocks a
+    // signed-token holder from storing HTML/SVG/script content under an image
+    // content-type (content-sniffing / stored-XSS vector).
+    if (!magicBytesMatch(rawBody, allowedType)) {
+      res.status(415).json({ error: "File content does not match its declared type" });
+      return;
+    }
+
     try {
       // Images and videos are both stored as-is — no server-side compression.
       // The 5 MB cap is enforced at request-url time and re-checked above.
@@ -187,6 +227,10 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
   try {
     const raw = req.params.filePath;
     const filePath = Array.isArray(raw) ? raw.join("/") : raw;
+    if (!filePath || filePath.includes("..") || filePath.includes("\0")) {
+      res.status(400).json({ error: "Invalid path" });
+      return;
+    }
     const file = await objectStorageService.searchPublicObject(filePath);
     if (!file) {
       res.status(404).json({ error: "File not found" });
@@ -219,6 +263,10 @@ router.get("/storage/objects/uploads/*path", async (req: Request, res: Response)
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
+    if (!wildcardPath || wildcardPath.includes("..") || wildcardPath.includes("\0")) {
+      res.status(400).json({ error: "Invalid path" });
+      return;
+    }
     const objectPath = `/objects/uploads/${wildcardPath}`;
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
 

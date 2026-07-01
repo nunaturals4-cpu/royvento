@@ -139,7 +139,8 @@ export class ObjectStorageService {
     }
 
     if (this.localDir) {
-      const fullPath = path.join(this.localDir, "public", filePath);
+      const fullPath = safeResolve(this.localDir, "public", filePath);
+      if (!fullPath) return null; // path traversal attempt — treat as missing
       try {
         await access(fullPath);
         return { _local: true, filePath: fullPath };
@@ -268,7 +269,8 @@ export class ObjectStorageService {
     }
 
     if (this.localDir) {
-      const filePath = path.join(this.localDir, entityId);
+      const filePath = safeResolve(this.localDir, entityId);
+      if (!filePath) throw new ObjectNotFoundError(); // path traversal attempt
       try {
         await access(filePath);
         // Try to read content-type from sidecar metadata file
@@ -501,6 +503,20 @@ export class ObjectStorageService {
       // best-effort — swallow all errors so caller is never blocked
     }
   }
+}
+
+/**
+ * Resolve `parts` against `base` and return the absolute path ONLY if it stays
+ * inside `base`. Any `..` traversal that would escape the storage root yields
+ * `null`, so a crafted URL (e.g. `/objects/uploads/../../../../etc/passwd`)
+ * can never read files outside the configured storage directory. Legitimate
+ * UUID keys resolve normally, so there is no behavioural change for real reads.
+ */
+function safeResolve(base: string, ...parts: string[]): string | null {
+  const root = path.resolve(base);
+  const target = path.resolve(root, ...parts);
+  if (target !== root && !target.startsWith(root + path.sep)) return null;
+  return target;
 }
 
 function parseObjectPath(p: string): { bucketName: string; objectName: string } {

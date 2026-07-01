@@ -85,14 +85,18 @@ export function FollowButton({ targetType, targetId, name, className = "", hideC
       disabled={busy}
       aria-pressed={following}
       className={[
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium leading-none transition-colors disabled:opacity-60",
+        // w-fit keeps the button at its content width even inside a flex-column
+        // parent (whose default align-items:stretch would otherwise blow it out
+        // to full width with the label left-packed). No self-* so it follows the
+        // parent's alignment (left in a column, vertically centred in a row).
+        "inline-flex w-fit items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium leading-none transition-colors disabled:opacity-60",
         following
           ? "bg-white/10 text-white border border-white/15 hover:bg-white/15"
           : "bg-primary text-white hover:bg-primary/90",
         className,
       ].join(" ")}
     >
-      {following ? <BellRing className="h-3 w-3" /> : <Bell className="h-3 w-3" />}
+      {following ? <BellRing className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
       {following ? "Following" : "Follow"}
       {!hideCount && followerCount > 0 && (
         <span className={following ? "text-white/50" : "text-white/70"}>· {followerCount}</span>
