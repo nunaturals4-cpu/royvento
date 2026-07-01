@@ -1,6 +1,6 @@
 // ── Cache names — bump the version suffix to force eviction on deploy ──────
-const STATIC_CACHE = "royvento-assets-v6";
-const API_CACHE    = "royvento-api-v6";
+const STATIC_CACHE = "royvento-assets-v7";
+const API_CACHE    = "royvento-api-v7";
 
 // Public read-only API paths that are safe to serve stale while revalidating.
 const CACHEABLE_API_PREFIXES = [
@@ -95,8 +95,17 @@ self.addEventListener("notificationclick", (event) => {
   const url = event.notification.data?.url ?? "/";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      // Reuse an open tab when we have one: navigate it to the deep-link target
+      // (e.g. the followed venue's page) and focus it, so the click always lands
+      // on the right page instead of wherever the tab happened to be.
       for (const client of list) {
-        if (client.url.includes(self.location.origin) && "focus" in client) return client.focus();
+        if (client.url.includes(self.location.origin)) {
+          const focused = "focus" in client ? client.focus() : Promise.resolve(client);
+          if ("navigate" in client && url) {
+            return Promise.resolve(focused).then(() => client.navigate(url).catch(() => client));
+          }
+          return focused;
+        }
       }
       if (clients.openWindow) return clients.openWindow(url);
     })

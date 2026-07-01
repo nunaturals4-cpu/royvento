@@ -1,11 +1,12 @@
 ﻿import { Link, useLocation } from "wouter";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, type MouseEvent } from "react";
 import { SEO } from "@/components/SEO";
 import {
-  ArrowRight, Bell, ChevronLeft,
+  ArrowRight, Bell, ChevronLeft, Calendar,
   Clock, GlassWater, Tag, Percent, RotateCcw, Gift, Utensils, Heart, MapPin,
   type LucideIcon,
 } from "lucide-react";
+import { pubDetailSlug } from "@/lib/seo-slug";
 import { apiGet } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react";
@@ -116,6 +117,16 @@ function DiscountCard({ deal, accent }: { deal: AllDrinkDeal; accent: DiscountAc
     ? `${deal.timeFrom} – ${deal.timeTo}`
     : deal.timeFrom || "";
 
+  // "Book now" → the venue's Book a Table form (canonical pub URL + ?book=1
+  // alias). stop the card's outer Link from also firing.
+  const [, navigate] = useLocation();
+  const bookHref = `${pubDetailSlug({ id: deal.vendorId, name: deal.vendorName, city: deal.vendorCity })}?book=1`;
+  const goBook = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(bookHref);
+  };
+
   return (
     <Link href={`/vendors/${deal.vendorId}`} className="group block">
       <div className={`overflow-hidden rounded-2xl border border-white/[0.07] bg-[#111] transition-all duration-300 group-hover:-translate-y-1 ${a.hoverBorder} group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.55)]`}>
@@ -171,6 +182,13 @@ function DiscountCard({ deal, accent }: { deal: AllDrinkDeal; accent: DiscountAc
               <MapPin className="h-3 w-3 flex-shrink-0" /> {deal.vendorCity}
             </p>
           )}
+          <button
+            type="button"
+            onClick={goBook}
+            className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[12px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <Calendar className="h-3.5 w-3.5" /> Book now
+          </button>
         </div>
       </div>
     </Link>

@@ -70,10 +70,17 @@ function TonightCard({ item }: { item: TonightItem }) {
   // Show the deal in the gold pill, but don't repeat it when it equals the title.
   const offerLabel = item.dealLabel && item.dealLabel.trim() && item.dealLabel !== item.title ? item.dealLabel : undefined;
 
+  // "Book now" → the venue's Book a Table form. Games book differently (their own
+  // flow on the game profile), so only venue/event experiences get the button.
+  const bookHref = item.kind === "game"
+    ? undefined
+    : `${item.href}${item.href.includes("?") ? "&" : "?"}book=1`;
+
   return (
     <div className="h-full w-[195px] sm:w-[210px]">
       <NightlifeOfferCard
         href={item.href}
+        bookHref={bookHref}
         imageUrl={item.imageUrl}
         title={item.title}
         venueName={item.subtitle}

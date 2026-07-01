@@ -37,6 +37,7 @@ import goingOutRouter from "./goingOut";
 import soloConnectRouter from "./soloConnect";
 import createYourPartyRouter from "./createYourParty";
 import siteSettingsRouter from "./siteSettings";
+import followsRouter from "./follows";
 
 const router: IRouter = Router();
 
@@ -78,5 +79,6 @@ router.use(goingOutRouter);
 router.use(soloConnectRouter);
 router.use(createYourPartyRouter);
 router.use(siteSettingsRouter);
+router.use(followsRouter);
 
 export default router;

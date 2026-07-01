@@ -1,5 +1,6 @@
-import { Link } from "wouter";
-import { MapPin, ChevronRight } from "lucide-react";
+import type { MouseEvent } from "react";
+import { Link, useLocation } from "wouter";
+import { MapPin, ChevronRight, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
  */
 export function NightlifeOfferCard({
   href,
+  bookHref,
   imageUrl,
   title,
   venueName,
@@ -32,6 +34,9 @@ export function NightlifeOfferCard({
   className,
 }: {
   href?: string;
+  /** When set, renders a "Book now" button that deep-links to the venue's
+   *  Book a Table form (independent of the card's own click destination). */
+  bookHref?: string;
   imageUrl?: string | null;
   title: string;
   venueName?: string;
@@ -43,6 +48,14 @@ export function NightlifeOfferCard({
   children?: React.ReactNode;
   className?: string;
 }) {
+  const [, navigate] = useLocation();
+  // Stop the card's outer Link from also firing when tapping "Book now".
+  const goBook = (e: MouseEvent) => {
+    if (!bookHref) return;
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(bookHref);
+  };
   const inner = (
     <div
       className={cn(
@@ -90,10 +103,20 @@ export function NightlifeOfferCard({
         {children}
 
         {location && (
-          <div className="mt-auto flex items-center gap-1.5 pt-0.5 text-[12px] text-white/55">
+          <div className={cn("flex items-center gap-1.5 pt-0.5 text-[12px] text-white/55", !bookHref && "mt-auto")}>
             <MapPin className="h-3.5 w-3.5 shrink-0 text-[#D4AF37]" />
             <span className="truncate">{location}</span>
           </div>
+        )}
+
+        {bookHref && (
+          <button
+            type="button"
+            onClick={goBook}
+            className="mt-auto flex w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <Calendar className="h-3.5 w-3.5" /> Book now
+          </button>
         )}
       </div>
     </div>

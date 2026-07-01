@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { todayIst } from "@/lib/utils";
-import { useParams, Link, useLocation } from "wouter";
+import { useParams, Link, useLocation, useSearch } from "wouter";
 import { SEO, buildBreadcrumbList } from "@/components/SEO";
 import { pubDetailSlug } from "@/lib/seo-slug";
 import {
@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
+import { FollowButton } from "@/components/FollowButton";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { useToast } from "@/hooks/use-toast";
 import { OfferCard, type VendorOffer as VendorOfferData } from "@/components/OfferCard";
@@ -182,6 +183,27 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
     apiGet<Announcement[]>(`/api/vendors/${id}/announcements`).then(setAnnouncements).catch(() => {});
     apiGet<HostedOrganizerEvent[]>(`/api/vendors/${id}/organizer-events`).then(setHostedEvents).catch(() => {});
   }, [id]);
+
+  // Deep link to a tab (e.g. a card's "Book now") opens it + scrolls once.
+  // Accepts `?tab=<key>` or `?book=1` (the shared booking alias used by cards and
+  // event-detail) so a single book URL works across pub and event pages.
+  const search = useSearch();
+  const tabDeepLinkDone = useRef(false);
+  useEffect(() => {
+    if (tabDeepLinkDone.current) return;
+    const params = new URLSearchParams(search);
+    const t = params.get("tab");
+    const target = t && TABS.some((tab) => tab.key === t)
+      ? t
+      : params.get("book")
+        ? "book"
+        : null;
+    if (target) {
+      tabDeepLinkDone.current = true;
+      setActiveTab(target as TabKey);
+      requestAnimationFrame(() => tabBarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
+  }, [search]);
 
   const lastTrackedVendorIdRef = useRef<number | null>(null);
   useEffect(() => {
@@ -432,6 +454,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
             >
               <Calendar className="h-4 w-4" /> Book a Table
             </button>
+            <FollowButton targetType="vendor" targetId={id} name={vendor.businessName} />
             <button
               onClick={() => switchTab("reviews")}
               className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-5 py-3 text-sm font-medium text-white hover:bg-black/60 transition-colors"

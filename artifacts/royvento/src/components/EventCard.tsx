@@ -1,5 +1,6 @@
-import { Link } from "wouter";
-import { Star } from "lucide-react";
+import type { MouseEvent } from "react";
+import { Link, useLocation } from "wouter";
+import { Star, Calendar } from "lucide-react";
 import { formatINR } from "@/lib/api";
 import { pubDetailSlug, eventDetailSlug } from "@/lib/seo-slug";
 
@@ -64,6 +65,18 @@ export function EventCard({ event, directBooking }: Props) {
     : event.type === "pub"
       ? pubDetailSlug({ id: pubLinkId, name: event.title, city: event.city })
       : eventHref;
+
+  // "Book now" → the connected venue's Book a Table tab. Pub cards open the pub
+  // profile's book tab; other listings open the event's booking form.
+  const [, navigate] = useLocation();
+  const bookHref = event.type === "pub"
+    ? `${pubDetailSlug({ id: pubLinkId, name: event.title, city: event.city })}?tab=book`
+    : `${eventHref}?book=1`;
+  const goBook = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(bookHref);
+  };
 
   // Body chips: venue category / vibe only.
   const bodyTags: string[] = [];
@@ -154,6 +167,14 @@ export function EventCard({ event, directBooking }: Props) {
             <span className="text-[11px] text-muted-foreground/70">Entry</span>
             <span className="text-sm font-bold text-white">{formatINR(event.price)}</span>
           </div>
+
+          {/* Book now → connected venue's Book a Table tab */}
+          <button
+            onClick={goBook}
+            className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <Calendar className="h-3.5 w-3.5" /> Book now
+          </button>
         </div>
       </article>
     </Link>

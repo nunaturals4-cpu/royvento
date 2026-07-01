@@ -37,6 +37,7 @@ import { eq, desc, asc, sql, inArray, isNotNull, isNull, and, gte, lte, or } fro
 import * as XLSX from "xlsx";
 import { requireAuth, hashPassword, type AuthedRequest } from "../lib/auth";
 import { createUserNotification } from "../lib/notify";
+import { notifyVenueFollowers, drinkPlanKind } from "../lib/venueFollowNotify";
 import { sendEventApprovedEmail } from "../lib/notifications";
 import { generateTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { resolvePlaceFromUrl, resolvePlaceById, downloadAndStorePhoto } from "../lib/googlePlaces";
@@ -1822,6 +1823,8 @@ router.post("/admin/venues/:id/drink-plans", requireAuth(["admin"]), async (req,
   const parsed = DrinkPlanBody.safeParse(req.body);
   if (!parsed.success) { respondInvalid(res, parsed.error); return; }
   const [plan] = await db.insert(drinkPlansTable).values({ vendorId: id, ...parsed.data }).returning();
+  // Notify followers when an admin adds a deal on the venue's behalf.
+  void notifyVenueFollowers(id, drinkPlanKind(plan.type));
   res.json(plan);
 });
 
@@ -1837,6 +1840,8 @@ router.patch("/admin/venues/:id/drink-plans/:planId", requireAuth(["admin"]), as
     .where(and(eq(drinkPlansTable.id, planId), eq(drinkPlansTable.vendorId, id)))
     .returning();
   if (!updated) { res.status(404).json({ error: "Plan not found" }); return; }
+  // Notify followers when an admin updates a deal on the venue's behalf.
+  void notifyVenueFollowers(id, drinkPlanKind(updated.type));
   res.json(updated);
 });
 

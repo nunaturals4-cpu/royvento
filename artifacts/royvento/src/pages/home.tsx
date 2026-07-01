@@ -22,6 +22,7 @@ import {
   Music,
   Mic2,
   Heart,
+  Gamepad2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useListFeaturedEvents, useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react";
@@ -187,6 +188,7 @@ const CATEGORIES = [
   { label: "Live Events",    sub: "Concerts & gigs",         icon: Mic2,        href: "/events",                  img: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=70" },
   { label: "Private Party",  sub: "Host your own party",     icon: PartyPopper, href: "/private-parties",         img: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&q=70" },
   { label: "Solo Groups",    sub: "Meet new people",         icon: Users,       href: "/solo-connect",            img: "https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600&q=70" },
+  { label: "Games & Sports", sub: "Play & book venues",      icon: Gamepad2,    href: "/games",                   img: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&q=70" },
 ] as const;
 
 export function Home() {

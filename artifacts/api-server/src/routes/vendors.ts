@@ -22,6 +22,7 @@ import { requireAuth, loadUserFromRequest, type Role } from "../lib/auth";
 import { getVendorRatings, getVendorRating } from "../lib/aggregates";
 import { generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { respondInvalid } from "../lib/validationError";
+import { notifyVenueFollowers, drinkPlanKind } from "../lib/venueFollowNotify";
 
 const router: IRouter = Router();
 
@@ -702,6 +703,8 @@ router.post("/vendors/me/drink-plans", requireAuth(["vendor"]), async (req, res)
     vendorId: vendor[0].id,
     ...parsed.data,
   }).returning();
+  // Instantly notify followers of the new deal (fire-and-forget).
+  void notifyVenueFollowers(vendor[0].id, drinkPlanKind(parsed.data.type));
   res.json(plan);
 });
 
@@ -740,6 +743,8 @@ router.patch("/vendors/me/drink-plans/:planId", requireAuth(["vendor"]), async (
     .where(and(eq(drinkPlansTable.id, planId), eq(drinkPlansTable.vendorId, vendor[0].id)))
     .returning();
   if (!updated) { res.status(404).json({ error: "Plan not found" }); return; }
+  // Instantly notify followers of the updated deal (fire-and-forget).
+  void notifyVenueFollowers(vendor[0].id, drinkPlanKind(effectiveType));
   res.json(updated);
 });
 

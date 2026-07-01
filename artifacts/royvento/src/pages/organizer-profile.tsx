@@ -22,8 +22,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { FollowButton } from "@/components/FollowButton";
 import {
-  BadgeCheck, Heart, Share2, CalendarDays, MapPin, Star, Users, Ticket,
+  BadgeCheck, Share2, CalendarDays, MapPin, Star, Users, Ticket,
   Instagram, Facebook, Youtube, Globe, Clock, ChevronDown, ChevronRight,
   Sparkles, Plus, Minus, CheckCircle2, ShieldCheck, PartyPopper, ArrowRight,
   User, Phone, Tag, Check,
@@ -85,7 +86,6 @@ function EventCard({ e }: { e: PublicEvent }) {
 export function OrganizerProfile() {
   const params = useParams<{ slug: string }>();
   const [data, setData] = useState<ProfilePayload | null | undefined>(undefined);
-  const [following, setFollowing] = useState(false);
 
   useEffect(() => {
     setData(undefined);
@@ -94,10 +94,6 @@ export function OrganizerProfile() {
     apiPost(`/api/organizers/${params.slug}/view`, {}).catch(() => {});
   }, [params.slug]);
 
-  useEffect(() => {
-    if (data?.organizer) setFollowing(localStorage.getItem(`rv_follow_org_${data.organizer.id}`) === "1");
-  }, [data?.organizer]);
-
   const share = useShare(data?.organizer.name ?? "Royvento Organizer");
 
   if (data === undefined) return <div className="flex justify-center py-32"><Spinner /></div>;
@@ -105,13 +101,6 @@ export function OrganizerProfile() {
 
   const { organizer: o, upcoming, past, reviews, stats } = data;
   const gallery = [...upcoming, ...past].flatMap((e) => e.galleryImages || []).slice(0, 12);
-
-  // Follow is stored locally in Phase 1; server-side follow persistence lands later.
-  function toggleFollow() {
-    const next = !following;
-    setFollowing(next);
-    localStorage.setItem(`rv_follow_org_${o.id}`, next ? "1" : "0");
-  }
 
   return (
     <div className="bg-black text-white">
@@ -141,9 +130,7 @@ export function OrganizerProfile() {
               <p className="text-white/55 text-sm mt-2 flex items-center gap-2"><MapPin className="h-4 w-4" /> {[o.city, o.state].filter(Boolean).join(", ") || "India"}</p>
             </div>
             <div className="flex items-center gap-2 md:pb-1">
-              <Button onClick={toggleFollow} className={following ? "bg-white/10 text-white hover:bg-white/15 border border-white/15" : "bg-primary text-white hover:bg-primary/90"}>
-                <Heart className={"h-4 w-4 mr-2 " + (following ? "fill-primary text-primary" : "")} /> {following ? "Following" : "Follow"}
-              </Button>
+              <FollowButton targetType="organizer" targetId={o.id} name={o.name} />
               <Button variant="outline" className="border-white/15 text-white/80" onClick={share}><Share2 className="h-4 w-4" /></Button>
             </div>
           </div>

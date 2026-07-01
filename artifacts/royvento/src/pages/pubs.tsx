@@ -1,5 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { Link } from "wouter";
+﻿import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { Link, useLocation } from "wouter";
 import { SEO } from "@/components/SEO";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Search, X, Star,
-  Wine, Coffee, Music, SlidersHorizontal, Store, Heart, Sunset,
+  Wine, Coffee, Music, SlidersHorizontal, Store, Heart, Sunset, Calendar,
 } from "lucide-react";
 import { apiGet, formatINR } from "@/lib/api";
 import { LocationSelect } from "@/components/LocationSelect";
@@ -131,6 +131,16 @@ function PubCard({ pub }: { pub: PublicEvent }) {
     ? eventDetailSlug({ id: pub.id, title: pub.title, city: pub.city })
     : `${eventDetailSlug({ id: pub.id, title: pub.title, city: pub.city })}#book`;
 
+  // "Book now" → open the venue's Book a Table form directly (?book=1 is handled
+  // by EventDetail). stop the card's outer Link from also firing.
+  const [, navigate] = useLocation();
+  const bookHref = `${eventDetailSlug({ id: pub.id, title: pub.title, city: pub.city })}?book=1`;
+  const goBook = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(bookHref);
+  };
+
   // Body chips: venue category / vibe only. Free-entry & drink-deal now render
   // as prominent colour-coded badges on the photo (see above), so they're not
   // repeated here.
@@ -227,6 +237,14 @@ function PubCard({ pub }: { pub: PublicEvent }) {
             <span className="text-[11px] text-muted-foreground/70">Entry</span>
             <span className="text-sm font-bold text-white">{formatINR(pub.price)}</span>
           </div>
+
+          {/* Book now → the venue's Book a Table form */}
+          <button
+            onClick={goBook}
+            className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <Calendar className="h-3.5 w-3.5" /> Book now
+          </button>
         </div>
       </article>
     </Link>

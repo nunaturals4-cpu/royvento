@@ -1,5 +1,6 @@
-import { Link } from "wouter";
-import { Star, MapPin, Music2 } from "lucide-react";
+import type { MouseEvent } from "react";
+import { Link, useLocation } from "wouter";
+import { Star, MapPin, Music2, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { pubDetailSlug } from "@/lib/seo-slug";
 
@@ -42,6 +43,15 @@ export function VendorCard({ vendor }: Props) {
   const fer = vendor.freeEntryRules;
   const danceFloorLabel = vendor.danceFloor ? DANCE_FLOOR_LABELS[vendor.danceFloor] : null;
   const crowd = vendor.crowdLevel ? CROWD_LABEL[vendor.crowdLevel] : null;
+  const [, navigate] = useLocation();
+  const detailHref = pubDetailSlug({ id: vendor.id, name: vendor.businessName, city: vendor.city ?? undefined });
+  // Jump straight to the venue's "Book a Table" tab. stopPropagation/preventDefault
+  // so the click doesn't also trigger the card's outer Link navigation.
+  const goBook = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(`${detailHref}?tab=book`);
+  };
   return (
     <Link href={pubDetailSlug({ id: vendor.id, name: vendor.businessName, city: vendor.city ?? undefined })}>
       <div className="group cursor-pointer overflow-hidden rounded-2xl border bg-card transition-all hover:-translate-y-1 hover:shadow-xl">
@@ -86,6 +96,12 @@ export function VendorCard({ vendor }: Props) {
               <span>{danceFloorLabel}</span>
             </div>
           )}
+          <button
+            onClick={goBook}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <Calendar className="h-4 w-4" /> Book now
+          </button>
         </div>
       </div>
     </Link>

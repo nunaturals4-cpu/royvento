@@ -1839,6 +1839,185 @@ router.put("/organizer/banking", requireAuth(["organizer"]), async (req, res) =>
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// ADMIN — view a specific organizer's dashboard data (Earnings / Insights /
+// Leads / Coupons) scoped by :orgId. These mirror the organizer-self endpoints
+// above so the admin Manage view can reuse the exact dashboard panels.
+// ════════════════════════════════════════════════════════════════════════════
+
+async function adminOrg(orgId: number) {
+  const [o] = await db.select({ id: organizersTable.id, commissionOwed: organizersTable.commissionOwed })
+    .from(organizersTable).where(eq(organizersTable.id, orgId)).limit(1);
+  return o ?? null;
+}
+
+router.get("/admin/organizer/:orgId/events", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid id" });
+  const rows = await db.select().from(organizerEventsTable).where(eq(organizerEventsTable.organizerId, orgId)).orderBy(desc(organizerEventsTable.id));
+  return res.json(rows);
+});
+
+router.get("/admin/organizer/:orgId/revenue", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  const org = await adminOrg(orgId);
+  if (!org) return res.status(404).json({ error: "Organizer not found" });
+  const rows = await db.execute(sql`
+    SELECT e.id, e.title, e.commission_pct AS "commissionPct", e.gateway_fee_percent AS "gatewayFeePercent",
+      COALESCE((SELECT SUM(t.sold_count) FROM event_tickets t WHERE t.event_id = e.id), 0)::int AS "ticketsSold",
+      COALESCE(SUM(l.revenue), 0) AS "revenue", COALESCE(SUM(l.commission), 0) AS "commission",
+      COALESCE(SUM(l.gateway_fee), 0) AS "gatewayFee", COALESCE(SUM(l.net), 0) AS "net", COUNT(l.id)::int AS "attended"
+    FROM organizer_events e
+    LEFT JOIN organizer_commission_ledger l ON l.organizer_event_id = e.id
+    WHERE e.organizer_id = ${orgId}
+    GROUP BY e.id, e.title, e.commission_pct, e.gateway_fee_percent ORDER BY e.created_at DESC
+  `);
+  const [tot] = (await db.execute(sql`
+    SELECT COALESCE(SUM(revenue),0) AS "revenue", COALESCE(SUM(commission),0) AS "commission",
+      COALESCE(SUM(gateway_fee),0) AS "gatewayFee", COALESCE(SUM(net),0) AS "net"
+    FROM organizer_commission_ledger WHERE organizer_id = ${orgId}
+  `)).rows as any[];
+  return res.json({ events: rows.rows, totals: tot ?? { revenue: 0, commission: 0, gatewayFee: 0, net: 0 }, commissionOwed: org.commissionOwed });
+});
+
+router.get("/admin/organizer/:orgId/banking", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  const org = await adminOrg(orgId);
+  if (!org) return res.status(404).json({ error: "Organizer not found" });
+  const banking = (await db.select().from(organizerBankingDetailsTable).where(eq(organizerBankingDetailsTable.organizerId, orgId)).limit(1))[0] ?? null;
+  const settlements = await db.select().from(organizerSettlementsTable).where(eq(organizerSettlementsTable.organizerId, orgId)).orderBy(desc(organizerSettlementsTable.createdAt)).limit(50);
+  return res.json({ banking, settlements, commissionOwed: org.commissionOwed });
+});
+
+router.put("/admin/organizer/:orgId/banking", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  const org = await adminOrg(orgId);
+  if (!org) return res.status(404).json({ error: "Organizer not found" });
+  const parsed = BankingBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const existing = (await db.select().from(organizerBankingDetailsTable).where(eq(organizerBankingDetailsTable.organizerId, orgId)).limit(1))[0];
+  if (existing) {
+    const [row] = await db.update(organizerBankingDetailsTable).set({ ...parsed.data, updatedAt: new Date() }).where(eq(organizerBankingDetailsTable.id, existing.id)).returning();
+    return res.json(row);
+  }
+  const [row] = await db.insert(organizerBankingDetailsTable).values({ organizerId: orgId, ...parsed.data }).returning();
+  return res.json(row);
+});
+
+router.get("/admin/organizer/:orgId/analytics", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid id" });
+  const [kpi] = (await db.execute(sql`
+    SELECT COUNT(*)::int AS "bookings", COALESCE(SUM(b.guests),0)::int AS "tickets",
+      COALESCE(SUM(b.final_price),0) AS "revenue", COUNT(*) FILTER (WHERE b.checked_in)::int AS "attended"
+    FROM bookings b WHERE b.kind='organizer' AND b.organizer_id = ${orgId} AND b.status='confirmed'
+  `)).rows as any[];
+  const perEvent = await db.execute(sql`
+    SELECT e.id, e.title, COUNT(b.id)::int AS "bookings", COALESCE(SUM(b.guests),0)::int AS "tickets",
+      COALESCE(SUM(b.final_price),0) AS "revenue", COUNT(b.id) FILTER (WHERE b.checked_in)::int AS "attended"
+    FROM organizer_events e
+    LEFT JOIN bookings b ON b.organizer_event_id = e.id AND b.kind='organizer' AND b.status='confirmed'
+    WHERE e.organizer_id = ${orgId} GROUP BY e.id, e.title ORDER BY "revenue" DESC
+  `);
+  const byTicketType = await db.execute(sql`
+    SELECT t.name AS "ticketType", COALESCE(SUM(b.guests),0)::int AS "tickets", COALESCE(SUM(b.final_price),0) AS "revenue"
+    FROM bookings b JOIN event_tickets t ON t.id = b.event_ticket_id
+    WHERE b.kind='organizer' AND b.organizer_id = ${orgId} AND b.status='confirmed'
+    GROUP BY t.name ORDER BY "revenue" DESC
+  `);
+  const recent = await db.execute(sql`
+    SELECT to_char(b.created_at, 'YYYY-MM-DD') AS "day", COUNT(*)::int AS "bookings", COALESCE(SUM(b.final_price),0) AS "revenue"
+    FROM bookings b WHERE b.kind='organizer' AND b.organizer_id = ${orgId} AND b.status='confirmed' AND b.created_at >= now() - interval '30 days'
+    GROUP BY "day" ORDER BY "day"
+  `);
+  const bookings = Number(kpi?.bookings ?? 0);
+  const attended = Number(kpi?.attended ?? 0);
+  return res.json({
+    totals: { bookings, tickets: Number(kpi?.tickets ?? 0), revenue: kpi?.revenue ?? "0", attended, attendanceRate: bookings > 0 ? Math.round((attended / bookings) * 100) : 0 },
+    perEvent: perEvent.rows, byTicketType: byTicketType.rows, recent: recent.rows,
+  });
+});
+
+router.get("/admin/organizer/:orgId/bookings", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid id" });
+  const eventId = Number(req.query["eventId"]);
+  const filter = Number.isFinite(eventId) && eventId > 0 ? sql` AND b.organizer_event_id = ${eventId}` : sql``;
+  const rows = await db.execute(sql`
+    SELECT b.id, b.created_at AS "createdAt", b.booking_date AS "bookingDate",
+      b.guests AS "quantity", (b.final_price + COALESCE(b.base_fee, 0)) AS "amount", b.checked_in AS "checkedIn",
+      b.person_name AS "attendee", b.phone, u.email AS "email", e.title AS "eventTitle", t.name AS "ticketType"
+    FROM bookings b
+    LEFT JOIN users u ON u.id = b.user_id
+    LEFT JOIN organizer_events e ON e.id = b.organizer_event_id
+    LEFT JOIN event_tickets t ON t.id = b.event_ticket_id
+    WHERE b.kind='organizer' AND b.organizer_id = ${orgId} AND b.status='confirmed'${filter}
+    ORDER BY b.created_at DESC
+  `);
+  return res.json(rows.rows);
+});
+
+router.get("/admin/organizer/:orgId/leads", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid id" });
+  const knownAgg = await db
+    .select({
+      viewerUserId: organizerProfileViewsTable.viewerUserId,
+      visitCount: sql<number>`count(*)::int`.as("visit_count"),
+      lastViewedAt: sql<Date>`max(${organizerProfileViewsTable.viewedAt})`.as("last_viewed_at"),
+    })
+    .from(organizerProfileViewsTable)
+    .where(and(eq(organizerProfileViewsTable.organizerId, orgId), sql`${organizerProfileViewsTable.viewerUserId} is not null`))
+    .groupBy(organizerProfileViewsTable.viewerUserId);
+  const [anonAgg] = await db
+    .select({ visitCount: sql<number>`count(*)::int`.as("visit_count"), lastViewedAt: sql<Date>`max(${organizerProfileViewsTable.viewedAt})`.as("last_viewed_at") })
+    .from(organizerProfileViewsTable)
+    .where(and(eq(organizerProfileViewsTable.organizerId, orgId), isNull(organizerProfileViewsTable.viewerUserId)));
+  const ids = knownAgg.map((r) => r.viewerUserId).filter((x): x is number => x != null);
+  const users = ids.length ? await db.select().from(usersTable).where(inArray(usersTable.id, ids)) : [];
+  const uMap = new Map(users.map((u) => [u.id, u]));
+  const bookedUserIds = new Set<number>();
+  if (ids.length) {
+    const bookedRows = await db.select({ userId: bookingsTable.userId }).from(bookingsTable)
+      .where(and(eq(bookingsTable.organizerId, orgId), eq(bookingsTable.kind, "organizer"), inArray(bookingsTable.userId, ids)));
+    bookedRows.forEach((b) => bookedUserIds.add(b.userId));
+  }
+  const knownViews = knownAgg.map((r) => {
+    const u = uMap.get(r.viewerUserId as number);
+    return { viewerUserId: r.viewerUserId, viewerName: u?.name ?? "Anonymous", viewerEmail: u?.email ?? "", phone: u?.phone ?? "", visitCount: r.visitCount, lastViewedAt: r.lastViewedAt, hasBooked: bookedUserIds.has(r.viewerUserId as number) };
+  }).sort((a, b) => new Date(b.lastViewedAt).getTime() - new Date(a.lastViewedAt).getTime());
+  const anonCount = anonAgg?.visitCount ?? 0;
+  const anonView = anonCount > 0 ? [{ viewerUserId: null, viewerName: "Anonymous", viewerEmail: "", phone: "", visitCount: anonCount, lastViewedAt: anonAgg!.lastViewedAt, hasBooked: false }] : [];
+  const views = [...knownViews, ...anonView];
+  return res.json({ totalViews: views.reduce((s, v) => s + v.visitCount, 0), bookedCount: knownViews.filter((v) => v.hasBooked).length, views });
+});
+
+router.get("/admin/organizer/:orgId/coupons", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid id" });
+  const rows = await db.select().from(organizerCouponsTable).where(eq(organizerCouponsTable.organizerId, orgId)).orderBy(desc(organizerCouponsTable.createdAt));
+  return res.json(rows);
+});
+
+router.post("/admin/organizer/:orgId/coupons", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  const org = await adminOrg(orgId);
+  if (!org) return res.status(404).json({ error: "Organizer not found" });
+  const parsed = CouponBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const d = parsed.data;
+  try {
+    const [row] = await db.insert(organizerCouponsTable).values({
+      organizerId: orgId, code: d.code.toUpperCase().trim(), discountType: d.discountType,
+      discountValue: String(d.discountValue), eventId: d.eventId ?? null, active: d.active,
+      maxUses: d.maxUses ?? null, expiresAt: d.expiresAt ? new Date(d.expiresAt) : null,
+    }).returning();
+    return res.json(row);
+  } catch {
+    return res.status(409).json({ error: "A coupon with that code already exists." });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // ADMIN
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -1853,6 +2032,187 @@ router.get("/admin/organizers", requireAuth(["admin"]), async (_req, res) => {
     ORDER BY o.created_at DESC
   `);
   return res.json(rows.rows);
+});
+
+// Sentinel owner id for admin-created organizers that have not been assigned to
+// a partner yet (mirrors the unassigned-venue pattern). The partial unique index
+// organizers_user_assigned_idx (WHERE user_id <> 0) lets many of these coexist.
+const UNASSIGNED_ORGANIZER_USER_ID = 0;
+
+// Admin: create an Event Organizer from the Venues tab WITHOUT an owner. It sits
+// unassigned (owner id 0, status 'pending' so it stays off public surfaces) until
+// an admin assigns it to a partner by email — exactly like admin-created venues.
+const AdminCreateOrganizerBody = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().max(5000).optional().default(""),
+  logoUrl: z.string().optional().default(""),
+  coverImageUrl: z.string().optional().default(""),
+  website: z.string().max(255).optional().default(""),
+  instagram: z.string().max(255).optional().default(""),
+  facebook: z.string().max(255).optional().default(""),
+  youtube: z.string().max(255).optional().default(""),
+  supportEmail: z.string().max(255).optional().default(""),
+  supportPhone: z.string().max(50).optional().default(""),
+  city: z.string().max(100).optional().default(""),
+  state: z.string().max(100).optional().default(""),
+});
+
+router.post("/admin/create-organizer", requireAuth(["admin"]), async (req, res) => {
+  const parsed = AdminCreateOrganizerBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const d = parsed.data;
+
+  const slug = await uniqueOrganizerSlug(d.name);
+  const usedPrefixes = (await db.select({ p: organizersTable.ticketPrefix }).from(organizersTable))
+    .map((r) => r.p)
+    .filter((p): p is string => Boolean(p));
+  const ticketPrefix = await generateUniqueTicketPrefix(d.name, usedPrefixes);
+  const ticketSalt = generateTicketSalt();
+
+  const [row] = await db
+    .insert(organizersTable)
+    .values({
+      userId: UNASSIGNED_ORGANIZER_USER_ID,
+      name: d.name.trim(),
+      slug,
+      description: d.description,
+      logoUrl: d.logoUrl,
+      coverImageUrl: d.coverImageUrl,
+      website: d.website,
+      instagram: d.instagram,
+      facebook: d.facebook,
+      youtube: d.youtube,
+      supportEmail: d.supportEmail,
+      supportPhone: d.supportPhone,
+      city: d.city,
+      state: d.state,
+      status: "pending",
+      ticketPrefix,
+      ticketSalt,
+    })
+    .returning();
+  return res.json(row);
+});
+
+// Admin: assign (or reassign) an unassigned organizer to a partner by email.
+// Links organizers.user_id to that account, flips them to the `organizer` role,
+// and marks the profile approved. Reverts any previous owner to a plain user.
+router.post("/admin/organizers/:id/assign", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const emailRaw = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  if (!emailRaw) return res.status(400).json({ error: "Partner email is required" });
+
+  const [org] = await db.select().from(organizersTable).where(eq(organizersTable.id, id)).limit(1);
+  if (!org) return res.status(404).json({ error: "Organizer not found" });
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, emailRaw)).limit(1);
+  if (!user) {
+    return res.status(404).json({ error: `No account found for "${emailRaw}". The partner must have a registered Royvento account before an organizer can be assigned.` });
+  }
+  if (user.role === "admin") return res.status(400).json({ error: "Cannot assign an organizer to an admin account." });
+  if (org.userId === user.id) return res.status(409).json({ error: "This organizer is already assigned to that partner." });
+
+  const [otherOrg] = await db
+    .select({ id: organizersTable.id, name: organizersTable.name })
+    .from(organizersTable)
+    .where(and(eq(organizersTable.userId, user.id), sql`${organizersTable.id} <> ${id}`))
+    .limit(1);
+  if (otherOrg) {
+    return res.status(409).json({ error: `${user.email} already owns an organizer ("${otherOrg.name}"). Each partner can own only one organizer — unassign that one first.` });
+  }
+
+  const prevOwnerId = org.userId;
+  await db.update(organizersTable)
+    .set({ userId: user.id, status: "approved", approvedAt: org.approvedAt ?? new Date() })
+    .where(eq(organizersTable.id, id));
+  await db.update(usersTable).set({ role: "organizer" }).where(eq(usersTable.id, user.id));
+
+  // Revert the previous owner (if a real user) to a plain user when they no
+  // longer own any organizer.
+  if (prevOwnerId && prevOwnerId !== UNASSIGNED_ORGANIZER_USER_ID && prevOwnerId !== user.id) {
+    const [stillOwns] = await db.select({ id: organizersTable.id }).from(organizersTable).where(eq(organizersTable.userId, prevOwnerId)).limit(1);
+    if (!stillOwns) await db.update(usersTable).set({ role: "user" }).where(eq(usersTable.id, prevOwnerId));
+  }
+
+  try {
+    await createUserNotification({
+      userId: user.id,
+      title: "An organizer profile has been assigned to you",
+      message: `You can now manage "${org.name}" from your organizer dashboard.`,
+      url: "/dashboard/organizer",
+      tag: `organizer-assigned-${id}`,
+    });
+  } catch { /* best-effort */ }
+
+  const [row] = await db.select().from(organizersTable).where(eq(organizersTable.id, id)).limit(1);
+  return res.json({ ...row, ownerEmail: user.email });
+});
+
+// Admin: unassign an organizer — return it to the unassigned pool (owner id 0).
+router.post("/admin/organizers/:id/unassign", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [org] = await db.select().from(organizersTable).where(eq(organizersTable.id, id)).limit(1);
+  if (!org) return res.status(404).json({ error: "Organizer not found" });
+  if (org.userId === UNASSIGNED_ORGANIZER_USER_ID) return res.status(409).json({ error: "Organizer is already unassigned." });
+
+  const prevOwnerId = org.userId;
+  await db.update(organizersTable)
+    .set({ userId: UNASSIGNED_ORGANIZER_USER_ID, status: "pending", approvedAt: null })
+    .where(eq(organizersTable.id, id));
+  if (prevOwnerId) {
+    const [stillOwns] = await db.select({ id: organizersTable.id }).from(organizersTable).where(eq(organizersTable.userId, prevOwnerId)).limit(1);
+    if (!stillOwns) await db.update(usersTable).set({ role: "user" }).where(eq(usersTable.id, prevOwnerId));
+  }
+  const [row] = await db.select().from(organizersTable).where(eq(organizersTable.id, id)).limit(1);
+  return res.json({ ...row, ownerEmail: null });
+});
+
+// Admin: full organizer profile for the edit form prefill.
+router.get("/admin/organizers/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [row] = await db.select().from(organizersTable).where(eq(organizersTable.id, id)).limit(1);
+  if (!row) return res.status(404).json({ error: "Not found" });
+  const [owner] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, row.userId)).limit(1);
+  return res.json({ ...row, ownerEmail: owner?.email ?? null });
+});
+
+// Admin: update an organizer's profile fields (edit form save).
+const AdminUpdateOrganizerBody = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().max(5000).optional(),
+  logoUrl: z.string().optional(),
+  coverImageUrl: z.string().optional(),
+  website: z.string().max(255).optional(),
+  instagram: z.string().max(255).optional(),
+  facebook: z.string().max(255).optional(),
+  youtube: z.string().max(255).optional(),
+  supportEmail: z.string().max(255).optional(),
+  supportPhone: z.string().max(50).optional(),
+  city: z.string().max(100).optional(),
+  state: z.string().max(100).optional(),
+});
+
+router.patch("/admin/organizers/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const parsed = AdminUpdateOrganizerBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const [org] = await db.select().from(organizersTable).where(eq(organizersTable.id, id)).limit(1);
+  if (!org) return res.status(404).json({ error: "Not found" });
+
+  const updates: Record<string, unknown> = {};
+  for (const k of ["description", "logoUrl", "coverImageUrl", "website", "instagram", "facebook", "youtube", "supportEmail", "supportPhone", "city", "state"] as const) {
+    if (parsed.data[k] !== undefined) updates[k] = parsed.data[k];
+  }
+  if (parsed.data.name !== undefined && parsed.data.name.trim() && parsed.data.name.trim() !== org.name) {
+    updates["name"] = parsed.data.name.trim();
+    updates["slug"] = await uniqueOrganizerSlug(parsed.data.name, org.id);
+  }
+  const [row] = await db.update(organizersTable).set(updates).where(eq(organizersTable.id, id)).returning();
+  return res.json(row);
 });
 
 router.patch("/admin/organizers/:id/verify", requireAuth(["admin"]), async (req, res) => {
@@ -1964,6 +2324,358 @@ router.get("/admin/organizer-events", requireAuth(["admin"]), async (_req, res) 
     ORDER BY e.created_at DESC
   `);
   return res.json(rows.rows);
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// ADMIN-AUTHORED ORGANIZER EVENTS
+// Admins create organizer events from the Venues tab WITHOUT an organizer, then
+// assign an organizer to each later (mirrors admin-created unassigned venues).
+// Unassigned events use sentinel organizer id 0 and stay non-public (no approved
+// organizer + approval_status='pending'). By-id routes use the singular
+// "/admin/organizer-event/:id" prefix to avoid colliding with the plural
+// collection routes (/admin/organizer-events/pending, /unassigned, /seed).
+// ════════════════════════════════════════════════════════════════════════════
+const UNASSIGNED_EVENT_ORGANIZER_ID = 0;
+
+// List admin-created events still awaiting an organizer (sentinel owner 0).
+router.get("/admin/organizer-events/unassigned", requireAuth(["admin"]), async (_req, res) => {
+  const rows = await db
+    .select()
+    .from(organizerEventsTable)
+    .where(eq(organizerEventsTable.organizerId, UNASSIGNED_EVENT_ORGANIZER_ID))
+    .orderBy(desc(organizerEventsTable.id));
+  return res.json(rows);
+});
+
+// All organizer events for the admin Manage view (assigned + unassigned), with
+// owner info so admins can manage/assign/reassign any of them at any time.
+router.get("/admin/organizer-events/all", requireAuth(["admin"]), async (_req, res) => {
+  const rows = await db.execute(sql`
+    SELECT e.id, e.title, e.slug, e.cover_image_url AS "coverImageUrl", e.category, e.city,
+      e.start_date AS "startDate", e.approval_status AS "approvalStatus",
+      e.organizer_id AS "organizerId",
+      CASE WHEN e.organizer_id = 0 THEN NULL ELSE o.name END AS "organizerName"
+    FROM organizer_events e
+    LEFT JOIN organizers o ON o.id = e.organizer_id
+    ORDER BY e.id DESC
+  `);
+  return res.json(rows.rows);
+});
+
+// Create a new unassigned organizer event (assign organizer later).
+router.post("/admin/organizer-events", requireAuth(["admin"]), async (req, res) => {
+  const parsed = EventBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const slug = await uniqueEventSlug(parsed.data.title);
+  const venue = await resolveVenueLink(parsed.data.venueId, res);
+  if (venue === "invalid") return; // response already sent
+  const [row] = await db
+    .insert(organizerEventsTable)
+    .values({
+      organizerId: UNASSIGNED_EVENT_ORGANIZER_ID,
+      slug,
+      approvalStatus: "pending",
+      ...eventValuesFromBody(parsed.data),
+      ...venueValues(venue),
+    })
+    .returning();
+  return res.json(row);
+});
+
+// Single event (+ its ticket tiers) for the editor prefill.
+router.get("/admin/organizer-event/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [ev] = await db.select().from(organizerEventsTable).where(eq(organizerEventsTable.id, id)).limit(1);
+  if (!ev) return res.status(404).json({ error: "Not found" });
+  const tickets = await db.select().from(eventTicketsTable).where(eq(eventTicketsTable.eventId, id)).orderBy(eventTicketsTable.id);
+  return res.json({ ...ev, tickets });
+});
+
+// Update an admin-authored event's fields.
+router.patch("/admin/organizer-event/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const parsed = EventBody.partial().safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const { venueId: venueIdInput, ...rest } = parsed.data;
+  let venueSet: Record<string, unknown> = {};
+  if ("venueId" in parsed.data) {
+    const venue = await resolveVenueLink(venueIdInput, res);
+    if (venue === "invalid") return; // response already sent
+    venueSet = venueValues(venue);
+  }
+  const [row] = await db
+    .update(organizerEventsTable)
+    .set({ ...rest, ...venueSet })
+    .where(eq(organizerEventsTable.id, id))
+    .returning();
+  if (!row) return res.status(404).json({ error: "Not found" });
+  return res.json(row);
+});
+
+router.delete("/admin/organizer-event/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  await db.delete(eventTicketsTable).where(eq(eventTicketsTable.eventId, id));
+  await db.delete(organizerEventsTable).where(eq(organizerEventsTable.id, id));
+  return res.json({ ok: true });
+});
+
+// Ticket tiers for an admin-authored event (no organizer-ownership check).
+router.get("/admin/organizer-event/:id/tickets", requireAuth(["admin"]), async (req, res) => {
+  const eventId = Number(req.params["id"]);
+  if (!Number.isFinite(eventId)) return res.status(400).json({ error: "Invalid id" });
+  const rows = await db.select().from(eventTicketsTable).where(eq(eventTicketsTable.eventId, eventId)).orderBy(eventTicketsTable.id);
+  return res.json(rows);
+});
+
+router.post("/admin/organizer-event/:id/tickets", requireAuth(["admin"]), async (req, res) => {
+  const eventId = Number(req.params["id"]);
+  if (!Number.isFinite(eventId)) return res.status(400).json({ error: "Invalid id" });
+  const parsed = TicketBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const { price, salesStartAt, salesEndAt, ...rest } = parsed.data;
+  const [row] = await db
+    .insert(eventTicketsTable)
+    .values({
+      eventId,
+      ...rest,
+      price: String(price ?? 0),
+      salesStartAt: salesStartAt ? new Date(salesStartAt) : null,
+      salesEndAt: salesEndAt ? new Date(salesEndAt) : null,
+    })
+    .returning();
+  return res.json(row);
+});
+
+router.patch("/admin/organizer-ticket/:tid", requireAuth(["admin"]), async (req, res) => {
+  const tid = Number(req.params["tid"]);
+  if (!Number.isFinite(tid)) return res.status(400).json({ error: "Invalid id" });
+  const parsed = TicketBody.partial().safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const { price, salesStartAt, salesEndAt, ...rest } = parsed.data;
+  const updates: Record<string, unknown> = { ...rest };
+  if (price != null) updates["price"] = String(price);
+  if (salesStartAt !== undefined) updates["salesStartAt"] = salesStartAt ? new Date(salesStartAt) : null;
+  if (salesEndAt !== undefined) updates["salesEndAt"] = salesEndAt ? new Date(salesEndAt) : null;
+  const [row] = await db.update(eventTicketsTable).set(updates).where(eq(eventTicketsTable.id, tid)).returning();
+  if (!row) return res.status(404).json({ error: "Not found" });
+  return res.json(row);
+});
+
+router.delete("/admin/organizer-ticket/:tid", requireAuth(["admin"]), async (req, res) => {
+  const tid = Number(req.params["tid"]);
+  if (!Number.isFinite(tid)) return res.status(400).json({ error: "Invalid id" });
+  await db.delete(eventTicketsTable).where(eq(eventTicketsTable.id, tid));
+  return res.json({ ok: true });
+});
+
+// Assign an organizer to an admin-authored event (the "later" step). Once linked,
+// the event follows the normal approval/public flow under that organizer.
+router.post("/admin/organizer-event/:id/assign-organizer", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const organizerId = Number((req.body as { organizerId?: unknown })?.organizerId);
+  if (!Number.isFinite(organizerId) || organizerId <= 0) return res.status(400).json({ error: "Select an organizer" });
+
+  const [org] = await db.select({ id: organizersTable.id, name: organizersTable.name, userId: organizersTable.userId })
+    .from(organizersTable).where(eq(organizersTable.id, organizerId)).limit(1);
+  if (!org) return res.status(404).json({ error: "Organizer not found" });
+
+  const [ev] = await db.select({ id: organizerEventsTable.id }).from(organizerEventsTable).where(eq(organizerEventsTable.id, id)).limit(1);
+  if (!ev) return res.status(404).json({ error: "Event not found" });
+
+  const [row] = await db.update(organizerEventsTable)
+    .set({ organizerId })
+    .where(eq(organizerEventsTable.id, id))
+    .returning();
+
+  // Carry everything connected to this event over to its new owner: any bookings
+  // and the event's coupons are re-pointed to the assigned organizer so the data
+  // shows under them (and stays consistent with organizer-scoped queries).
+  try {
+    await db.update(bookingsTable)
+      .set({ organizerId })
+      .where(and(eq(bookingsTable.organizerEventId, id), eq(bookingsTable.kind, "organizer")));
+  } catch (err) { logger.error({ err, eventId: id }, "assign: failed to migrate bookings"); }
+  try {
+    await db.update(organizerCouponsTable)
+      .set({ organizerId })
+      .where(eq(organizerCouponsTable.eventId, id));
+  } catch (err) { logger.error({ err, eventId: id }, "assign: failed to migrate coupons (code collision?)"); }
+  // Earnings (commission ledger) is keyed by event — re-point it so the event's
+  // realised revenue shows under the new organizer too.
+  try {
+    await db.execute(sql`UPDATE organizer_commission_ledger SET organizer_id = ${organizerId} WHERE organizer_event_id = ${id}`);
+  } catch (err) { logger.error({ err, eventId: id }, "assign: failed to migrate commission ledger"); }
+
+  if (org.userId && org.userId !== UNASSIGNED_EVENT_ORGANIZER_ID) {
+    try {
+      await createUserNotification({
+        userId: org.userId,
+        title: "An event was assigned to you",
+        message: `Admin created "${row?.title ?? "an event"}" and assigned it to ${org.name}. Review it in your dashboard.`,
+        url: "/dashboard/organizer",
+        tag: `event-assigned-${id}`,
+      });
+    } catch { /* best-effort */ }
+  }
+  return res.json(row);
+});
+
+// ── Per-event management (admin Manage view: Earnings / Insights / Leads /
+// Coupons). All scoped strictly by organizer_event_id so the data belongs to the
+// event itself — it follows the event when an organizer is assigned later. ──────
+
+// Earnings + insights KPIs for a single event.
+router.get("/admin/organizer-event/:id/analytics", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [ev] = await db.select({ commissionPct: organizerEventsTable.commissionPct }).from(organizerEventsTable).where(eq(organizerEventsTable.id, id)).limit(1);
+  if (!ev) return res.status(404).json({ error: "Not found" });
+
+  const [kpi] = (await db.execute(sql`
+    SELECT COUNT(*)::int AS "bookings", COALESCE(SUM(b.guests),0)::int AS "tickets",
+      COALESCE(SUM(b.final_price),0) AS "revenue",
+      COUNT(*) FILTER (WHERE b.checked_in)::int AS "attended",
+      COALESCE(SUM(b.final_price) FILTER (WHERE b.checked_in),0) AS "realisedRevenue"
+    FROM bookings b
+    WHERE b.kind='organizer' AND b.organizer_event_id = ${id} AND b.status='confirmed'
+  `)).rows as any[];
+
+  const byTicketType = await db.execute(sql`
+    SELECT t.name AS "ticketType", COALESCE(SUM(b.guests),0)::int AS "tickets", COALESCE(SUM(b.final_price),0) AS "revenue"
+    FROM bookings b JOIN event_tickets t ON t.id = b.event_ticket_id
+    WHERE b.kind='organizer' AND b.organizer_event_id = ${id} AND b.status='confirmed'
+    GROUP BY t.name ORDER BY "revenue" DESC
+  `);
+  const recent = await db.execute(sql`
+    SELECT to_char(b.created_at, 'YYYY-MM-DD') AS "day", COUNT(*)::int AS "bookings", COALESCE(SUM(b.final_price),0) AS "revenue"
+    FROM bookings b
+    WHERE b.kind='organizer' AND b.organizer_event_id = ${id} AND b.status='confirmed' AND b.created_at >= now() - interval '30 days'
+    GROUP BY "day" ORDER BY "day"
+  `);
+
+  const bookings = Number(kpi?.bookings ?? 0);
+  const attended = Number(kpi?.attended ?? 0);
+  const pct = Number(ev.commissionPct ?? 0);
+  // Commission is realised at door check-in (mirrors the organizer earnings model).
+  const realisedRevenue = Number(kpi?.realisedRevenue ?? 0);
+  const commission = Math.round(realisedRevenue * pct) / 100;
+  return res.json({
+    totals: {
+      bookings, tickets: Number(kpi?.tickets ?? 0), revenue: kpi?.revenue ?? "0",
+      attended, attendanceRate: bookings > 0 ? Math.round((attended / bookings) * 100) : 0,
+    },
+    earnings: { commissionPct: pct, realisedRevenue, commission, net: Math.round((realisedRevenue - commission) * 100) / 100 },
+    byTicketType: byTicketType.rows,
+    recent: recent.rows,
+  });
+});
+
+// Earnings (RevenuePayload shape, single event) for the reused EarningsPanel.
+router.get("/admin/organizer-event/:id/revenue", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const rows = await db.execute(sql`
+    SELECT e.id, e.title, e.commission_pct AS "commissionPct", e.gateway_fee_percent AS "gatewayFeePercent",
+      COALESCE((SELECT SUM(t.sold_count) FROM event_tickets t WHERE t.event_id = e.id), 0)::int AS "ticketsSold",
+      COALESCE(SUM(l.revenue),0) AS "revenue", COALESCE(SUM(l.commission),0) AS "commission",
+      COALESCE(SUM(l.gateway_fee),0) AS "gatewayFee", COALESCE(SUM(l.net),0) AS "net", COUNT(l.id)::int AS "attended"
+    FROM organizer_events e
+    LEFT JOIN organizer_commission_ledger l ON l.organizer_event_id = e.id
+    WHERE e.id = ${id}
+    GROUP BY e.id, e.title, e.commission_pct, e.gateway_fee_percent
+  `);
+  const [tot] = (await db.execute(sql`
+    SELECT COALESCE(SUM(revenue),0) AS "revenue", COALESCE(SUM(commission),0) AS "commission",
+      COALESCE(SUM(gateway_fee),0) AS "gatewayFee", COALESCE(SUM(net),0) AS "net"
+    FROM organizer_commission_ledger WHERE organizer_event_id = ${id}
+  `)).rows as any[];
+  return res.json({ events: rows.rows, totals: tot ?? { revenue: 0, commission: 0, gatewayFee: 0, net: 0 }, commissionOwed: "0" });
+});
+
+// Leads (LeadsPayload shape) for one event — the people who booked it (the
+// event's engaged audience; per-event profile-view tracking doesn't exist).
+router.get("/admin/organizer-event/:id/leads", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const rows = (await db.execute(sql`
+    SELECT b.user_id AS "viewerUserId", u.name AS "viewerName", u.email AS "viewerEmail", u.phone AS "phone",
+      COUNT(*)::int AS "visitCount", MAX(b.created_at) AS "lastViewedAt"
+    FROM bookings b LEFT JOIN users u ON u.id = b.user_id
+    WHERE b.kind='organizer' AND b.organizer_event_id = ${id} AND b.status='confirmed' AND b.user_id IS NOT NULL
+    GROUP BY b.user_id, u.name, u.email, u.phone
+    ORDER BY MAX(b.created_at) DESC
+  `)).rows as any[];
+  const views = rows.map((r) => ({
+    viewerUserId: r.viewerUserId, viewerName: r.viewerName ?? "Guest", viewerEmail: r.viewerEmail ?? "",
+    phone: r.phone ?? "", visitCount: Number(r.visitCount ?? 0), lastViewedAt: r.lastViewedAt, hasBooked: true,
+  }));
+  return res.json({ totalViews: views.reduce((s, v) => s + v.visitCount, 0), bookedCount: views.length, views });
+});
+
+// Leads — every booking for this event with attendee contact.
+router.get("/admin/organizer-event/:id/bookings", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const rows = await db.execute(sql`
+    SELECT b.id, b.created_at AS "createdAt", b.booking_date AS "bookingDate",
+      b.guests AS "quantity", (b.final_price + COALESCE(b.base_fee, 0)) AS "amount", b.checked_in AS "checkedIn",
+      b.person_name AS "attendee", b.phone, u.email AS "email", t.name AS "ticketType"
+    FROM bookings b
+    LEFT JOIN users u ON u.id = b.user_id
+    LEFT JOIN event_tickets t ON t.id = b.event_ticket_id
+    WHERE b.kind='organizer' AND b.organizer_event_id = ${id} AND b.status='confirmed'
+    ORDER BY b.created_at DESC
+  `);
+  return res.json(rows.rows);
+});
+
+// Coupons scoped to a single event.
+router.get("/admin/organizer-event/:id/coupons", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const rows = await db.select().from(organizerCouponsTable).where(eq(organizerCouponsTable.eventId, id)).orderBy(desc(organizerCouponsTable.createdAt));
+  return res.json(rows);
+});
+
+router.post("/admin/organizer-event/:id/coupons", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [ev] = await db.select({ organizerId: organizerEventsTable.organizerId }).from(organizerEventsTable).where(eq(organizerEventsTable.id, id)).limit(1);
+  if (!ev) return res.status(404).json({ error: "Event not found" });
+  const parsed = CouponBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const d = parsed.data;
+  try {
+    const [row] = await db.insert(organizerCouponsTable).values({
+      organizerId: ev.organizerId, eventId: id, code: d.code.toUpperCase().trim(), discountType: d.discountType,
+      discountValue: String(d.discountValue), active: d.active,
+      maxUses: d.maxUses ?? null, expiresAt: d.expiresAt ? new Date(d.expiresAt) : null,
+    }).returning();
+    return res.json(row);
+  } catch {
+    return res.status(409).json({ error: "A coupon with that code already exists for this organizer." });
+  }
+});
+
+router.patch("/admin/organizer-coupon/:cid", requireAuth(["admin"]), async (req, res) => {
+  const cid = Number(req.params["cid"]);
+  if (!Number.isFinite(cid)) return res.status(400).json({ error: "Invalid id" });
+  const active = (req.body as { active?: unknown })?.active;
+  if (typeof active !== "boolean") return res.status(400).json({ error: "active must be boolean" });
+  const [row] = await db.update(organizerCouponsTable).set({ active }).where(eq(organizerCouponsTable.id, cid)).returning();
+  if (!row) return res.status(404).json({ error: "Not found" });
+  return res.json(row);
+});
+
+router.delete("/admin/organizer-coupon/:cid", requireAuth(["admin"]), async (req, res) => {
+  const cid = Number(req.params["cid"]);
+  if (!Number.isFinite(cid)) return res.status(400).json({ error: "Invalid id" });
+  await db.delete(organizerCouponsTable).where(eq(organizerCouponsTable.id, cid));
+  return res.json({ ok: true });
 });
 
 router.patch("/admin/organizer-events/:id/slider", requireAuth(["admin"]), async (req, res) => {

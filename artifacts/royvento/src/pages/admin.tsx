@@ -2,6 +2,8 @@
 // (bump) fix: inArray for thread header match — 2026-05-21f
 import { SEO } from "@/components/SEO";
 import { Logo } from "@/components/Logo";
+import { EventEditor, ADMIN_EVENT_API, EarningsPanel as OrgEarningsPanel, InsightsPanel as OrgInsightsPanel, LeadsPanel as OrgLeadsPanel, CouponsPanel as OrgCouponsPanel, adminEventApi, type OrganizerEvent } from "./organizer-dashboard";
+import { GameEditor, PackageEditor, adminGameApi, adminPackageApi, InsightsPanel as GameInsightsPanel, LeadsPanel as GameLeadsPanel, CouponsPanel as GameCouponsPanel, adminGameOrgApi, type Game } from "./game-organizer-dashboard";
 import {
   useGetAdminAnalytics,
   useListPendingVendors,
@@ -63,7 +65,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   LineChart, Line, Area, AreaChart, PieChart, Pie, Cell,
 } from "recharts";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useLocation, useSearch } from "wouter";
 import { pubDetailSlug } from "@/lib/seo-slug";
@@ -8183,6 +8185,8 @@ function pctColor(p: number) {
 
 function LiveOccupancyAdmin() {
   const [drillVendor, setDrillVendor] = useState<ApiOccupancyRow | null>(null);
+  const [country, setCountry] = useState("India");
+  const [stateF, setStateF] = useState("");
   const [city, setCity] = useState("");
   const [q, setQ] = useState("");
   const [sortBy, setSortBy] = useState<"occupancy" | "name" | "city">("occupancy");
@@ -8218,9 +8222,10 @@ function LiveOccupancyAdmin() {
           <label className="text-xs uppercase text-muted-foreground">Search</label>
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Pub or city" className="bg-black/40 border-white/10" />
         </div>
-        <div className="w-48">
-          <label className="text-xs uppercase text-muted-foreground">City</label>
-          <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Bengaluru" className="bg-black/40 border-white/10" />
+        <div className="w-full md:w-auto md:min-w-[420px]">
+          <label className="text-xs uppercase text-muted-foreground block mb-1">Filter by location</label>
+          <LocationSelect compact country={country} state={stateF} city={city}
+            onChange={(n) => { setCountry(n.country); setStateF(n.state); setCity(n.city); }} />
         </div>
         <div>
           <label className="text-xs uppercase text-muted-foreground block">Sort</label>
@@ -8451,10 +8456,548 @@ interface VenueFormInitial {
   freeEntryForTable?: boolean; freeEntryForTableDays?: string[]; freeEntryForTableBeforeTime?: string | null;
 }
 
+// Create / edit an Event Organizer or Game Organizer from the admin Venues tab.
+// Self-contained (own state + submit). Organizers must be owned by an existing
+// user account, so create mode asks for the partner's account email; the backend
+// flips that user to the organizer role and creates the profile. Edit mode loads
+// the full profile by id and PATCHes it (owner can't change). Both Event and Game
+// organizers share ~all fields; Game adds Address + Maps URL.
+function OrganizerProfileForm({
+  kind, mode, id, onCreated, onUpdated, secondary,
+}: {
+  kind: "event" | "game";
+  mode: "create" | "edit";
+  id?: number;
+  onCreated?: () => void;
+  onUpdated?: () => void;
+  secondary?: { label: string; onClick: () => void };
+}) {
+  const { toast } = useToast();
+  const isGame = kind === "game";
+  const label = isGame ? "Game Organizer" : "Event Organizer";
+  const createPath = isGame ? "/api/admin/create-game-organizer" : "/api/admin/create-organizer";
+  const detailPath = (oid: number) => (isGame ? `/api/admin/game-organizers/${oid}` : `/api/admin/organizers/${oid}`);
+
+  const [loading, setLoading] = useState(mode === "edit");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
+  const [supportPhone, setSupportPhone] = useState("");
+  // Organizers store only city + state (no country column); a local country
+  // (default India) drives the dependent LocationSelect cascade.
+  const [country, setCountry] = useState("India");
+  const [city, setCity] = useState("");
+  const [stateF, setStateF] = useState("");
+  const [website, setWebsite] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [facebook, setFacebook] = useState("");
+  const [youtube, setYoutube] = useState("");
+  const [address, setAddress] = useState("");
+  const [mapsUrl, setMapsUrl] = useState("");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (mode !== "edit" || id == null) return;
+    let active = true;
+    apiGet<Record<string, unknown>>(detailPath(id))
+      .then((d) => {
+        if (!active) return;
+        const s = (k: string) => (typeof d[k] === "string" ? (d[k] as string) : "");
+        setName(s("name")); setDescription(s("description"));
+        setLogoUrl(s("logoUrl")); setCoverImageUrl(s("coverImageUrl"));
+        setSupportEmail(s("supportEmail")); setSupportPhone(s("supportPhone"));
+        setCity(s("city")); setStateF(s("state"));
+        setWebsite(s("website")); setInstagram(s("instagram")); setFacebook(s("facebook")); setYoutube(s("youtube"));
+        setAddress(s("address")); setMapsUrl(s("mapsUrl"));
+      })
+      .catch((e: { message?: string }) => setError(e?.message ?? "Failed to load"))
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [mode, id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function onLogo(files: FileList | null) {
+    const file = files?.[0]; if (!file) return;
+    setLogoUploading(true);
+    try { setLogoUrl(await uploadImage(file)); }
+    catch { toast({ title: "Logo upload failed", variant: "destructive" }); }
+    finally { setLogoUploading(false); }
+  }
+  async function onCover(files: FileList | null) {
+    const file = files?.[0]; if (!file) return;
+    setCoverUploading(true);
+    try { setCoverImageUrl(await uploadImage(file)); }
+    catch { toast({ title: "Cover upload failed", variant: "destructive" }); }
+    finally { setCoverUploading(false); }
+  }
+
+  function reset() {
+    setName(""); setDescription(""); setLogoUrl(""); setCoverImageUrl("");
+    setSupportEmail(""); setSupportPhone(""); setCountry("India"); setCity(""); setStateF("");
+    setWebsite(""); setInstagram(""); setFacebook(""); setYoutube(""); setAddress(""); setMapsUrl("");
+  }
+
+  async function handleSubmit(e: { preventDefault: () => void }) {
+    e.preventDefault();
+    if (!name.trim()) { setError(`${label} name is required.`); return; }
+    setError(""); setSubmitting(true);
+    const payload: Record<string, unknown> = {
+      name: name.trim(), description, logoUrl, coverImageUrl,
+      website, instagram, facebook, youtube,
+      supportEmail, supportPhone, city, state: stateF,
+    };
+    if (isGame) { payload["address"] = address; payload["mapsUrl"] = mapsUrl; }
+    try {
+      if (mode === "create") {
+        await apiPost(createPath, payload);
+        toast({ title: `${label} created (unassigned)`, description: `"${name.trim()}" is ready. Assign it to a partner by email from the ${label}s tab.` });
+        reset();
+        onCreated?.();
+      } else {
+        await apiPatch(detailPath(id as number), payload);
+        toast({ title: `${label} updated` });
+        onUpdated?.();
+      }
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message ?? "Something went wrong.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loading) return <div className="text-sm text-muted-foreground py-8">Loading…</div>;
+
+  const imgBox = (url: string, clear: () => void, uploading: boolean, onPick: (f: FileList | null) => void, pickLabel: string) =>
+    url ? (
+      <div className="relative w-32 h-20 rounded-lg overflow-hidden border border-white/10">
+        <img src={url} alt="" className="w-full h-full object-cover" />
+        <button type="button" onClick={clear}
+          className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 flex items-center justify-center text-white">
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    ) : (
+      <label className={cn(
+        "flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/20 text-sm text-muted-foreground cursor-pointer hover:border-white/40 transition-colors w-fit",
+        uploading && "opacity-50 pointer-events-none",
+      )}>
+        <Upload className="h-4 w-4" />
+        {uploading ? "Uploading..." : pickLabel}
+        <input type="file" accept="image/*" className="hidden" onChange={(e) => onPick(e.target.files)} />
+      </label>
+    );
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300 flex items-center gap-2">
+          <XCircle className="h-4 w-4 shrink-0" /> {error}
+        </div>
+      )}
+
+      {mode === "create" && (
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-xs text-muted-foreground flex items-start gap-2">
+          <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-white/40" />
+          <span>Created <b className="text-white/70">unassigned</b> — no partner needed now. Assign it to a partner by email later from the <b className="text-white/70">{label}s</b> tab, just like venues.</span>
+        </div>
+      )}
+
+      {/* -- Brand (mirrors the partner-side organizer onboarding form) -------- */}
+      <section className="rounded-xl border border-white/8 p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label} brand</p>
+        <div className="space-y-1.5">
+          <Label>{label} name <span className="text-red-400">*</span></Label>
+          <Input placeholder={isGame ? "e.g. GameZone Arena" : "e.g. Midnight Live Co."} value={name}
+            onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10" required />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Brand description</Label>
+          <Textarea placeholder="Tell guests what your events are about." value={description}
+            onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10 min-h-[80px]" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Country / State / City</Label>
+          <LocationSelect country={country} state={stateF} city={city}
+            onChange={(n) => { setCountry(n.country); setStateF(n.state); setCity(n.city); }} />
+        </div>
+        {isGame && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5"><Label>Address</Label>
+              <Input placeholder="Street address" value={address} onChange={(e) => setAddress(e.target.value)} className="bg-black/40 border-white/10" /></div>
+            <div className="space-y-1.5"><Label>Google Maps URL</Label>
+              <Input placeholder="https://maps.google.com/..." value={mapsUrl} onChange={(e) => setMapsUrl(e.target.value)} className="bg-black/40 border-white/10" /></div>
+          </div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5"><Label>Logo</Label>{imgBox(logoUrl, () => setLogoUrl(""), logoUploading, onLogo, "Upload logo")}</div>
+          <div className="space-y-1.5"><Label>Cover image</Label>{imgBox(coverImageUrl, () => setCoverImageUrl(""), coverUploading, onCover, "Upload cover photo")}</div>
+        </div>
+      </section>
+
+      {/* -- Links & support -------------------------------------------------- */}
+      <section className="rounded-xl border border-white/8 p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Links & support</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5"><Label>Website</Label>
+            <Input value={website} onChange={(e) => setWebsite(e.target.value)} className="bg-black/40 border-white/10" /></div>
+          <div className="space-y-1.5"><Label>Instagram</Label>
+            <Input value={instagram} onChange={(e) => setInstagram(e.target.value)} className="bg-black/40 border-white/10" /></div>
+          <div className="space-y-1.5"><Label>Facebook</Label>
+            <Input value={facebook} onChange={(e) => setFacebook(e.target.value)} className="bg-black/40 border-white/10" /></div>
+          <div className="space-y-1.5"><Label>YouTube</Label>
+            <Input value={youtube} onChange={(e) => setYoutube(e.target.value)} className="bg-black/40 border-white/10" /></div>
+          <div className="space-y-1.5"><Label>Support email</Label>
+            <Input type="email" value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} className="bg-black/40 border-white/10" /></div>
+          <div className="space-y-1.5"><Label>Support phone</Label>
+            <Input value={supportPhone} onChange={(e) => setSupportPhone(e.target.value)} className="bg-black/40 border-white/10" /></div>
+        </div>
+      </section>
+
+      <div className="flex gap-3">
+        <Button type="submit" disabled={submitting} className="flex-1">
+          {submitting ? (mode === "create" ? "Creating..." : "Saving...") : (mode === "create" ? `Create ${label}` : "Save Changes")}
+        </Button>
+        {secondary && (
+          <Button type="button" variant="outline" onClick={secondary.onClick}>{secondary.label}</Button>
+        )}
+      </div>
+    </form>
+  );
+}
+
+interface AdminUnassignedEvent {
+  id: number; title: string; coverImageUrl: string; category: string; city: string; startDate: string | null; approvalStatus: string;
+  organizerId?: number; organizerName?: string | null;
+}
+
+
+// Per-event Manage view. Reuses the EXACT event-organizer dashboard panels
+// (Earnings / Insights / Leads / Coupons), scoped to the single event via
+// /admin/organizer-event/:id/*. Works BEFORE assignment (data is event-keyed);
+// on assignment the event's bookings, coupons and earnings move to the organizer.
+function AdminEventManage({ event, onBack }: { event: AdminUnassignedEvent; onBack: () => void }) {
+  const [tab, setTab] = useState<"earnings" | "insights" | "leads" | "coupons">("earnings");
+  const api = useMemo(() => adminEventApi(event.id), [event.id]);
+  // The reused Insights/Coupons panels accept an events list; for a single-event
+  // view we pass just this event so labels resolve (the coupon picker is locked).
+  const selfEvent = useMemo(() => ([{ id: event.id, title: event.title }] as unknown as OrganizerEvent[]), [event.id, event.title]);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-3">
+        <Button size="sm" variant="ghost" className="text-white/60" onClick={onBack}>← Back</Button>
+        <div>
+          <h2 className="font-serif text-xl">{event.title}</h2>
+          <p className="text-xs text-muted-foreground">{event.organizerName ? `Organizer: ${event.organizerName}` : "Unassigned — data follows the event on assignment"}</p>
+        </div>
+      </div>
+
+      <div className="inline-flex rounded-lg border border-white/10 bg-black/30 p-1 flex-wrap">
+        {([["earnings", "Earnings"], ["insights", "Insights"], ["leads", "Leads"], ["coupons", "Coupons"]] as const).map(([id, label]) => (
+          <button key={id} type="button" onClick={() => setTab(id)}
+            className={cn("px-4 py-1.5 rounded-md text-sm font-medium transition-colors", tab === id ? "bg-primary text-white" : "text-white/60 hover:text-white hover:bg-white/5")}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === "earnings" && <OrgEarningsPanel api={api} showBanking={false} />}
+      {tab === "insights" && <OrgInsightsPanel events={[]} api={api} />}
+      {tab === "leads" && <OrgLeadsPanel api={api} />}
+      {tab === "coupons" && <OrgCouponsPanel events={selfEvent} api={api} lockedEventId={event.id} />}
+    </div>
+  );
+}
+
+// Venues > Event Organizer: admins author organizer events using the exact
+// organizer "Create Event" form (EventEditor + ADMIN_EVENT_API). Events are saved
+// unassigned (sentinel organizer 0); an organizer is linked later from "Manage
+// events" — mirroring how admin-created venues are assigned to a partner later.
+function AdminEventOrganizerPanel() {
+  const { toast } = useToast();
+  const [view, setView] = useState<"create" | "manage">("create");
+  const [editingId, setEditingId] = useState<number | null>(null); // null = new event
+  const [events, setEvents] = useState<AdminUnassignedEvent[]>([]);
+  const [organizers, setOrganizers] = useState<{ id: number; name: string }[]>([]);
+  const [assignTarget, setAssignTarget] = useState<AdminUnassignedEvent | null>(null);
+  const [assignOrgId, setAssignOrgId] = useState("");
+  const [assigning, setAssigning] = useState(false);
+  const [managing, setManaging] = useState<AdminUnassignedEvent | null>(null);
+
+  const loadEvents = () => apiGet<AdminUnassignedEvent[]>("/api/admin/organizer-events/all").then(setEvents).catch(() => {});
+  const loadOrgs = () => apiGet<{ id: number; name: string }[]>("/api/admin/organizers").then((d) => setOrganizers(d.map((o) => ({ id: o.id, name: o.name })))).catch(() => {});
+  useEffect(() => { loadEvents(); loadOrgs(); }, []);
+
+  const removeEvent = async (e: AdminUnassignedEvent) => {
+    if (!window.confirm(`Delete event "${e.title}"? This cannot be undone.`)) return;
+    try { await apiDelete(`/api/admin/organizer-event/${e.id}`); toast({ title: "Event deleted" }); loadEvents(); }
+    catch (err: any) { toast({ title: "Delete failed", description: err?.message, variant: "destructive" }); }
+  };
+  const assign = async () => {
+    if (!assignTarget) return;
+    const organizerId = Number(assignOrgId);
+    if (!organizerId) { toast({ title: "Select an organizer", variant: "destructive" }); return; }
+    setAssigning(true);
+    try {
+      await apiPost(`/api/admin/organizer-event/${assignTarget.id}/assign-organizer`, { organizerId });
+      toast({ title: "Organizer assigned", description: "The event now belongs to that organizer." });
+      setAssignTarget(null); setAssignOrgId(""); loadEvents();
+    } catch (err: any) { toast({ title: "Assign failed", description: err?.message, variant: "destructive" }); }
+    finally { setAssigning(false); }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-xs text-muted-foreground flex items-start gap-2">
+        <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-white/40" />
+        <span>This is the organizer's <b className="text-white/70">Create Event</b> form. The event is saved <b className="text-white/70">unassigned</b> — link it to an organizer later from <b className="text-white/70">Manage events</b>.</span>
+      </div>
+
+      <div className="inline-flex rounded-lg border border-white/10 bg-black/30 p-1">
+        {([{ id: "create" as const, label: editingId ? "Edit event" : "Create event", icon: Plus }, { id: "manage" as const, label: `Manage events (${events.length})`, icon: Briefcase }]).map((t) => (
+          <button key={t.id} type="button"
+            onClick={() => { if (t.id === "create") { setView("create"); } else { setView("manage"); loadEvents(); } }}
+            className={cn("flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors", view === t.id ? "bg-primary text-white" : "text-white/60 hover:text-white hover:bg-white/5")}>
+            <t.icon className="h-3.5 w-3.5" />{t.label}
+          </button>
+        ))}
+        {editingId != null && view === "create" && (
+          <button type="button" onClick={() => setEditingId(null)} className="flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium text-white/60 hover:text-white hover:bg-white/5">
+            <Plus className="h-3.5 w-3.5" />New
+          </button>
+        )}
+      </div>
+
+      {view === "create" ? (
+        <EventEditor
+          key={editingId ?? "new"}
+          api={ADMIN_EVENT_API}
+          eventId={editingId}
+          onDone={(created) => {
+            loadEvents();
+            if (created && editingId == null) {
+              setEditingId(created.id);
+              toast({ title: "Event created (unassigned)", description: "Add ticket tiers below, then assign an organizer from Manage events." });
+            } else {
+              setEditingId(null); setView("manage");
+            }
+          }}
+          onCancel={() => { setEditingId(null); setView("manage"); loadEvents(); }}
+        />
+      ) : managing ? (
+        <AdminEventManage event={managing} onBack={() => { setManaging(null); loadEvents(); }} />
+      ) : events.length === 0 ? (
+        <div className="rounded-2xl glass-card p-6 text-center">
+          <CalendarCheck className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">No events yet. Create one, then assign an organizer here.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {events.map((e) => {
+            const assigned = !!(e.organizerId && e.organizerId !== 0);
+            return (
+            <div key={e.id} className="rounded-2xl glass-card p-4 flex flex-wrap items-center gap-4">
+              <div className="h-14 w-20 rounded-lg overflow-hidden bg-white/5 shrink-0">
+                {e.coverImageUrl ? <img src={e.coverImageUrl} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center"><CalendarCheck className="h-5 w-5 text-white/30" /></div>}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-medium truncate">{e.title}</p>
+                  {assigned
+                    ? <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border text-emerald-300 border-emerald-500/30 bg-emerald-500/10">{e.organizerName}</span>
+                    : <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border text-sky-300 border-sky-500/30 bg-sky-500/10">Unassigned</span>}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">{e.category || "—"} · {e.city || "—"} · {e.startDate || "no date"} · {e.approvalStatus}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button size="sm" onClick={() => setManaging(e)}><Briefcase className="h-3.5 w-3.5 mr-1" />Manage</Button>
+                <Button size="sm" variant="outline" onClick={() => { setEditingId(e.id); setView("create"); }}><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
+                <Button size="sm" variant="outline" className="text-sky-300 border-sky-500/30 hover:bg-sky-500/10" onClick={() => { setAssignTarget(e); setAssignOrgId(""); }}>{assigned ? "Reassign" : "Assign organizer"}</Button>
+                <Button size="sm" variant="outline" className="text-red-400 border-red-500/30 hover:bg-red-500/10" onClick={() => removeEvent(e)}><Trash2 className="h-4 w-4" /></Button>
+              </div>
+            </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={assignTarget != null} onOpenChange={(open) => { if (!open) { setAssignTarget(null); setAssignOrgId(""); } }}>
+        <DialogContent className="sm:max-w-md bg-[#16151a] border-white/10">
+          <DialogHeader>
+            <DialogTitle>Assign organizer</DialogTitle>
+            <DialogDescription>Link <b className="text-white/80">{assignTarget?.title}</b> to an organizer. It then follows the normal approval flow under that organizer.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>Organizer</Label>
+            <Select value={assignOrgId} onValueChange={setAssignOrgId}>
+              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="Select an organizer" /></SelectTrigger>
+              <SelectContent>
+                {organizers.map((o) => <SelectItem key={o.id} value={String(o.id)}>{o.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {organizers.length === 0 && <p className="text-[11px] text-amber-300/80">No organizers exist yet. A partner must onboard as an organizer first.</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAssignTarget(null); setAssignOrgId(""); }}>Cancel</Button>
+            <Button onClick={assign} disabled={assigning}>{assigning ? "Assigning..." : "Assign"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+interface AdminGameRow { id: number; name: string; category: string; approvalStatus: string; coverImageUrl: string; }
+interface AdminPkgRow { id: number; name: string; price: string; approvalStatus: string; }
+
+// Venues > Game Organizer (Phase 1): create the game organizer Profile (unassigned,
+// assign owner by email later), then Manage a chosen game organizer's Games &
+// Packages using the exact partner forms (admin-scoped endpoints). Coupons, Leads
+// and Analytics come in a later phase.
+function AdminGameOrganizerPanel() {
+  const { toast } = useToast();
+  const [view, setView] = useState<"create" | "manage">("create");
+  const [orgs, setOrgs] = useState<{ id: number; name: string; ownerEmail: string | null }[]>([]);
+  const [orgId, setOrgId] = useState("");
+  const [section, setSection] = useState<"games" | "packages" | "analytics" | "leads" | "coupons">("games");
+  const [games, setGames] = useState<Game[]>([]);
+  const [packages, setPackages] = useState<AdminPkgRow[]>([]);
+  const [gEditing, setGEditing] = useState<number | "new" | null>(null);
+  const [pEditing, setPEditing] = useState<number | "new" | null>(null);
+
+  const loadOrgs = () => apiGet<{ id: number; name: string; ownerEmail: string | null }[]>("/api/admin/game-organizers")
+    .then((d) => setOrgs(d.map((o) => ({ id: o.id, name: o.name, ownerEmail: o.ownerEmail })))).catch(() => {});
+  useEffect(() => { loadOrgs(); }, []);
+
+  const numOrgId = Number(orgId) || 0;
+  const loadGames = () => { if (numOrgId) apiGet<Game[]>(`/api/admin/game-organizer/${numOrgId}/games`).then(setGames).catch(() => {}); };
+  const loadPackages = () => { if (numOrgId) apiGet<AdminPkgRow[]>(`/api/admin/game-organizer/${numOrgId}/packages`).then(setPackages).catch(() => {}); };
+  useEffect(() => {
+    setGEditing(null); setPEditing(null);
+    if (numOrgId) { loadGames(); loadPackages(); } else { setGames([]); setPackages([]); }
+  }, [numOrgId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const gameApi = useMemo(() => adminGameApi(numOrgId), [numOrgId]);
+  const pkgApi = useMemo(() => adminPackageApi(numOrgId), [numOrgId]);
+  const gameOrgApi = useMemo(() => adminGameOrgApi(numOrgId), [numOrgId]);
+
+  const delGame = async (g: AdminGameRow | Game) => {
+    if (!window.confirm(`Delete game "${g.name}"?`)) return;
+    try { await apiDelete(`/api/admin/game/${g.id}`); toast({ title: "Game deleted" }); loadGames(); }
+    catch (e: any) { toast({ title: "Delete failed", description: e?.message, variant: "destructive" }); }
+  };
+  const delPkg = async (p: AdminPkgRow) => {
+    if (!window.confirm(`Delete package "${p.name}"?`)) return;
+    try { await apiDelete(`/api/admin/game-package/${p.id}`); toast({ title: "Package deleted" }); loadPackages(); }
+    catch (e: any) { toast({ title: "Delete failed", description: e?.message, variant: "destructive" }); }
+  };
+
+  const selectedOrg = orgs.find((o) => o.id === numOrgId);
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-xs text-muted-foreground flex items-start gap-2">
+        <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-white/40" />
+        <span><b className="text-white/70">Create profile</b> makes an unassigned game organizer (assign an owner by email later from the Game Organizers tab). <b className="text-white/70">Manage</b> lets you add games & packages to any game organizer using the partner's own forms.</span>
+      </div>
+
+      <div className="inline-flex rounded-lg border border-white/10 bg-black/30 p-1">
+        {([{ id: "create" as const, label: "Create profile", icon: Plus }, { id: "manage" as const, label: "Manage games & packages", icon: Briefcase }]).map((t) => (
+          <button key={t.id} type="button"
+            onClick={() => { setView(t.id); if (t.id === "manage") loadOrgs(); }}
+            className={cn("flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors", view === t.id ? "bg-primary text-white" : "text-white/60 hover:text-white hover:bg-white/5")}>
+            <t.icon className="h-3.5 w-3.5" />{t.label}
+          </button>
+        ))}
+      </div>
+
+      {view === "create" ? (
+        <OrganizerProfileForm kind="game" mode="create" onCreated={() => { loadOrgs(); }} />
+      ) : (
+        <div className="space-y-4">
+          <div className="space-y-1.5 max-w-md">
+            <Label>Game organizer</Label>
+            <Select value={orgId} onValueChange={setOrgId}>
+              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="Select a game organizer to manage" /></SelectTrigger>
+              <SelectContent>
+                {orgs.map((o) => <SelectItem key={o.id} value={String(o.id)}>{o.name}{o.ownerEmail ? "" : " · unassigned"}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {orgs.length === 0 && <p className="text-[11px] text-amber-300/80">No game organizers yet. Create a profile first.</p>}
+          </div>
+
+          {!numOrgId ? (
+            <div className="rounded-2xl glass-card p-6 text-center">
+              <Gamepad2 className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">Pick a game organizer to add games & packages.</p>
+            </div>
+          ) : (
+            <>
+              <div className="inline-flex rounded-lg border border-white/10 bg-black/30 p-1 flex-wrap">
+                {([{ id: "games" as const, label: `Games (${games.length})` }, { id: "packages" as const, label: `Packages (${packages.length})` }, { id: "analytics" as const, label: "Analytics" }, { id: "leads" as const, label: "Leads" }, { id: "coupons" as const, label: "Coupons" }]).map((s) => (
+                  <button key={s.id} type="button" onClick={() => setSection(s.id)}
+                    className={cn("px-4 py-1.5 rounded-md text-sm font-medium transition-colors", section === s.id ? "bg-primary text-white" : "text-white/60 hover:text-white hover:bg-white/5")}>
+                    {s.label}
+                  </button>
+                ))}
+                <span className="px-3 py-1.5 text-xs text-white/40 self-center">{selectedOrg?.name}{selectedOrg && !selectedOrg.ownerEmail ? " · unassigned" : ""}</span>
+              </div>
+
+              {section === "analytics" ? (
+                <GameInsightsPanel api={gameOrgApi} />
+              ) : section === "leads" ? (
+                <GameLeadsPanel api={gameOrgApi} />
+              ) : section === "coupons" ? (
+                <GameCouponsPanel games={games} api={gameOrgApi} />
+              ) : section === "games" ? (
+                gEditing != null ? (
+                  <GameEditor key={`g-${gEditing}`} api={gameApi} gameId={gEditing === "new" ? null : gEditing}
+                    onDone={() => { setGEditing(null); loadGames(); }} onCancel={() => setGEditing(null)} />
+                ) : (
+                  <div className="space-y-3">
+                    <Button size="sm" onClick={() => setGEditing("new")}><Plus className="h-4 w-4 mr-1" />Add game</Button>
+                    {games.length === 0 ? <p className="text-sm text-muted-foreground">No games yet.</p> : games.map((g) => (
+                      <div key={g.id} className="rounded-2xl glass-card p-4 flex items-center gap-4">
+                        <div className="h-12 w-16 rounded-lg overflow-hidden bg-white/5 shrink-0">{g.coverImageUrl ? <img src={g.coverImageUrl} alt="" className="h-full w-full object-cover" /> : null}</div>
+                        <div className="min-w-0 flex-1"><p className="font-medium truncate">{g.name}</p><p className="text-xs text-muted-foreground">{g.category || "—"} · {g.approvalStatus}</p></div>
+                        <Button size="sm" variant="outline" onClick={() => setGEditing(g.id)}><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
+                        <Button size="sm" variant="outline" className="text-red-400 border-red-500/30 hover:bg-red-500/10" onClick={() => delGame(g)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : (
+                pEditing != null ? (
+                  <PackageEditor key={`p-${pEditing}`} api={pkgApi} pkgId={pEditing === "new" ? null : pEditing} games={games}
+                    onDone={() => { setPEditing(null); loadPackages(); }} onCancel={() => setPEditing(null)} />
+                ) : (
+                  <div className="space-y-3">
+                    <Button size="sm" onClick={() => setPEditing("new")}><Plus className="h-4 w-4 mr-1" />Build package</Button>
+                    {packages.length === 0 ? <p className="text-sm text-muted-foreground">No packages yet.</p> : packages.map((p) => (
+                      <div key={p.id} className="rounded-2xl glass-card p-4 flex items-center gap-4">
+                        <div className="min-w-0 flex-1"><p className="font-medium truncate">{p.name}</p><p className="text-xs text-muted-foreground">₹{Number(p.price).toLocaleString("en-IN")} · {p.approvalStatus}</p></div>
+                        <Button size="sm" variant="outline" onClick={() => setPEditing(p.id)}><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
+                        <Button size="sm" variant="outline" className="text-red-400 border-red-500/30 hover:bg-red-500/10" onClick={() => delPkg(p)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Shared create/edit venue form. Owns all field state + uploads; calls onSubmit
 // with the payload shape both the create and edit endpoints accept.
 function VenueForm({
-  initial, submitLabel, submittingLabel, onSubmit, resetOnSuccess, secondary,
+  initial, submitLabel, submittingLabel, onSubmit, resetOnSuccess, secondary, allowOrganizerCategories,
 }: {
   initial?: VenueFormInitial;
   submitLabel: string;
@@ -8462,6 +9005,9 @@ function VenueForm({
   onSubmit: (payload: VenuePayload) => Promise<void>;
   resetOnSuccess?: boolean;
   secondary?: { label: string; onClick: () => void };
+  // Only the Venues → Create flow may switch into the Event/Game Organizer forms.
+  // Venue edit keeps the venue-only category list (a venue can't become an organizer).
+  allowOrganizerCategories?: boolean;
 }) {
   const { toast } = useToast();
 
@@ -8700,7 +9246,40 @@ function VenueForm({
     }
   }
 
+  const isEventOrg = category === "Event Organizer";
+  const isGameOrg = category === "Game Organizer";
+
   return (
+    <div className="space-y-6">
+      {/* Category — drives which form renders below. Selecting an organizer
+          category swaps the whole layout to its dedicated form. */}
+      <section className="rounded-xl border border-white/8 p-4 space-y-2">
+        <Label>Category</Label>
+        <div className="max-w-xs">
+          <Select value={category} onValueChange={(v) => setCategory(v as VenueCategory)}>
+            <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Pub">Pub</SelectItem>
+              <SelectItem value="Club">Club</SelectItem>
+              <SelectItem value="Pub & Club">Pub & Club</SelectItem>
+              <SelectItem value="Pub & Bar">Pub & Bar</SelectItem>
+              {allowOrganizerCategories && <SelectItem value="Event Organizer">Event Organizer</SelectItem>}
+              {allowOrganizerCategories && <SelectItem value="Game Organizer">Game Organizer</SelectItem>}
+            </SelectContent>
+          </Select>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          {isEventOrg ? "Create the event now (unassigned) using the organizer's Create Event form, then assign an organizer to it later."
+            : isGameOrg ? "Create the game organizer profile (unassigned), add its games & packages, then assign an owner by email later."
+            : "Creates a pub/club venue. Pub & Club and Pub & Bar are venue types."}
+        </p>
+      </section>
+
+      {isEventOrg ? (
+        <AdminEventOrganizerPanel />
+      ) : isGameOrg ? (
+        <AdminGameOrganizerPanel />
+      ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
 
           {submitError && (
@@ -8713,27 +9292,11 @@ function VenueForm({
           <section className="rounded-xl border border-white/8 p-4 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Venue Info</p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="cp-title">Venue Name <span className="text-red-400">*</span></Label>
-                <Input id="cp-title" placeholder="e.g. The Brew House"
-                  value={title} onChange={(e) => setTitle(e.target.value)}
-                  className="bg-black/40 border-white/10" required />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Category</Label>
-                <Select value={category} onValueChange={(v) => setCategory(v as VenueCategory)}>
-                  <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Pub">Pub</SelectItem>
-                    <SelectItem value="Club">Club</SelectItem>
-                    <SelectItem value="Pub & Club">Pub & Club</SelectItem>
-                    <SelectItem value="Pub & Bar">Pub & Bar</SelectItem>
-                    <SelectItem value="Event Organizer">Event Organizer</SelectItem>
-                    <SelectItem value="Game Organizer">Game Organizer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cp-title">Venue Name <span className="text-red-400">*</span></Label>
+              <Input id="cp-title" placeholder="e.g. The Brew House"
+                value={title} onChange={(e) => setTitle(e.target.value)}
+                className="bg-black/40 border-white/10" required />
             </div>
 
             <div className="space-y-1.5">
@@ -9127,6 +9690,8 @@ function VenueForm({
             </Button>
           </div>
         </form>
+      )}
+    </div>
   );
 }
 
@@ -9193,6 +9758,7 @@ function CreatePubAdmin() {
             submittingLabel="Creating..."
             onSubmit={createVenue}
             resetOnSuccess
+            allowOrganizerCategories
           />
         </div>
       )}
@@ -10080,6 +10646,10 @@ function OrganizerAccountsAdmin() {
   const [items, setItems] = useState<AdminOrganizer[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [assignTarget, setAssignTarget] = useState<AdminOrganizer | null>(null);
+  const [assignEmail, setAssignEmail] = useState("");
+  const [assigning, setAssigning] = useState(false);
   const { toast } = useToast();
 
   const load = () => {
@@ -10111,6 +10681,23 @@ function OrganizerAccountsAdmin() {
       load();
     } catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
   };
+  const assign = async () => {
+    if (!assignTarget) return;
+    const email = assignEmail.trim();
+    if (!email) { toast({ title: "Enter the partner's account email", variant: "destructive" }); return; }
+    setAssigning(true);
+    try {
+      await apiPost(`/api/admin/organizers/${assignTarget.id}/assign`, { email });
+      toast({ title: "Organizer assigned", description: `Linked to ${email}.` });
+      setAssignTarget(null); setAssignEmail(""); load();
+    } catch (e: any) { toast({ title: "Assign failed", description: e?.message, variant: "destructive" }); }
+    finally { setAssigning(false); }
+  };
+  const unassign = async (o: AdminOrganizer) => {
+    if (!window.confirm(`Unassign "${o.name}" from ${o.ownerEmail}? It returns to the unassigned pool and the partner loses access.`)) return;
+    try { await apiPost(`/api/admin/organizers/${o.id}/unassign`, {}); toast({ title: "Organizer unassigned" }); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+  };
 
   if (loading) return <p className="text-muted-foreground text-sm">Loading organizers...</p>;
   if (loadError) return (
@@ -10135,6 +10722,7 @@ function OrganizerAccountsAdmin() {
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-medium truncate">{o.name}</p>
               {o.verified && <ShieldCheck className="h-4 w-4 text-amber-400" />}
+              {!o.ownerEmail && <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border text-sky-300 border-sky-500/30 bg-sky-500/10">Unassigned</span>}
               {o.hidden && <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border text-red-300 border-red-500/30 bg-red-500/10">Hidden</span>}
               <span className={
                 "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border " +
@@ -10143,10 +10731,13 @@ function OrganizerAccountsAdmin() {
                   : "text-amber-300 border-amber-500/30 bg-amber-500/10")
               }>{o.status}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{o.ownerEmail ?? "—"} · {[o.city, o.state].filter(Boolean).join(", ") || "—"} · {o.eventCount} event{o.eventCount !== 1 ? "s" : ""}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{o.ownerEmail ?? "Unassigned — assign a partner by email"} · {[o.city, o.state].filter(Boolean).join(", ") || "—"} · {o.eventCount} event{o.eventCount !== 1 ? "s" : ""}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {o.slug && <Button size="sm" variant="outline" asChild><a href={`/organizers/${o.slug}`} target="_blank" rel="noreferrer">View</a></Button>}
+            <Button size="sm" variant="outline" onClick={() => setEditId(o.id)}><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
+            <Button size="sm" variant="outline" className="text-sky-300 border-sky-500/30 hover:bg-sky-500/10" onClick={() => { setAssignTarget(o); setAssignEmail(o.ownerEmail ?? ""); }}>{o.ownerEmail ? "Reassign" : "Assign"}</Button>
+            {o.ownerEmail && <Button size="sm" variant="outline" onClick={() => unassign(o)}>Unassign</Button>}
             <Button size="sm" variant="outline" onClick={() => setVerified(o.id, !o.verified)}>{o.verified ? "Unverify" : "Verify"}</Button>
             <Button size="sm" variant="outline" className={o.hidden ? "text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/10" : "text-orange-300 border-orange-500/30 hover:bg-orange-500/10"} onClick={() => setHidden(o.id, !o.hidden)}>{o.hidden ? "Show" : "Hide"}</Button>
             {o.status !== "approved" && <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setStatus(o.id, "approved")}>Approve</Button>}
@@ -10155,6 +10746,44 @@ function OrganizerAccountsAdmin() {
           </div>
         </div>
       ))}
+
+      <Dialog open={editId != null} onOpenChange={(open) => { if (!open) setEditId(null); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-[#16151a] border-white/10">
+          <DialogHeader>
+            <DialogTitle>Edit Event Organizer</DialogTitle>
+            <DialogDescription>Update the organizer's public profile. Owner account can't be changed here.</DialogDescription>
+          </DialogHeader>
+          {editId != null && (
+            <OrganizerProfileForm
+              kind="event" mode="edit" id={editId}
+              onUpdated={() => { setEditId(null); load(); }}
+              secondary={{ label: "Cancel", onClick: () => setEditId(null) }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={assignTarget != null} onOpenChange={(open) => { if (!open) { setAssignTarget(null); setAssignEmail(""); } }}>
+        <DialogContent className="sm:max-w-md bg-[#16151a] border-white/10">
+          <DialogHeader>
+            <DialogTitle>{assignTarget?.ownerEmail ? "Reassign" : "Assign"} organizer</DialogTitle>
+            <DialogDescription>
+              Link <b className="text-white/80">{assignTarget?.name}</b> to a partner's account by email. They must already have a Royvento account; they'll be switched to the organizer role and can manage it from their dashboard.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>Partner account email</Label>
+            <Input type="email" placeholder="partner@email.com" value={assignEmail}
+              onChange={(e) => setAssignEmail(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") assign(); }}
+              className="bg-black/40 border-white/10" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAssignTarget(null); setAssignEmail(""); }}>Cancel</Button>
+            <Button onClick={assign} disabled={assigning}>{assigning ? "Assigning..." : "Assign"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -10284,6 +10913,10 @@ function GameOrganizerAccountsAdmin() {
   const [items, setItems] = useState<AdminGameOrganizer[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [assignTarget, setAssignTarget] = useState<AdminGameOrganizer | null>(null);
+  const [assignEmail, setAssignEmail] = useState("");
+  const [assigning, setAssigning] = useState(false);
   const { toast } = useToast();
 
   const load = () => {
@@ -10306,6 +10939,23 @@ function GameOrganizerAccountsAdmin() {
   const remove = async (o: AdminGameOrganizer) => {
     if (!window.confirm(`Delete game organizer "${o.name}"? This permanently removes the venue and all ${o.gameCount} game(s) and ${o.packageCount} package(s), along with related bookings. This cannot be undone.`)) return;
     try { await apiDelete(`/api/admin/game-organizers/${o.id}`); toast({ title: "Game organizer deleted" }); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+  };
+  const assign = async () => {
+    if (!assignTarget) return;
+    const email = assignEmail.trim();
+    if (!email) { toast({ title: "Enter the partner's account email", variant: "destructive" }); return; }
+    setAssigning(true);
+    try {
+      await apiPost(`/api/admin/game-organizers/${assignTarget.id}/assign`, { email });
+      toast({ title: "Game organizer assigned", description: `Linked to ${email}.` });
+      setAssignTarget(null); setAssignEmail(""); load();
+    } catch (e: any) { toast({ title: "Assign failed", description: e?.message, variant: "destructive" }); }
+    finally { setAssigning(false); }
+  };
+  const unassign = async (o: AdminGameOrganizer) => {
+    if (!window.confirm(`Unassign "${o.name}" from ${o.ownerEmail}? It returns to the unassigned pool and the partner loses access.`)) return;
+    try { await apiPost(`/api/admin/game-organizers/${o.id}/unassign`, {}); toast({ title: "Game organizer unassigned" }); load(); }
     catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
   };
 
@@ -10332,6 +10982,7 @@ function GameOrganizerAccountsAdmin() {
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-medium truncate">{o.name}</p>
               {o.verified && <ShieldCheck className="h-4 w-4 text-amber-400" />}
+              {!o.ownerEmail && <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border text-sky-300 border-sky-500/30 bg-sky-500/10">Unassigned</span>}
               <span className={
                 "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border " +
                 (o.status === "approved" ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10"
@@ -10339,10 +10990,13 @@ function GameOrganizerAccountsAdmin() {
                   : "text-amber-300 border-amber-500/30 bg-amber-500/10")
               }>{o.status}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{o.ownerEmail ?? "—"} · {[o.city, o.state].filter(Boolean).join(", ") || "—"} · {o.gameCount} game{o.gameCount !== 1 ? "s" : ""} · {o.packageCount} package{o.packageCount !== 1 ? "s" : ""}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{o.ownerEmail ?? "Unassigned — assign a partner by email"} · {[o.city, o.state].filter(Boolean).join(", ") || "—"} · {o.gameCount} game{o.gameCount !== 1 ? "s" : ""} · {o.packageCount} package{o.packageCount !== 1 ? "s" : ""}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {o.slug && <Button size="sm" variant="outline" asChild><a href={`/game-organizers/${o.slug}`} target="_blank" rel="noreferrer">View</a></Button>}
+            <Button size="sm" variant="outline" onClick={() => setEditId(o.id)}><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
+            <Button size="sm" variant="outline" className="text-sky-300 border-sky-500/30 hover:bg-sky-500/10" onClick={() => { setAssignTarget(o); setAssignEmail(o.ownerEmail ?? ""); }}>{o.ownerEmail ? "Reassign" : "Assign"}</Button>
+            {o.ownerEmail && <Button size="sm" variant="outline" onClick={() => unassign(o)}>Unassign</Button>}
             <Button size="sm" variant="outline" onClick={() => setVerified(o.id, !o.verified)}>{o.verified ? "Unverify" : "Verify"}</Button>
             {o.status !== "approved" && <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setStatus(o.id, "approved")}>Approve</Button>}
             {o.status !== "rejected" && <Button size="sm" variant="outline" className="text-red-300 border-red-500/30" onClick={() => setStatus(o.id, "rejected")}>Reject</Button>}
@@ -10350,6 +11004,44 @@ function GameOrganizerAccountsAdmin() {
           </div>
         </div>
       ))}
+
+      <Dialog open={editId != null} onOpenChange={(open) => { if (!open) setEditId(null); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-[#16151a] border-white/10">
+          <DialogHeader>
+            <DialogTitle>Edit Game Organizer</DialogTitle>
+            <DialogDescription>Update the game organizer's public profile. Owner account can't be changed here.</DialogDescription>
+          </DialogHeader>
+          {editId != null && (
+            <OrganizerProfileForm
+              kind="game" mode="edit" id={editId}
+              onUpdated={() => { setEditId(null); load(); }}
+              secondary={{ label: "Cancel", onClick: () => setEditId(null) }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={assignTarget != null} onOpenChange={(open) => { if (!open) { setAssignTarget(null); setAssignEmail(""); } }}>
+        <DialogContent className="sm:max-w-md bg-[#16151a] border-white/10">
+          <DialogHeader>
+            <DialogTitle>{assignTarget?.ownerEmail ? "Reassign" : "Assign"} game organizer</DialogTitle>
+            <DialogDescription>
+              Link <b className="text-white/80">{assignTarget?.name}</b> to a partner's account by email. They must already have a Royvento account; they'll be switched to the game organizer role and can manage it from their dashboard.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>Partner account email</Label>
+            <Input type="email" placeholder="partner@email.com" value={assignEmail}
+              onChange={(e) => setAssignEmail(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") assign(); }}
+              className="bg-black/40 border-white/10" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAssignTarget(null); setAssignEmail(""); }}>Cancel</Button>
+            <Button onClick={assign} disabled={assigning}>{assigning ? "Assigning..." : "Assign"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

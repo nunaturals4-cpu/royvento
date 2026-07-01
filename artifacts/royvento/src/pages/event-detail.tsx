@@ -27,6 +27,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet, apiDelete } from "@/lib/api";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { SquareImage } from "@/components/SquareImage";
+import { FollowButton } from "@/components/FollowButton";
 import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket, Check, Crown, ShieldCheck, Headphones, Zap, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1147,6 +1148,14 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               <div className="text-[13px] text-white/70 leading-relaxed [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4" dangerouslySetInnerHTML={{ __html: event.description }} />
             </div>
           )}
+
+          {/* Follow — pub events subscribe to the venue (its deals); standalone
+              events subscribe to the event itself. */}
+          <FollowButton
+            targetType={(event as any).vendor?.id ? "vendor" : "event"}
+            targetId={((event as any).vendor?.id as number | undefined) ?? event.id}
+            name={((event as any).vendor?.businessName as string | undefined) ?? event.title}
+          />
 
           {/* Wishlist */}
           {me?.user && (

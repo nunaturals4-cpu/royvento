@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { SEO } from "@/components/SEO";
 
-const LAST_UPDATED = "16 June 2026";
+const LAST_UPDATED = "1 July 2026";
 
 export function Terms() {
   return (
@@ -43,6 +43,9 @@ export function Terms() {
           <h2 className="text-lg font-semibold text-foreground mb-2">2. Our Role as a Platform</h2>
           <p>
             Royvento is an intermediary marketplace that connects Users with Pub Partners. Pub Partners are independent third parties; Royvento does not own, operate, or control the venues, events, food, or beverages offered through the Service. Any contract for the supply of services or goods is formed directly between the User and the Pub Partner. Royvento is not a party to that contract and is not liable for its performance.
+          </p>
+          <p className="mt-3">
+            Royvento acts solely as an <strong className="text-foreground">"intermediary"</strong> within the meaning of the Information Technology Act, 2000 and the rules made thereunder. Listings, offers, reviews, images, group content, and other materials made available through the Service are provided by Users and Partners, not by Royvento. Except where we expressly state that we have verified something, Royvento does not create, endorse, verify, or guarantee any third-party content, and is entitled to the protections and safe harbour available to intermediaries under applicable law.
           </p>
         </section>
 
@@ -97,6 +100,9 @@ export function Terms() {
             <strong className="text-foreground">Cancellations &amp; service quality.</strong> You set your own cancellation and refund policy but must apply it fairly and honour valid refund requests promptly. Repeated cancellations, no-shows, misleading listings, or poor service quality may result in reduced visibility, suspension, or removal from the platform.
           </p>
           <p className="mt-3">
+            <strong className="text-foreground">Partner indemnity.</strong> You are solely responsible for the goods, services, events, and experiences you provide, and for compliance with all laws applicable to them. You agree to indemnify and hold Royvento harmless from any claim, penalty, or liability arising from your listings, your service to customers, your breach of these Terms, or your non-compliance with any law, licence, or tax obligation.
+          </p>
+          <p className="mt-3">
             <strong className="text-foreground">Suspension &amp; delisting.</strong> Royvento may suspend, restrict, or delist a Partner account at its discretion where there is suspected fraud, a breach of these Terms, a regulatory issue, or a risk to Users. Outstanding confirmed bookings must still be honoured, and verified payouts due to you for completed bookings will be settled in the ordinary course.
           </p>
         </section>
@@ -147,59 +153,128 @@ export function Terms() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">9. Intellectual Property</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">9. Assumption of Risk &amp; Personal Responsibility</h2>
+          <p>
+            Attending venues, events, games, parties, and any activity discovered through Royvento is voluntary and undertaken <strong className="text-foreground">at your own risk</strong>. You are responsible for your own health, safety, conduct, belongings, and lawful behaviour, including responsible consumption of alcohol and compliance with all venue rules and local laws. Royvento does not supervise, control, or guarantee the condition or safety of any venue or event, the conduct of any Partner, staff member, performer, or other guest, or any outcome of your attendance.
+          </p>
+          <p className="mt-3">
+            To the fullest extent permitted by law, Royvento is <strong className="text-foreground">not liable for any personal injury, illness, death, loss, theft, damage, altercation, harassment, or other harm</strong> arising before, during, or after any booking, event, meetup, or activity, whether caused by a Partner, another User, a third party, or your own acts or omissions. You are solely responsible for assessing whether any venue, event, or activity is appropriate and safe for you.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">10. User-Generated Content &amp; Reviews</h2>
+          <p>
+            The Service may allow you to submit reviews, ratings, photos, comments, group messages, and other materials ("User Content"). You are solely responsible for your User Content and represent that you own or have the rights to it and that it is lawful, accurate, and not defamatory, obscene, infringing, harassing, or misleading. By submitting User Content you grant Royvento a worldwide, perpetual, irrevocable, royalty-free, transferable, and sub-licensable licence to use, host, store, reproduce, adapt, publish, translate, and display it in connection with operating, improving, and promoting the Service.
+          </p>
+          <p className="mt-3">
+            Royvento does not endorse any User Content and may, without obligation and without notice, review, moderate, refuse, edit, disable, or remove any User Content at its discretion — including on receipt of a valid complaint or legal notice — without liability to you.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">11. Third-Party Links &amp; Services</h2>
+          <p>
+            The Service may contain links to, or integrations with, third-party websites, applications, and services (including payment processors, mapping, authentication, and analytics providers). These are provided for convenience only. Royvento does not control and is not responsible for the content, policies, availability, security, or practices of any third party, and your use of them is governed by their own terms and undertaken at your own risk.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">12. Intellectual Property</h2>
           <p>
             All content on the Royvento platform — including logos, design, text, and software — is owned by or licensed to Royvento and may not be copied, reproduced, or distributed without prior written consent. Pub Partners grant Royvento a non-exclusive, royalty-free licence to display their venue name, logo, images, and listing content for the purpose of operating and promoting the Service.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">10. Disclaimer of Warranties</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">13. Disclaimer of Warranties</h2>
           <p>
             The Service is provided on an "as is" and "as available" basis, without warranties of any kind, whether express or implied, including implied warranties of merchantability, fitness for a particular purpose, accuracy, or non-infringement. Royvento does not warrant that the Service will be uninterrupted, timely, secure, or error-free, or that listings, pricing, availability, or other information provided by Pub Partners are accurate, complete, or current. The quality, safety, and legality of venues, events, food, and beverages are the sole responsibility of the relevant Pub Partner, and any reliance you place on the Service or on Pub Partner content is at your own risk.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">11. Limitation of Liability</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">14. Limitation of Liability</h2>
           <p>
-            To the fullest extent permitted by law, Royvento and its officers, directors, employees, and agents shall not be liable for any indirect, incidental, special, or consequential damages arising out of your use of the Service, including but not limited to damages for loss of profits, data, goodwill, or other intangible losses, or for the acts or omissions of any Pub Partner or User.
+            To the fullest extent permitted by law, Royvento and its officers, directors, employees, and agents shall not be liable for any indirect, incidental, special, punitive, or consequential damages arising out of or related to your use of, or inability to use, the Service, including but not limited to damages for loss of profits, revenue, data, goodwill, or other intangible losses, for any service interruption or data loss, or for the acts or omissions of any Pub Partner, User, or third party.
           </p>
           <p className="mt-3">
-            Our total liability to you for any claim arising from or related to the Service shall not exceed the amount of commission or fees you paid to Royvento in the twelve months preceding the claim.
+            To the maximum extent permitted by law, Royvento's total aggregate liability to you for any and all claims arising from or related to the Service shall not exceed the greater of (a) the total fees or commission you actually paid to Royvento in connection with the transaction giving rise to the claim, or (b) INR 1,000 (Indian Rupees one thousand).
+          </p>
+          <p className="mt-3">
+            Nothing in these Terms excludes or limits any liability that cannot be excluded or limited under applicable law. Where such liability cannot be wholly excluded, it is limited to the minimum extent permitted by law.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">12. Indemnification</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">15. Indemnification</h2>
           <p>
             You agree to indemnify, defend, and hold harmless Royvento and its officers, directors, employees, and agents from and against any claims, demands, liabilities, damages, losses, costs, and expenses (including reasonable legal fees) arising out of or related to: (a) your use or misuse of the Service; (b) your breach of these Terms or of any applicable law; (c) any content you submit or listing you publish; or (d) your violation of the rights of any third party, including any Pub Partner or User. Royvento may, at your expense, assume the exclusive defence and control of any matter subject to indemnification, and you agree to cooperate with that defence.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">13. Termination &amp; Suspension</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">16. Force Majeure</h2>
           <p>
-            You may stop using the Service and close your account at any time. Royvento may suspend, restrict, or terminate your access to the Service, in whole or in part, with or without prior notice, where we reasonably believe you have breached these Terms or any applicable law, engaged in fraudulent, abusive, or harmful conduct, or where action is needed to protect the Service, other Users, or Pub Partners. On termination your right to use the Service ends immediately; confirmed bookings and any payment, payout, refund, or tax obligations accrued beforehand survive, as do the provisions that by their nature should continue (including Intellectual Property, Disclaimer of Warranties, Limitation of Liability, Indemnification, and Governing Law).
+            Royvento shall not be liable for any failure or delay in performing its obligations, or for any unavailability of the Service, caused by circumstances beyond its reasonable control, including acts of God, natural disasters, epidemics or pandemics, fire, flood, power or internet failure, strikes, civil unrest, war, terrorism, government or regulatory action, or the failure of any third-party service provider.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">14. Changes to These Terms</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">17. Termination &amp; Suspension</h2>
+          <p>
+            You may stop using the Service and close your account at any time. Royvento may suspend, restrict, or terminate your access to the Service, in whole or in part, with or without prior notice, where we reasonably believe you have breached these Terms or any applicable law, engaged in fraudulent, abusive, or harmful conduct, or where action is needed to protect the Service, other Users, or Pub Partners. On termination your right to use the Service ends immediately; confirmed bookings and any payment, payout, refund, or tax obligations accrued beforehand survive, as do the provisions that by their nature should continue (including Assumption of Risk &amp; Personal Responsibility, Intellectual Property, Disclaimer of Warranties, Limitation of Liability, Indemnification, Force Majeure, Grievance Redressal &amp; Dispute Resolution, General Provisions, and Governing Law).
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">18. Grievance Redressal &amp; Dispute Resolution</h2>
+          <p>
+            <strong className="text-foreground">Grievance Officer.</strong> In accordance with the Information Technology Act, 2000 and the rules made thereunder, any complaint regarding the Service or any content available on it may be addressed to our Grievance Officer:
+          </p>
+          <p className="mt-3">
+            <strong className="text-foreground">Sandip Dey</strong> — Grievance Officer, Royvento<br />
+            Near New Town Water Tank No. 3, Kolkata - 700156<br />
+            Email: <a href="mailto:support@royvento.com" className="text-primary hover:underline">support@royvento.com</a>
+          </p>
+          <p className="mt-3">
+            We will acknowledge your complaint within 48 hours and endeavour to resolve it within the timelines prescribed by applicable law.
+          </p>
+          <p className="mt-3">
+            <strong className="text-foreground">Amicable resolution.</strong> Before initiating any formal proceedings, you agree to first contact us and attempt in good faith to resolve any dispute informally.
+          </p>
+          <p className="mt-3">
+            <strong className="text-foreground">Arbitration.</strong> Any dispute, claim, or difference arising out of or relating to these Terms or the Service that is not resolved informally shall be referred to and finally settled by arbitration by a sole arbitrator appointed by mutual agreement of the parties in accordance with the Arbitration and Conciliation Act, 1996. The seat and venue of arbitration shall be Kolkata, West Bengal, and the proceedings shall be conducted in English. The arbitrator's award shall be final and binding on the parties. Nothing in this clause prevents Royvento from seeking urgent injunctive or equitable relief before any court of competent jurisdiction.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">19. General Provisions</h2>
+          <ul className="list-disc pl-5 space-y-2">
+            <li><strong className="text-foreground">Entire agreement.</strong> These Terms, together with the Privacy Policy and any policies referenced here, constitute the entire agreement between you and Royvento regarding the Service and supersede all prior agreements or understandings.</li>
+            <li><strong className="text-foreground">Severability.</strong> If any provision of these Terms is held invalid or unenforceable, it will be limited or removed to the minimum extent necessary, and the remaining provisions will remain in full force and effect.</li>
+            <li><strong className="text-foreground">No waiver.</strong> Royvento's failure to enforce any right or provision of these Terms will not be a waiver of that right or provision.</li>
+            <li><strong className="text-foreground">Assignment.</strong> You may not assign or transfer these Terms without our prior written consent. Royvento may assign these Terms, in whole or in part, to any affiliate or successor without restriction.</li>
+            <li><strong className="text-foreground">No partnership or agency.</strong> Nothing in these Terms creates any partnership, joint venture, employment, franchise, or agency relationship between you and Royvento.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">20. Changes to These Terms</h2>
           <p>
             We may update these Terms from time to time. We will notify you of significant changes by updating the "Last updated" date at the top of this page. Your continued use of the Service after any changes constitutes acceptance of the new Terms.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">15. Governing Law</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">21. Governing Law &amp; Jurisdiction</h2>
           <p>
-            These Terms shall be governed by and construed in accordance with the laws of India. Any disputes arising under these Terms shall be subject to the exclusive jurisdiction of the courts of Kolkata, West Bengal.
+            These Terms shall be governed by and construed in accordance with the laws of India. Subject to the Grievance Redressal &amp; Dispute Resolution section above, the courts of Kolkata, West Bengal shall have exclusive jurisdiction over any dispute arising under or in connection with these Terms.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">16. Contact Us</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">22. Contact Us</h2>
           <p>
             If you have questions about these Terms, please reach out via our{" "}
             <Link href="/contact" className="text-primary hover:underline">Contact page</Link> or email us at{" "}

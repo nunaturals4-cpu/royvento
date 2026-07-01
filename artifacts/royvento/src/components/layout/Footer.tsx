@@ -94,6 +94,7 @@ export function Footer() {
           <ul className="space-y-2.5 text-sm text-white">
             <li><Link href="/terms" className="hover:text-foreground transition-colors">Terms &amp; Conditions</Link></li>
             <li><Link href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link></li>
+            <li><Link href="/about" className="hover:text-foreground transition-colors">About Us</Link></li>
           </ul>
         </div>
 

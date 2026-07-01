@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { SEO } from "@/components/SEO";
 
-const LAST_UPDATED = "16 June 2026";
+const LAST_UPDATED = "1 July 2026";
 
 export function Privacy() {
   return (
@@ -27,7 +27,17 @@ export function Privacy() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">2. Information We Collect from Users</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">2. Consent &amp; Legal Basis</h2>
+          <p>
+            By using the Service and providing your information, you consent to the collection, use, storage, processing, and disclosure of your information as described in this Policy, in accordance with the <strong className="text-foreground">Digital Personal Data Protection Act, 2023</strong>, the Information Technology Act, 2000, and other applicable laws. We process personal data where you have given consent, where it is necessary to provide the Service or perform a contract with you, to comply with a legal obligation, or for our legitimate interests in operating, securing, and improving the Service.
+          </p>
+          <p className="mt-3">
+            Providing certain information is necessary to use the Service; if you do not provide it, we may be unable to offer some features. You may withdraw your consent at any time by contacting us, although this will not affect any processing already carried out and may limit your ability to use the Service.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">3. Information We Collect from Users</h2>
           <ul className="list-disc pl-5 space-y-2">
             <li><strong className="text-foreground">Account information:</strong> Name, email address, phone number, gender (collected once during onboarding), and password when you register.</li>
             <li><strong className="text-foreground">Booking data:</strong> Event, table, and game bookings, ticket types, number of guests, and payment method preferences.</li>
@@ -39,7 +49,7 @@ export function Privacy() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">3. Information We Collect from Pub Partners</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">4. Information We Collect from Pub Partners</h2>
           <p>
             When you register as a Pub Partner, we additionally collect business and verification information needed to list your venue and pay you:
           </p>
@@ -53,7 +63,7 @@ export function Privacy() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">4. Solo Connector &amp; Verification</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">5. Solo Connector &amp; Verification</h2>
           <p>
             If you use our premium <strong className="text-foreground">Solo Connector</strong> feature, we collect additional information specifically to verify you are a real person and to keep members safe:
           </p>
@@ -80,7 +90,7 @@ export function Privacy() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">5. How We Use Your Information</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">6. How We Use Your Information</h2>
           <ul className="list-disc pl-5 space-y-2">
             <li>To create and manage accounts, process bookings, and settle Partner payouts.</li>
             <li>To send booking confirmations, reminders, payout notices, and service updates via email or SMS.</li>
@@ -95,7 +105,7 @@ export function Privacy() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">6. Sharing Your Information</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">7. Sharing Your Information</h2>
           <p>
             We do not sell your personal data. We may share information in the following limited circumstances:
           </p>
@@ -110,34 +120,51 @@ export function Privacy() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">7. Cookies &amp; Tracking</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">8. Cookies &amp; Tracking</h2>
           <p>
             We use cookies and similar technologies to keep you logged in, remember your preferences, and understand how the platform is used. You can disable cookies in your browser settings, but some features may not work correctly as a result.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">8. Data Retention</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">9. Third-Party Services &amp; Links</h2>
+          <p>
+            The Service integrates with and links to third-party services — including payment processors (e.g. PhonePe), authentication (e.g. Firebase), mapping, hosting, analytics, and communications providers. When you use these, your information may be processed by them under their own privacy policies, which we do not control. The Service may also contain links to third-party websites; we are not responsible for the content, security, or privacy practices of those sites, and we encourage you to review their policies before providing any information.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">10. International Data Transfers</h2>
+          <p>
+            We are based in India and primarily process data within India. Some of our service providers may store or process data on servers located outside India. Where data is transferred across borders, we take reasonable steps to ensure it continues to be protected consistently with this Policy and applicable law.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">11. Data Retention</h2>
           <p>
             We retain account, booking, and payout data for as long as your account is active or as required to fulfil the purposes described in this Policy. Transaction, invoice, and payout records may be retained for longer where tax or accounting law requires. <strong className="text-foreground">Solo Connector group chat messages are deleted automatically every day at 3:00 AM, and inactive groups (with their chat and data) are removed automatically after 15 days.</strong> Verification records (including your selfie) are retained only while needed to keep your verification valid and to maintain platform safety, and are deleted when you close your account or your verification is removed, except where short-term retention is required to handle a safety report or to comply with law. You may request deletion of your account at any time; we will delete your personal data within 30 days, except where retention is required by law.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">9. Your Rights</h2>
-          <p>You have the right to:</p>
+          <h2 className="text-lg font-semibold text-foreground mb-2">12. Your Rights</h2>
+          <p>Subject to applicable law, including the Digital Personal Data Protection Act, 2023, you have the right to:</p>
           <ul className="list-disc pl-5 space-y-2 mt-3">
             <li>Access the personal data we hold about you.</li>
             <li>Correct inaccurate or incomplete information.</li>
             <li>Request deletion of your personal data.</li>
             <li>Opt out of marketing communications at any time.</li>
             <li>Withdraw consent for optional data processing.</li>
+            <li>Nominate another individual to exercise your rights in the event of your death or incapacity.</li>
           </ul>
-          <p className="mt-3">To exercise any of these rights, contact us using the details below.</p>
+          <p className="mt-3">
+            To exercise any of these rights, contact us using the details below. We may need to verify your identity before acting on a request, and some rights may be subject to legal exceptions.
+          </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">10. Security</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">13. Security</h2>
           <p>
             We implement industry-standard security measures to protect your information, including encrypted connections (HTTPS), hashed passwords, and access controls. However, no method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.
           </p>
@@ -148,21 +175,44 @@ export function Privacy() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">11. Children's Privacy</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">14. Limitation of Liability</h2>
+          <p>
+            While we take reasonable measures to protect your information, you provide it at your own risk. To the fullest extent permitted by law, Royvento is not liable for any unauthorised access to, or loss, misuse, or alteration of, your information arising from events beyond our reasonable control — including hacking, third-party breaches, or your own failure to safeguard your credentials. Your use of the Service is also governed by our{" "}
+            <Link href="/terms" className="text-primary hover:underline">Terms &amp; Conditions</Link>, including their limitation of liability.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">15. Children's Privacy</h2>
           <p>
             The Service is intended for users aged 18 and over. We do not knowingly collect personal data from anyone under 18. If we become aware that a minor has provided us with personal data, we will delete it promptly.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">12. Changes to This Policy</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">16. Grievance Officer &amp; Data Protection Contact</h2>
+          <p>
+            In accordance with the Information Technology Act, 2000, the rules made thereunder, and the Digital Personal Data Protection Act, 2023, you may contact our Grievance Officer regarding this Policy, your personal data, or any concern about how your information is handled:
+          </p>
+          <p className="mt-3">
+            <strong className="text-foreground">Sandip Dey</strong> — Grievance Officer, Royvento<br />
+            Near New Town Water Tank No. 3, Kolkata - 700156<br />
+            Email: <a href="mailto:support@royvento.com" className="text-primary hover:underline">support@royvento.com</a>
+          </p>
+          <p className="mt-3">
+            We will acknowledge your complaint within 48 hours and endeavour to resolve it within the timelines prescribed by applicable law. If you are not satisfied with our response, you may have the right to escalate your complaint to the Data Protection Board of India or other competent authority.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">17. Changes to This Policy</h2>
           <p>
             We may update this Privacy Policy from time to time. We will notify you of material changes by updating the "Last updated" date at the top of this page. Your continued use of the Service after any changes constitutes acceptance of the updated Policy.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">13. Contact Us</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">18. Contact Us</h2>
           <p>
             If you have questions or concerns about this Privacy Policy, please contact us via our{" "}
             <Link href="/contact" className="text-primary hover:underline">Contact page</Link> or email{" "}

@@ -766,7 +766,11 @@ async function applyPendingSchemaChanges() {
         "approved_at" timestamp with time zone,
         "created_at" timestamp with time zone NOT NULL DEFAULT now()
       )`);
-    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "organizers_user_idx" ON "organizers" ("user_id")`);
+    // Migrate the organizer owner index to PARTIAL so admin-created organizers
+    // can sit unassigned at sentinel owner id 0 until assigned by email later
+    // (mirrors vendors_user_assigned_idx). Drop the old full-unique index first.
+    await db.execute(sql`DROP INDEX IF EXISTS "organizers_user_idx"`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "organizers_user_assigned_idx" ON "organizers" ("user_id") WHERE "user_id" <> 0`);
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "organizers_slug_idx" ON "organizers" ("slug")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "organizers_status_idx" ON "organizers" ("status")`);
     await db.execute(sql`
@@ -1029,7 +1033,10 @@ async function applyPendingSchemaChanges() {
         "approved_at" timestamp with time zone,
         "created_at" timestamp with time zone NOT NULL DEFAULT now()
       )`);
-    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "game_organizers_user_idx" ON "game_organizers" ("user_id")`);
+    // Partial owner index — allow unassigned admin-created game organizers at
+    // sentinel owner id 0 (assigned to a partner by email later).
+    await db.execute(sql`DROP INDEX IF EXISTS "game_organizers_user_idx"`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "game_organizers_user_assigned_idx" ON "game_organizers" ("user_id") WHERE "user_id" <> 0`);
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "game_organizers_slug_idx" ON "game_organizers" ("slug")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "game_organizers_status_idx" ON "game_organizers" ("status")`);
     await db.execute(sql`
@@ -1236,6 +1243,21 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "razorpay_order_id" varchar(100) NOT NULL DEFAULT ''`);
     await db.execute(sql`ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "razorpay_payment_id" varchar(100) NOT NULL DEFAULT ''`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "payments_razorpay_order_idx" ON "payments" ("razorpay_order_id") WHERE "razorpay_order_id" <> ''`);
+
+    // ── Follow & instant notification system ──────────────────────────────
+    // Polymorphic follow (vendor | event | game_organizer | organizer).
+    // Followers of an approved venue get a push/in-app notification whenever the
+    // venue adds/updates a drink deal or a food & drink discount. Idempotent.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "follows" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "user_id" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "target_type" varchar(20) NOT NULL,
+        "target_id" integer NOT NULL,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "follows_user_target_idx" ON "follows" ("user_id", "target_type", "target_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "follows_target_idx" ON "follows" ("target_type", "target_id")`);
 
     logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url + announcements.approval_status + razorpay columns + events.disabled_genders + events.hidden ensured");
   } catch (err) {

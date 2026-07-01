@@ -85,6 +85,8 @@ export interface DrinkDealCardProps {
   /** "+N more plans" footnote. */
   extraPlansCount?: number;
   href?: string;
+  /** When set, adds a "Book now" button that deep-links to the venue booking. */
+  bookHref?: string;
   onClick?: () => void;
 }
 
@@ -93,6 +95,7 @@ export function DrinkDealCard({
   title,
   fallbackImage,
   href,
+  bookHref,
   onClick,
 }: DrinkDealCardProps) {
   const { t } = useTranslation();
@@ -131,6 +134,7 @@ export function DrinkDealCard({
   const card = (
     <NightlifeOfferCard
       href={href}
+      bookHref={bookHref}
       imageUrl={imageUrl}
       title={dealText}
       venueName={title}

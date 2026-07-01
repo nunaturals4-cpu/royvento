@@ -608,6 +608,31 @@ export const wishlistsTable = pgTable(
 
 export type Wishlist = typeof wishlistsTable.$inferSelect;
 
+// Polymorphic follow: a user follows a profile (a venue, an event, a game zone,
+// or an organizer). Followers of an approved venue receive instant push/in-app
+// notifications whenever that venue creates or updates a drink deal (Free Drinks
+// / Included with Ticket / Cover Charges) or a Food & Drink discount.
+// targetType ∈ "vendor" | "event" | "game_organizer" | "organizer".
+// One row per (user, targetType, targetId).
+export const followsTable = pgTable(
+  "follows",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    targetType: varchar("target_type", { length: 20 }).notNull(),
+    targetId: integer("target_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userTargetIdx: uniqueIndex("follows_user_target_idx").on(t.userId, t.targetType, t.targetId),
+    targetIdx: index("follows_target_idx").on(t.targetType, t.targetId),
+  }),
+);
+
+export type Follow = typeof followsTable.$inferSelect;
+
 export const blogsTable = pgTable(
   "blogs",
   {
@@ -1196,7 +1221,10 @@ export const organizersTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    userIdx: uniqueIndex("organizers_user_idx").on(t.userId),
+    // Partial unique: many admin-created organizers can sit unassigned at the
+    // sentinel owner id 0 before being assigned to a partner by email later
+    // (mirrors vendors_user_assigned_idx). Assigned organizers keep one-per-user.
+    userIdx: uniqueIndex("organizers_user_assigned_idx").on(t.userId).where(sql`user_id <> 0`),
     slugIdx: uniqueIndex("organizers_slug_idx").on(t.slug),
     statusIdx: index("organizers_status_idx").on(t.status),
   }),
@@ -1575,7 +1603,9 @@ export const gameOrganizersTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    userIdx: uniqueIndex("game_organizers_user_idx").on(t.userId),
+    // Partial unique: unassigned admin-created game organizers sit at sentinel
+    // owner id 0 until assigned to a partner by email (mirrors vendors).
+    userIdx: uniqueIndex("game_organizers_user_assigned_idx").on(t.userId).where(sql`user_id <> 0`),
     slugIdx: uniqueIndex("game_organizers_slug_idx").on(t.slug),
     statusIdx: index("game_organizers_status_idx").on(t.status),
   }),

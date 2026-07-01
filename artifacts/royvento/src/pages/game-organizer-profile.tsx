@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { FollowButton } from "@/components/FollowButton";
 import {
-  BadgeCheck, Heart, Share2, MapPin, Star, Users, Gamepad2, Package,
+  BadgeCheck, Share2, MapPin, Star, Users, Gamepad2, Package,
   Instagram, Facebook, Youtube, Globe, Plus, Minus, CheckCircle2, ShieldCheck,
   PartyPopper, ArrowRight, User, Phone, Tag, Check, Clock, Timer, IndianRupee, CalendarDays,
 } from "lucide-react";
@@ -93,7 +94,6 @@ function SocialLink({ href, icon, label }: { href: string; icon: React.ReactNode
 export function GameOrganizerProfile() {
   const params = useParams<{ slug: string }>();
   const [data, setData] = useState<ProfilePayload | null | undefined>(undefined);
-  const [following, setFollowing] = useState(false);
   const [booking, setBooking] = useState<Bookable | null>(null);
 
   useEffect(() => {
@@ -101,10 +101,6 @@ export function GameOrganizerProfile() {
     apiGet<ProfilePayload>(`/api/game-organizers/${params.slug}`).then(setData).catch(() => setData(null));
     apiPost(`/api/game-organizers/${params.slug}/view`, {}).catch(() => {});
   }, [params.slug]);
-
-  useEffect(() => {
-    if (data?.organizer) setFollowing(localStorage.getItem(`rv_follow_game_${data.organizer.id}`) === "1");
-  }, [data?.organizer]);
 
   // When arrived via a game card on the Games & Sports page (which links with a
   // #available-games hash), jump straight to that section once it has rendered.
@@ -124,12 +120,6 @@ export function GameOrganizerProfile() {
 
   const { organizer: o, games, packages, reviews, stats } = data;
   const gallery = [...(o.galleryImages ?? []), ...games.flatMap((g) => g.images || [])].slice(0, 12);
-
-  function toggleFollow() {
-    const next = !following;
-    setFollowing(next);
-    localStorage.setItem(`rv_follow_game_${o.id}`, next ? "1" : "0");
-  }
 
   return (
     <div className="bg-black text-white">
@@ -157,9 +147,7 @@ export function GameOrganizerProfile() {
               <p className="text-white/55 text-sm mt-2 flex items-center gap-2"><MapPin className="h-4 w-4" /> {[o.city, o.state].filter(Boolean).join(", ") || "India"}</p>
             </div>
             <div className="flex items-center gap-2 md:pb-1">
-              <Button onClick={toggleFollow} className={following ? "bg-white/10 text-white hover:bg-white/15 border border-white/15" : "bg-primary text-white hover:bg-primary/90"}>
-                <Heart className={"h-4 w-4 mr-2 " + (following ? "fill-primary text-primary" : "")} /> {following ? "Following" : "Follow"}
-              </Button>
+              <FollowButton targetType="game_organizer" targetId={o.id} name={o.name} />
               <Button variant="outline" className="border-white/15 text-white/80" onClick={share}><Share2 className="h-4 w-4" /></Button>
             </div>
           </div>

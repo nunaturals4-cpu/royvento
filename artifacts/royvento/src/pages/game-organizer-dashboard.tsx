@@ -4,6 +4,7 @@ import { apiGet, apiPost, apiPatch, apiPut, apiDelete, formatINR } from "@/lib/a
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { useToast } from "@/hooks/use-toast";
 import { SEO } from "@/components/SEO";
+import { LocationSelect } from "@/components/LocationSelect";
 import { TonightVisibilityFields } from "@/components/TonightVisibilityFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,7 @@ interface GameOrganizer {
   supportEmail: string; supportPhone: string; address: string; mapsUrl: string;
   city: string; state: string; verified: boolean; status: string;
 }
-interface Game {
+export interface Game {
   id: number; name: string; slug: string; category: string; description: string; rules: string;
   coverImageUrl: string; images: string[]; videos: string[]; capacity: number; ageRestriction: string;
   pricingModel: "fixed" | "hourly"; price: string; hourlyRate: string; minHours: number; maxHours: number;
@@ -386,7 +387,30 @@ function blankGame(): Game {
   };
 }
 
-function GameEditor({ gameId, onDone, onCancel }: { gameId: number | null; onDone: () => void; onCancel: () => void }) {
+// Endpoint config so the same game form serves both the game organizer (their
+// own games) and an admin authoring games for a chosen game organizer (/admin/*).
+export interface GameEditorApi {
+  getGame: (id: number) => string;
+  createGame: string;
+  saveGame: (id: number) => string;
+  createdToast: string;
+}
+const GAME_ORG_API: GameEditorApi = {
+  getGame: (id) => `/api/game-organizer/games/${id}`,
+  createGame: "/api/game-organizer/games",
+  saveGame: (id) => `/api/game-organizer/games/${id}`,
+  createdToast: "Sent for admin review.",
+};
+export function adminGameApi(orgId: number): GameEditorApi {
+  return {
+    getGame: (id) => `/api/admin/game/${id}`,
+    createGame: `/api/admin/game-organizer/${orgId}/games`,
+    saveGame: (id) => `/api/admin/game/${id}`,
+    createdToast: "Saved. Assign a game organizer owner later if not yet linked.",
+  };
+}
+
+export function GameEditor({ gameId, onDone, onCancel, api = GAME_ORG_API }: { gameId: number | null; onDone: () => void; onCancel: () => void; api?: GameEditorApi }) {
   const { toast } = useToast();
   const [f, setF] = useState<Game>(() => blankGame());
   const [loading, setLoading] = useState(Boolean(gameId));
@@ -395,9 +419,9 @@ function GameEditor({ gameId, onDone, onCancel }: { gameId: number | null; onDon
   useEffect(() => {
     if (gameId) {
       setLoading(true);
-      apiGet<Game>(`/api/game-organizer/games/${gameId}`).then((g) => setF(g)).catch(() => {}).finally(() => setLoading(false));
+      apiGet<Game>(api.getGame(gameId)).then((g) => setF(g)).catch(() => {}).finally(() => setLoading(false));
     } else { setF(blankGame()); }
-  }, [gameId]);
+  }, [gameId, api]);
 
   const set = <K extends keyof Game>(k: K) => (v: Game[K]) => setF((s) => ({ ...s, [k]: v }));
 
@@ -415,9 +439,9 @@ function GameEditor({ gameId, onDone, onCancel }: { gameId: number | null; onDon
       lastMinuteDeal: f.lastMinuteDeal ?? false, dealLabel: f.dealLabel ?? "",
     };
     try {
-      if (gameId) await apiPatch(`/api/game-organizer/games/${gameId}`, body);
-      else await apiPost("/api/game-organizer/games", body);
-      toast({ title: gameId ? "Game updated" : "Game created", description: "Sent for admin review." });
+      if (gameId) await apiPatch(api.saveGame(gameId), body);
+      else await apiPost(api.createGame, body);
+      toast({ title: gameId ? "Game updated" : "Game created", description: api.createdToast });
       onDone();
     } catch (e: any) { toast({ title: "Save failed", description: e?.message, variant: "destructive" }); }
     finally { setSaving(false); }
@@ -551,7 +575,25 @@ function blankPkg(): GamePackage {
   };
 }
 
-function PackageEditor({ pkgId, games, onDone, onCancel }: { pkgId: number | null; games: Game[]; onDone: () => void; onCancel: () => void }) {
+export interface PackageEditorApi {
+  getPackage: (id: number) => string;
+  createPackage: string;
+  savePackage: (id: number) => string;
+}
+const PKG_ORG_API: PackageEditorApi = {
+  getPackage: (id) => `/api/game-organizer/packages/${id}`,
+  createPackage: "/api/game-organizer/packages",
+  savePackage: (id) => `/api/game-organizer/packages/${id}`,
+};
+export function adminPackageApi(orgId: number): PackageEditorApi {
+  return {
+    getPackage: (id) => `/api/admin/game-package/${id}`,
+    createPackage: `/api/admin/game-organizer/${orgId}/packages`,
+    savePackage: (id) => `/api/admin/game-package/${id}`,
+  };
+}
+
+export function PackageEditor({ pkgId, games, onDone, onCancel, api = PKG_ORG_API }: { pkgId: number | null; games: Game[]; onDone: () => void; onCancel: () => void; api?: PackageEditorApi }) {
   const { toast } = useToast();
   const [f, setF] = useState<GamePackage>(() => blankPkg());
   const [loading, setLoading] = useState(Boolean(pkgId));
@@ -560,9 +602,9 @@ function PackageEditor({ pkgId, games, onDone, onCancel }: { pkgId: number | nul
   useEffect(() => {
     if (pkgId) {
       setLoading(true);
-      apiGet<GamePackage>(`/api/game-organizer/packages/${pkgId}`).then((p) => setF({ ...p, items: p.items ?? [], addons: p.addons ?? [] })).catch(() => {}).finally(() => setLoading(false));
+      apiGet<GamePackage>(api.getPackage(pkgId)).then((p) => setF({ ...p, items: p.items ?? [], addons: p.addons ?? [] })).catch(() => {}).finally(() => setLoading(false));
     } else setF(blankPkg());
-  }, [pkgId]);
+  }, [pkgId, api]);
 
   const set = <K extends keyof GamePackage>(k: K) => (v: GamePackage[K]) => setF((s) => ({ ...s, [k]: v }));
   const items = f.items ?? [];
@@ -577,8 +619,8 @@ function PackageEditor({ pkgId, games, onDone, onCancel }: { pkgId: number | nul
       groupSize: f.groupSize, capacity: f.capacity, ageRestriction: f.ageRestriction,
     };
     try {
-      if (pkgId) await apiPatch(`/api/game-organizer/packages/${pkgId}`, body);
-      else await apiPost("/api/game-organizer/packages", body);
+      if (pkgId) await apiPatch(api.savePackage(pkgId), body);
+      else await apiPost(api.createPackage, body);
       toast({ title: pkgId ? "Package updated" : "Package created", description: "Sent for admin review." });
       onDone();
     } catch (e: any) { toast({ title: "Save failed", description: e?.message, variant: "destructive" }); }
@@ -1020,12 +1062,31 @@ interface BookingRow {
   itemName: string; gameName: string | null; packageName: string | null;
 }
 
-function InsightsPanel() {
+// Endpoint config so the game dashboard panels (Analytics/Leads/Coupons) serve
+// both the game organizer (their own data, default) and an admin viewing a
+// specific game organizer via /admin/game-organizer/:orgId/* in the Venues view.
+export interface GameOrgDashboardApi {
+  analytics: string; bookings: string; leads: string;
+  couponsList: string; couponCreate: string; couponMutate: (id: number) => string;
+}
+const GAME_SELF_API: GameOrgDashboardApi = {
+  analytics: "/api/game-organizer/analytics", bookings: "/api/game-organizer/bookings", leads: "/api/game-organizer/leads",
+  couponsList: "/api/game-organizer/coupons", couponCreate: "/api/game-organizer/coupons", couponMutate: (id) => `/api/game-organizer/coupons/${id}`,
+};
+export function adminGameOrgApi(orgId: number): GameOrgDashboardApi {
+  return {
+    analytics: `/api/admin/game-organizer/${orgId}/analytics`, bookings: `/api/admin/game-organizer/${orgId}/bookings`,
+    leads: `/api/admin/game-organizer/${orgId}/leads`, couponsList: `/api/admin/game-organizer/${orgId}/coupons`,
+    couponCreate: `/api/admin/game-organizer/${orgId}/coupons`, couponMutate: (id) => `/api/admin/game-coupon/${id}`,
+  };
+}
+
+export function InsightsPanel({ api = GAME_SELF_API }: { api?: GameOrgDashboardApi } = {}) {
   const [an, setAn] = useState<Analytics | null>(null);
   const [rows, setRows] = useState<BookingRow[]>([]);
 
-  useEffect(() => { apiGet<Analytics>("/api/game-organizer/analytics").then(setAn).catch(() => {}); }, []);
-  useEffect(() => { apiGet<BookingRow[]>("/api/game-organizer/bookings").then(setRows).catch(() => {}); }, []);
+  useEffect(() => { apiGet<Analytics>(api.analytics).then(setAn).catch(() => {}); }, [api]);
+  useEffect(() => { apiGet<BookingRow[]>(api.bookings).then(setRows).catch(() => {}); }, [api]);
 
   const peakMax = Math.max(1, ...(an?.peakHours ?? []).map((h) => h.bookings));
 
@@ -1125,9 +1186,9 @@ function InsightsPanel() {
 interface LeadView { viewerUserId: number | null; viewerName: string; viewerEmail: string; phone: string; visitCount: number; lastViewedAt: string | null; hasBooked: boolean; }
 interface LeadsPayload { totalViews: number; bookedCount: number; views: LeadView[]; }
 
-function LeadsPanel() {
+export function LeadsPanel({ api = GAME_SELF_API }: { api?: GameOrgDashboardApi } = {}) {
   const [data, setData] = useState<LeadsPayload | null>(null);
-  useEffect(() => { apiGet<LeadsPayload>("/api/game-organizer/leads").then(setData).catch(() => {}); }, []);
+  useEffect(() => { apiGet<LeadsPayload>(api.leads).then(setData).catch(() => {}); }, [api]);
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
@@ -1179,20 +1240,20 @@ function LeadsPanel() {
 
 interface Coupon { id: number; code: string; discountType: string; discountValue: string; gameId: number | null; active: boolean; maxUses: number | null; usedCount: number; expiresAt: string | null; }
 
-function CouponsPanel({ games }: { games: Game[] }) {
+export function CouponsPanel({ games, api = GAME_SELF_API }: { games: Game[]; api?: GameOrgDashboardApi }) {
   const { toast } = useToast();
   const [rows, setRows] = useState<Coupon[]>([]);
   const [form, setForm] = useState({ code: "", discountType: "percent", discountValue: "10", gameId: "all", maxUses: "", expiresAt: "" });
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(() => { apiGet<Coupon[]>("/api/game-organizer/coupons").then(setRows).catch(() => {}); }, []);
+  const load = useCallback(() => { apiGet<Coupon[]>(api.couponsList).then(setRows).catch(() => {}); }, [api]);
   useEffect(() => { load(); }, [load]);
 
   const create = async () => {
     if (!form.code.trim()) { toast({ title: "Enter a code", variant: "destructive" }); return; }
     setSaving(true);
     try {
-      await apiPost("/api/game-organizer/coupons", {
+      await apiPost(api.couponCreate, {
         code: form.code, discountType: form.discountType, discountValue: Number(form.discountValue),
         gameId: form.gameId === "all" ? null : Number(form.gameId),
         maxUses: form.maxUses ? Number(form.maxUses) : null, expiresAt: form.expiresAt || null,
@@ -1203,8 +1264,8 @@ function CouponsPanel({ games }: { games: Game[] }) {
     } catch (e: any) { toast({ title: "Create failed", description: e?.message, variant: "destructive" }); }
     finally { setSaving(false); }
   };
-  const toggle = async (c: Coupon) => { try { await apiPatch(`/api/game-organizer/coupons/${c.id}`, { active: !c.active }); load(); } catch {} };
-  const remove = async (c: Coupon) => { try { await apiDelete(`/api/game-organizer/coupons/${c.id}`); load(); } catch {} };
+  const toggle = async (c: Coupon) => { try { await apiPatch(api.couponMutate(c.id), { active: !c.active }); load(); } catch {} };
+  const remove = async (c: Coupon) => { try { await apiDelete(api.couponMutate(c.id)); load(); } catch {} };
 
   const ic = "mt-1 bg-white/[0.04] border-white/10 text-white";
   return (
@@ -1328,6 +1389,7 @@ function PromotePanel({ games }: { games: Game[] }) {
 function ProfileSettings({ org, onSaved }: { org: GameOrganizer; onSaved: () => void }) {
   const { toast } = useToast();
   const [f, setF] = useState<GameOrganizer>(org);
+  const [country, setCountry] = useState("India"); // no country column — drives the cascade locally
   const [saving, setSaving] = useState(false);
   const set = <K extends keyof GameOrganizer>(k: K) => (v: GameOrganizer[K]) => setF((s) => ({ ...s, [k]: v }));
 
@@ -1353,8 +1415,10 @@ function ProfileSettings({ org, onSaved }: { org: GameOrganizer; onSaved: () => 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Venue name" full><Input className={inputCls} value={f.name} onChange={(e) => set("name")(e.target.value)} /></Field>
           <Field label="About" full><Textarea className={inputCls} rows={3} value={f.description} onChange={(e) => set("description")(e.target.value)} /></Field>
-          <Field label="City"><Input className={inputCls} value={f.city} onChange={(e) => set("city")(e.target.value)} /></Field>
-          <Field label="State"><Input className={inputCls} value={f.state} onChange={(e) => set("state")(e.target.value)} /></Field>
+          <Field label="Country / State / City" full>
+            <LocationSelect country={country} state={f.state} city={f.city}
+              onChange={(n) => { setCountry(n.country); setF((s) => ({ ...s, state: n.state, city: n.city })); }} />
+          </Field>
           <Field label="Address" full><Textarea className={inputCls} rows={2} value={f.address} onChange={(e) => set("address")(e.target.value)} /></Field>
           <Field label="Google Maps URL" full><Input className={inputCls} value={f.mapsUrl} onChange={(e) => set("mapsUrl")(e.target.value)} /></Field>
           <ImageUploadField label="Logo" value={f.logoUrl} onChange={set("logoUrl")} />

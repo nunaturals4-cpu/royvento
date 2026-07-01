@@ -390,6 +390,259 @@ router.delete("/game-organizer/packages/:id", requireAuth(["game_organizer"]), a
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// ADMIN-AUTHORED GAMES & PACKAGES
+// Admins author games/packages for a (possibly still unassigned) game organizer
+// from the Venues tab, using the same forms partners use. Scoped by :orgId;
+// by-id routes use singular /admin/game/:id and /admin/game-package/:id to avoid
+// colliding with the plural admin routes (/admin/games/:id/approve, etc.).
+// ════════════════════════════════════════════════════════════════════════════
+
+router.get("/admin/game-organizer/:orgId/games", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid id" });
+  const rows = await db.select().from(gamesTable).where(eq(gamesTable.gameOrganizerId, orgId)).orderBy(desc(gamesTable.id));
+  return res.json(rows);
+});
+
+router.post("/admin/game-organizer/:orgId/games", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid id" });
+  const [org] = await db.select({ id: gameOrganizersTable.id }).from(gameOrganizersTable).where(eq(gameOrganizersTable.id, orgId)).limit(1);
+  if (!org) return res.status(404).json({ error: "Game organizer not found" });
+  const parsed = GameBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const slug = await uniqueGameSlug(parsed.data.name);
+  const [row] = await db.insert(gamesTable).values({
+    gameOrganizerId: orgId, slug, approvalStatus: "pending", ...gameValuesFromBody(parsed.data),
+  }).returning();
+  return res.json(row);
+});
+
+router.get("/admin/game/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [row] = await db.select().from(gamesTable).where(eq(gamesTable.id, id)).limit(1);
+  if (!row) return res.status(404).json({ error: "Not found" });
+  return res.json(row);
+});
+
+router.patch("/admin/game/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const parsed = GameBody.partial().safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const updates: Record<string, unknown> = { ...parsed.data };
+  if (parsed.data.price != null) updates["price"] = String(parsed.data.price);
+  if (parsed.data.hourlyRate != null) updates["hourlyRate"] = String(parsed.data.hourlyRate);
+  const [row] = await db.update(gamesTable).set(updates).where(eq(gamesTable.id, id)).returning();
+  if (!row) return res.status(404).json({ error: "Not found" });
+  return res.json(row);
+});
+
+router.delete("/admin/game/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  await db.delete(gamesTable).where(eq(gamesTable.id, id));
+  return res.json({ ok: true });
+});
+
+router.get("/admin/game-organizer/:orgId/packages", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid id" });
+  const rows = await db.select().from(gamePackagesTable).where(eq(gamePackagesTable.gameOrganizerId, orgId)).orderBy(desc(gamePackagesTable.createdAt));
+  return res.json(rows);
+});
+
+router.post("/admin/game-organizer/:orgId/packages", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid id" });
+  const [org] = await db.select({ id: gameOrganizersTable.id }).from(gameOrganizersTable).where(eq(gameOrganizersTable.id, orgId)).limit(1);
+  if (!org) return res.status(404).json({ error: "Game organizer not found" });
+  const parsed = PackageBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const slug = await uniquePackageSlug(parsed.data.name);
+  const [row] = await db.insert(gamePackagesTable).values({
+    gameOrganizerId: orgId, slug, approvalStatus: "pending", ...packageValuesFromBody(parsed.data),
+  }).returning();
+  return res.json(row);
+});
+
+router.get("/admin/game-package/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [row] = await db.select().from(gamePackagesTable).where(eq(gamePackagesTable.id, id)).limit(1);
+  if (!row) return res.status(404).json({ error: "Not found" });
+  return res.json(row);
+});
+
+router.patch("/admin/game-package/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const parsed = PackageBody.partial().safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const updates: Record<string, unknown> = { ...parsed.data };
+  if (parsed.data.price != null) updates["price"] = String(parsed.data.price);
+  if (parsed.data.items != null) updates["items"] = parsed.data.items as GamePackageItem[];
+  if (parsed.data.addons != null) updates["addons"] = parsed.data.addons as GamePackageAddon[];
+  const [row] = await db.update(gamePackagesTable).set(updates).where(eq(gamePackagesTable.id, id)).returning();
+  if (!row) return res.status(404).json({ error: "Not found" });
+  return res.json(row);
+});
+
+router.delete("/admin/game-package/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  await db.delete(gamePackagesTable).where(eq(gamePackagesTable.id, id));
+  return res.json({ ok: true });
+});
+
+// ── Admin: a game organizer's Analytics / Leads / Coupons (scoped by :orgId).
+// Mirror the game-dashboard endpoints so the Venues Manage view reuses the exact
+// panels. Data is keyed by game_organizer_id, so it already belongs to the org
+// regardless of which owner is assigned by email later. ────────────────────────
+
+router.get("/admin/game-organizer/:orgId/analytics", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid id" });
+  const [kpi] = (await db.execute(sql`
+    SELECT COUNT(*)::int AS "bookings", COALESCE(SUM(b.guests),0)::int AS "players",
+      COALESCE(SUM(b.final_price),0) AS "revenue", COUNT(*) FILTER (WHERE b.checked_in)::int AS "attended"
+    FROM bookings b WHERE b.kind='game' AND b.game_organizer_id = ${orgId} AND b.status='confirmed'
+  `)).rows as any[];
+  const popularGames = await db.execute(sql`
+    SELECT g.id, g.name, COUNT(b.id)::int AS "bookings", COALESCE(SUM(b.guests),0)::int AS "players", COALESCE(SUM(b.final_price),0) AS "revenue"
+    FROM games g LEFT JOIN bookings b ON b.game_id = g.id AND b.kind='game' AND b.status='confirmed'
+    WHERE g.game_organizer_id = ${orgId} GROUP BY g.id, g.name ORDER BY "revenue" DESC
+  `);
+  const popularPackages = await db.execute(sql`
+    SELECT p.id, p.name, COUNT(b.id)::int AS "bookings", COALESCE(SUM(b.final_price),0) AS "revenue"
+    FROM game_packages p LEFT JOIN bookings b ON b.game_package_id = p.id AND b.kind='game' AND b.status='confirmed'
+    WHERE p.game_organizer_id = ${orgId} GROUP BY p.id, p.name ORDER BY "revenue" DESC
+  `);
+  const peakHours = await db.execute(sql`
+    SELECT COALESCE(NULLIF(split_part(b.arrival_time, ':', 1), ''), '--') AS "hour", COUNT(*)::int AS "bookings"
+    FROM bookings b WHERE b.kind='game' AND b.game_organizer_id = ${orgId} AND b.status='confirmed'
+    GROUP BY "hour" ORDER BY "hour"
+  `);
+  const [repeat] = (await db.execute(sql`
+    SELECT COUNT(*)::int AS "totalCustomers", COUNT(*) FILTER (WHERE c > 1)::int AS "repeatCustomers"
+    FROM (SELECT b.user_id, COUNT(*) AS c FROM bookings b WHERE b.kind='game' AND b.game_organizer_id = ${orgId} AND b.status='confirmed' GROUP BY b.user_id) t
+  `)).rows as any[];
+  const recent = await db.execute(sql`
+    SELECT to_char(b.created_at, 'YYYY-MM-DD') AS "day", COUNT(*)::int AS "bookings", COALESCE(SUM(b.final_price),0) AS "revenue"
+    FROM bookings b WHERE b.kind='game' AND b.game_organizer_id = ${orgId} AND b.status='confirmed' AND b.created_at >= now() - interval '30 days'
+    GROUP BY "day" ORDER BY "day"
+  `);
+  const totalViews = (await db.execute(sql`SELECT COUNT(*)::int AS c FROM game_profile_views WHERE game_organizer_id = ${orgId}`)).rows[0] as any;
+  const bookings = Number(kpi?.bookings ?? 0);
+  const attended = Number(kpi?.attended ?? 0);
+  const views = Number(totalViews?.c ?? 0);
+  return res.json({
+    totals: {
+      bookings, players: Number(kpi?.players ?? 0), revenue: kpi?.revenue ?? "0", attended,
+      attendanceRate: bookings > 0 ? Math.round((attended / bookings) * 100) : 0,
+      conversionRate: views > 0 ? Math.round((bookings / views) * 100) : 0,
+      totalCustomers: Number(repeat?.totalCustomers ?? 0), repeatCustomers: Number(repeat?.repeatCustomers ?? 0),
+    },
+    popularGames: popularGames.rows, popularPackages: popularPackages.rows, peakHours: peakHours.rows, recent: recent.rows,
+  });
+});
+
+router.get("/admin/game-organizer/:orgId/bookings", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid id" });
+  const gameId = Number(req.query["gameId"]);
+  const filter = Number.isFinite(gameId) && gameId > 0 ? sql` AND b.game_id = ${gameId}` : sql``;
+  const rows = await db.execute(sql`
+    SELECT b.id, b.created_at AS "createdAt", b.booking_date AS "bookingDate", b.arrival_time AS "time",
+      b.duration_hours AS "durationHours", b.guests AS "persons", b.final_price AS "amount", b.checked_in AS "checkedIn",
+      b.person_name AS "attendee", b.phone, u.email AS "email", b.selected_pub_event AS "itemName",
+      g.name AS "gameName", p.name AS "packageName"
+    FROM bookings b
+    LEFT JOIN users u ON u.id = b.user_id
+    LEFT JOIN games g ON g.id = b.game_id
+    LEFT JOIN game_packages p ON p.id = b.game_package_id
+    WHERE b.kind='game' AND b.game_organizer_id = ${orgId} AND b.status='confirmed'${filter}
+    ORDER BY b.created_at DESC
+  `);
+  return res.json(rows.rows);
+});
+
+router.get("/admin/game-organizer/:orgId/leads", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid id" });
+  const knownAgg = await db
+    .select({ viewerUserId: gameProfileViewsTable.viewerUserId, visitCount: sql<number>`count(*)::int`.as("visit_count"), lastViewedAt: sql<Date>`max(${gameProfileViewsTable.viewedAt})`.as("last_viewed_at") })
+    .from(gameProfileViewsTable)
+    .where(and(eq(gameProfileViewsTable.gameOrganizerId, orgId), sql`${gameProfileViewsTable.viewerUserId} is not null`))
+    .groupBy(gameProfileViewsTable.viewerUserId);
+  const [anonAgg] = await db
+    .select({ visitCount: sql<number>`count(*)::int`.as("visit_count"), lastViewedAt: sql<Date>`max(${gameProfileViewsTable.viewedAt})`.as("last_viewed_at") })
+    .from(gameProfileViewsTable)
+    .where(and(eq(gameProfileViewsTable.gameOrganizerId, orgId), isNull(gameProfileViewsTable.viewerUserId)));
+  const ids = knownAgg.map((r) => r.viewerUserId).filter((x): x is number => x != null);
+  const users = ids.length ? await db.select().from(usersTable).where(inArray(usersTable.id, ids)) : [];
+  const uMap = new Map(users.map((u) => [u.id, u]));
+  const bookedUserIds = new Set<number>();
+  if (ids.length) {
+    const bookedRows = await db.select({ userId: bookingsTable.userId }).from(bookingsTable)
+      .where(and(eq(bookingsTable.gameOrganizerId, orgId), eq(bookingsTable.kind, "game"), inArray(bookingsTable.userId, ids)));
+    bookedRows.forEach((b) => bookedUserIds.add(b.userId));
+  }
+  const knownViews = knownAgg.map((r) => {
+    const u = uMap.get(r.viewerUserId as number);
+    return { viewerUserId: r.viewerUserId, viewerName: u?.name ?? "Anonymous", viewerEmail: u?.email ?? "", phone: u?.phone ?? "", visitCount: r.visitCount, lastViewedAt: r.lastViewedAt, hasBooked: bookedUserIds.has(r.viewerUserId as number) };
+  }).sort((a, b) => new Date(b.lastViewedAt).getTime() - new Date(a.lastViewedAt).getTime());
+  const anonCount = anonAgg?.visitCount ?? 0;
+  const anonView = anonCount > 0 ? [{ viewerUserId: null, viewerName: "Anonymous", viewerEmail: "", phone: "", visitCount: anonCount, lastViewedAt: anonAgg!.lastViewedAt, hasBooked: false }] : [];
+  const views = [...knownViews, ...anonView];
+  return res.json({ totalViews: views.reduce((s, v) => s + v.visitCount, 0), bookedCount: knownViews.filter((v) => v.hasBooked).length, views });
+});
+
+router.get("/admin/game-organizer/:orgId/coupons", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  if (!Number.isFinite(orgId)) return res.status(400).json({ error: "Invalid id" });
+  const rows = await db.select().from(gameCouponsTable).where(eq(gameCouponsTable.gameOrganizerId, orgId)).orderBy(desc(gameCouponsTable.createdAt));
+  return res.json(rows);
+});
+
+router.post("/admin/game-organizer/:orgId/coupons", requireAuth(["admin"]), async (req, res) => {
+  const orgId = Number(req.params["orgId"]);
+  const [org] = await db.select({ id: gameOrganizersTable.id }).from(gameOrganizersTable).where(eq(gameOrganizersTable.id, orgId)).limit(1);
+  if (!org) return res.status(404).json({ error: "Game organizer not found" });
+  const parsed = CouponBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const d = parsed.data;
+  try {
+    const [row] = await db.insert(gameCouponsTable).values({
+      gameOrganizerId: orgId, code: d.code.toUpperCase().trim(), discountType: d.discountType,
+      discountValue: String(d.discountValue), gameId: d.gameId ?? null, active: d.active,
+      maxUses: d.maxUses ?? null, expiresAt: d.expiresAt ? new Date(d.expiresAt) : null,
+    }).returning();
+    return res.json(row);
+  } catch {
+    return res.status(409).json({ error: "A coupon with that code already exists." });
+  }
+});
+
+router.patch("/admin/game-coupon/:cid", requireAuth(["admin"]), async (req, res) => {
+  const cid = Number(req.params["cid"]);
+  if (!Number.isFinite(cid)) return res.status(400).json({ error: "Invalid id" });
+  const active = (req.body as { active?: unknown })?.active;
+  if (typeof active !== "boolean") return res.status(400).json({ error: "active must be boolean" });
+  const [row] = await db.update(gameCouponsTable).set({ active }).where(eq(gameCouponsTable.id, cid)).returning();
+  if (!row) return res.status(404).json({ error: "Not found" });
+  return res.json(row);
+});
+
+router.delete("/admin/game-coupon/:cid", requireAuth(["admin"]), async (req, res) => {
+  const cid = Number(req.params["cid"]);
+  if (!Number.isFinite(cid)) return res.status(400).json({ error: "Invalid id" });
+  await db.delete(gameCouponsTable).where(eq(gameCouponsTable.id, cid));
+  return res.json({ ok: true });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // PUBLIC
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -1340,6 +1593,186 @@ router.get("/admin/game-organizers", requireAuth(["admin"]), async (_req, res) =
     ORDER BY o.created_at DESC
   `);
   return res.json(rows.rows);
+});
+
+// Sentinel owner id for unassigned admin-created game organizers (mirrors the
+// unassigned-venue pattern). Partial unique index game_organizers_user_assigned_idx
+// (WHERE user_id <> 0) lets many of these coexist before assignment.
+const UNASSIGNED_GAME_ORG_USER_ID = 0;
+
+// Admin: create a Game Organizer from the Venues tab WITHOUT an owner. It sits
+// unassigned (owner id 0, status 'pending') until an admin assigns it to a
+// partner by email later — exactly like admin-created venues.
+const AdminCreateGameOrgBody = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().max(5000).optional().default(""),
+  logoUrl: z.string().optional().default(""),
+  coverImageUrl: z.string().optional().default(""),
+  website: z.string().max(255).optional().default(""),
+  instagram: z.string().max(255).optional().default(""),
+  facebook: z.string().max(255).optional().default(""),
+  youtube: z.string().max(255).optional().default(""),
+  supportEmail: z.string().max(255).optional().default(""),
+  supportPhone: z.string().max(50).optional().default(""),
+  address: z.string().max(2000).optional().default(""),
+  mapsUrl: z.string().max(1000).optional().default(""),
+  city: z.string().max(100).optional().default(""),
+  state: z.string().max(100).optional().default(""),
+});
+
+router.post("/admin/create-game-organizer", requireAuth(["admin"]), async (req, res) => {
+  const parsed = AdminCreateGameOrgBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const d = parsed.data;
+
+  const slug = await uniqueOrganizerSlug(d.name);
+  const usedPrefixes = (await db.select({ p: gameOrganizersTable.ticketPrefix }).from(gameOrganizersTable))
+    .map((r) => r.p)
+    .filter((p): p is string => Boolean(p));
+  const ticketPrefix = await generateUniqueTicketPrefix(d.name, usedPrefixes);
+  const ticketSalt = generateTicketSalt();
+
+  const [row] = await db.insert(gameOrganizersTable).values({
+    userId: UNASSIGNED_GAME_ORG_USER_ID,
+    name: d.name.trim(),
+    slug,
+    description: d.description,
+    logoUrl: d.logoUrl,
+    coverImageUrl: d.coverImageUrl,
+    website: d.website,
+    instagram: d.instagram,
+    facebook: d.facebook,
+    youtube: d.youtube,
+    supportEmail: d.supportEmail,
+    supportPhone: d.supportPhone,
+    address: d.address,
+    mapsUrl: d.mapsUrl,
+    city: d.city,
+    state: d.state,
+    status: "pending",
+    ticketPrefix,
+    ticketSalt,
+  }).returning();
+  return res.json(row);
+});
+
+// Admin: assign (or reassign) an unassigned game organizer to a partner by email.
+router.post("/admin/game-organizers/:id/assign", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const emailRaw = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  if (!emailRaw) return res.status(400).json({ error: "Partner email is required" });
+
+  const [org] = await db.select().from(gameOrganizersTable).where(eq(gameOrganizersTable.id, id)).limit(1);
+  if (!org) return res.status(404).json({ error: "Game organizer not found" });
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, emailRaw)).limit(1);
+  if (!user) {
+    return res.status(404).json({ error: `No account found for "${emailRaw}". The partner must have a registered Royvento account before a game organizer can be assigned.` });
+  }
+  if (user.role === "admin") return res.status(400).json({ error: "Cannot assign a game organizer to an admin account." });
+  if (org.userId === user.id) return res.status(409).json({ error: "This game organizer is already assigned to that partner." });
+
+  const [otherOrg] = await db
+    .select({ id: gameOrganizersTable.id, name: gameOrganizersTable.name })
+    .from(gameOrganizersTable)
+    .where(and(eq(gameOrganizersTable.userId, user.id), sql`${gameOrganizersTable.id} <> ${id}`))
+    .limit(1);
+  if (otherOrg) {
+    return res.status(409).json({ error: `${user.email} already owns a game organizer ("${otherOrg.name}"). Each partner can own only one — unassign that one first.` });
+  }
+
+  const prevOwnerId = org.userId;
+  await db.update(gameOrganizersTable)
+    .set({ userId: user.id, status: "approved", approvedAt: org.approvedAt ?? new Date() })
+    .where(eq(gameOrganizersTable.id, id));
+  await db.update(usersTable).set({ role: "game_organizer" }).where(eq(usersTable.id, user.id));
+
+  if (prevOwnerId && prevOwnerId !== UNASSIGNED_GAME_ORG_USER_ID && prevOwnerId !== user.id) {
+    const [stillOwns] = await db.select({ id: gameOrganizersTable.id }).from(gameOrganizersTable).where(eq(gameOrganizersTable.userId, prevOwnerId)).limit(1);
+    if (!stillOwns) await db.update(usersTable).set({ role: "user" }).where(eq(usersTable.id, prevOwnerId));
+  }
+
+  try {
+    await createUserNotification({
+      userId: user.id,
+      title: "A game organizer profile has been assigned to you",
+      message: `You can now manage "${org.name}" from your game organizer dashboard.`,
+      url: "/dashboard/game-organizer",
+      tag: `game-organizer-assigned-${id}`,
+    });
+  } catch { /* best-effort */ }
+
+  const [row] = await db.select().from(gameOrganizersTable).where(eq(gameOrganizersTable.id, id)).limit(1);
+  return res.json({ ...row, ownerEmail: user.email });
+});
+
+// Admin: unassign a game organizer — return it to the unassigned pool.
+router.post("/admin/game-organizers/:id/unassign", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [org] = await db.select().from(gameOrganizersTable).where(eq(gameOrganizersTable.id, id)).limit(1);
+  if (!org) return res.status(404).json({ error: "Game organizer not found" });
+  if (org.userId === UNASSIGNED_GAME_ORG_USER_ID) return res.status(409).json({ error: "Game organizer is already unassigned." });
+
+  const prevOwnerId = org.userId;
+  await db.update(gameOrganizersTable)
+    .set({ userId: UNASSIGNED_GAME_ORG_USER_ID, status: "pending", approvedAt: null })
+    .where(eq(gameOrganizersTable.id, id));
+  if (prevOwnerId) {
+    const [stillOwns] = await db.select({ id: gameOrganizersTable.id }).from(gameOrganizersTable).where(eq(gameOrganizersTable.userId, prevOwnerId)).limit(1);
+    if (!stillOwns) await db.update(usersTable).set({ role: "user" }).where(eq(usersTable.id, prevOwnerId));
+  }
+  const [row] = await db.select().from(gameOrganizersTable).where(eq(gameOrganizersTable.id, id)).limit(1);
+  return res.json({ ...row, ownerEmail: null });
+});
+
+// Admin: full game-organizer profile for the edit form prefill.
+router.get("/admin/game-organizers/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [row] = await db.select().from(gameOrganizersTable).where(eq(gameOrganizersTable.id, id)).limit(1);
+  if (!row) return res.status(404).json({ error: "Not found" });
+  const [owner] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, row.userId)).limit(1);
+  return res.json({ ...row, ownerEmail: owner?.email ?? null });
+});
+
+// Admin: update a game-organizer's profile fields (edit form save).
+const AdminUpdateGameOrgBody = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().max(5000).optional(),
+  logoUrl: z.string().optional(),
+  coverImageUrl: z.string().optional(),
+  website: z.string().max(255).optional(),
+  instagram: z.string().max(255).optional(),
+  facebook: z.string().max(255).optional(),
+  youtube: z.string().max(255).optional(),
+  supportEmail: z.string().max(255).optional(),
+  supportPhone: z.string().max(50).optional(),
+  address: z.string().max(2000).optional(),
+  mapsUrl: z.string().max(1000).optional(),
+  city: z.string().max(100).optional(),
+  state: z.string().max(100).optional(),
+});
+
+router.patch("/admin/game-organizers/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const parsed = AdminUpdateGameOrgBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const [org] = await db.select().from(gameOrganizersTable).where(eq(gameOrganizersTable.id, id)).limit(1);
+  if (!org) return res.status(404).json({ error: "Not found" });
+
+  const updates: Record<string, unknown> = {};
+  for (const k of ["description", "logoUrl", "coverImageUrl", "website", "instagram", "facebook", "youtube", "supportEmail", "supportPhone", "address", "mapsUrl", "city", "state"] as const) {
+    if (parsed.data[k] !== undefined) updates[k] = parsed.data[k];
+  }
+  if (parsed.data.name !== undefined && parsed.data.name.trim() && parsed.data.name.trim() !== org.name) {
+    updates["name"] = parsed.data.name.trim();
+    updates["slug"] = await uniqueOrganizerSlug(parsed.data.name, org.id);
+  }
+  const [row] = await db.update(gameOrganizersTable).set(updates).where(eq(gameOrganizersTable.id, id)).returning();
+  return res.json(row);
 });
 
 router.patch("/admin/game-organizers/:id/verify", requireAuth(["admin"]), async (req, res) => {

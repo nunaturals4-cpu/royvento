@@ -39,6 +39,7 @@ const PaymentResult = lazy(() => import("@/pages/payment-result").then((m) => ({
 const Terms = lazy(() => import("@/pages/terms").then((m) => ({ default: m.Terms })));
 const Privacy = lazy(() => import("@/pages/privacy").then((m) => ({ default: m.Privacy })));
 const CommunityGuidelines = lazy(() => import("@/pages/community-guidelines").then((m) => ({ default: m.CommunityGuidelines })));
+const About = lazy(() => import("@/pages/about").then((m) => ({ default: m.About })));
 const City = lazy(() => import("@/pages/city").then((m) => ({ default: m.City })));
 const CitySecondary = lazy(() => import("@/pages/city-secondary").then((m) => ({ default: m.CitySecondary })));
 const VendorSlugRoute = lazy(() => import("@/pages/slugged-detail-redirect").then((m) => ({ default: m.VendorSlugRoute })));
@@ -209,6 +210,7 @@ function Router() {
           <Route path="/terms" component={Terms} />
           <Route path="/privacy" component={Privacy} />
           <Route path="/community-guidelines" component={CommunityGuidelines} />
+          <Route path="/about" component={About} />
 
           <Route path="/wishlist">
             {() => <RequireAuth><Wishlist /></RequireAuth>}

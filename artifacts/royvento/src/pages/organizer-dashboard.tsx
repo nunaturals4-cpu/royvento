@@ -41,7 +41,7 @@ interface Artist { name: string; role: string; imageUrl: string; bio: string; so
 interface ScheduleItem { time: string; title: string; desc: string; }
 interface Policies { dressCode: string; entryRules: string; agePolicy: string; refundPolicy: string; cancellationPolicy: string; }
 interface Faq { q: string; a: string; }
-interface OrganizerEvent {
+export interface OrganizerEvent {
   id: number; title: string; slug: string; category: string; subcategory: string;
   shortDescription: string; description: string; tags: string[]; language: string; ageRestriction: string;
   coverImageUrl: string; bannerUrl: string; mobileBannerUrl: string; galleryImages: string[]; promoVideos: string[];
@@ -152,6 +152,9 @@ export function BecomeOrganizer() {
     website: "", instagram: "", facebook: "", youtube: "",
     supportEmail: "", supportPhone: "", logoUrl: "", coverImageUrl: "",
   });
+  // Organizers store only city + state; a local country (default India) drives
+  // the dependent LocationSelect cascade.
+  const [country, setCountry] = useState("India");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -198,13 +201,10 @@ export function BecomeOrganizer() {
               <Label className="text-white/70 text-xs uppercase tracking-wider">Brand description</Label>
               <Textarea className={inputCls + " mt-1.5"} value={form.description} onChange={(e) => set("description")(e.target.value)} rows={3} placeholder="Tell guests what your events are about." />
             </div>
-            <div>
-              <Label className="text-white/70 text-xs uppercase tracking-wider">City</Label>
-              <Input className={inputCls + " mt-1.5"} value={form.city} onChange={(e) => set("city")(e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-white/70 text-xs uppercase tracking-wider">State</Label>
-              <Input className={inputCls + " mt-1.5"} value={form.state} onChange={(e) => set("state")(e.target.value)} />
+            <div className="sm:col-span-2">
+              <Label className="text-white/70 text-xs uppercase tracking-wider">Country / State / City</Label>
+              <LocationSelect className="mt-1.5" country={country} state={form.state} city={form.city}
+                onChange={(n) => { setCountry(n.country); setForm((f) => ({ ...f, state: n.state, city: n.city })); }} />
             </div>
             <ImageUploadField label="Logo" value={form.logoUrl} onChange={set("logoUrl")} />
             <ImageUploadField label="Cover image" value={form.coverImageUrl} onChange={set("coverImageUrl")} />
@@ -482,6 +482,25 @@ const ORGANIZER_EVENT_API: EventEditorApi = {
   editedToast: "Event updated — sent for re-approval",
 };
 
+// Config for an admin authoring an organizer event from the Venues tab. The
+// event is created unassigned (sentinel organizer 0) and an organizer is linked
+// later. By-id routes use the singular "/admin/organizer-event/:id" prefix.
+export const ADMIN_EVENT_API: EventEditorApi = {
+  getEvent: (id) => `/api/admin/organizer-event/${id}`,
+  saveEvent: (id) => `/api/admin/organizer-event/${id}`,
+  createEvent: "/api/admin/organizer-events",
+  ticketsList: (id) => `/api/admin/organizer-event/${id}/tickets`,
+  ticketCreate: (id) => `/api/admin/organizer-event/${id}/tickets`,
+  ticketUpdate: (tid) => `/api/admin/organizer-ticket/${tid}`,
+  ticketDelete: (tid) => `/api/admin/organizer-ticket/${tid}`,
+  // The host-venue picker calls the organizer-only /api/organizer/host-venues
+  // endpoint (403 for admins), so hide it here — admins set venue details
+  // manually and link an organizer later instead.
+  showVenuePicker: false,
+  showHeader: true,
+  editedToast: "Event updated",
+};
+
 // Config for the venue partner editing an event hosted at their venue. The venue
 // link can't be changed here, so the host picker is hidden.
 export function partnerEventApi(vq: string): EventEditorApi {
@@ -499,7 +518,7 @@ export function partnerEventApi(vq: string): EventEditorApi {
   };
 }
 
-export function EventEditor({ eventId, onDone, onCancel, api = ORGANIZER_EVENT_API }: { eventId: number | null; onDone: () => void; onCancel: () => void; api?: EventEditorApi }) {
+export function EventEditor({ eventId, onDone, onCancel, api = ORGANIZER_EVENT_API }: { eventId: number | null; onDone: (created?: OrganizerEvent) => void; onCancel: () => void; api?: EventEditorApi }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(eventId != null);
   const [saving, setSaving] = useState(false);
@@ -544,9 +563,9 @@ export function EventEditor({ eventId, onDone, onCancel, api = ORGANIZER_EVENT_A
       } else {
         const created = await apiPost<OrganizerEvent>(api.createEvent, body);
         toast({ title: "Event created", description: f.venueId ? "Add ticket tiers — then the venue partner approves it." : "Add ticket tiers, then it goes for admin approval." });
-        // jump into edit mode of the new event so tickets can be added
-        onDone();
-        void created;
+        // Pass the created event back so callers can jump into edit mode (to add
+        // ticket tiers). Existing callers ignore the argument.
+        onDone(created);
       }
     } catch (e: any) {
       toast({ title: "Save failed", description: e?.message, variant: "destructive" });
@@ -1014,6 +1033,7 @@ function ProfileBasics({ organizer, onSaved }: { organizer: Organizer; onSaved: 
 function ProfileSettings({ organizer, onSaved }: { organizer: Organizer; onSaved: () => void }) {
   const { toast } = useToast();
   const [f, setF] = useState<Organizer>(organizer);
+  const [country, setCountry] = useState("India"); // no country column — drives the cascade locally
   const [saving, setSaving] = useState(false);
   useEffect(() => { setF(organizer); }, [organizer]);
   const set = (k: keyof Organizer) => (v: string) => setF((p) => ({ ...p, [k]: v }));
@@ -1040,8 +1060,10 @@ function ProfileSettings({ organizer, onSaved }: { organizer: Organizer; onSaved
           <ImageUploadField label="Cover image" value={f.coverImageUrl} onChange={set("coverImageUrl")} />
           <Field label="Organizer name" full><Input className={inputCls} value={f.name} onChange={(e) => set("name")(e.target.value)} /></Field>
           <Field label="Description" full><Textarea className={inputCls} rows={3} value={f.description} onChange={(e) => set("description")(e.target.value)} /></Field>
-          <Field label="City"><Input className={inputCls} value={f.city} onChange={(e) => set("city")(e.target.value)} /></Field>
-          <Field label="State"><Input className={inputCls} value={f.state} onChange={(e) => set("state")(e.target.value)} /></Field>
+          <Field label="Country / State / City" full>
+            <LocationSelect country={country} state={f.state} city={f.city}
+              onChange={(n) => { setCountry(n.country); setF((p) => ({ ...p, state: n.state, city: n.city })); }} />
+          </Field>
           {([["website","Website"],["instagram","Instagram"],["facebook","Facebook"],["youtube","YouTube"],["supportEmail","Support email"],["supportPhone","Support phone"]] as const).map(([k,label]) => (
             <Field key={k} label={label}><Input className={inputCls} value={f[k] as string} onChange={(e) => set(k)(e.target.value)} /></Field>
           ))}
@@ -1350,7 +1372,42 @@ interface BankingPayload {
   commissionOwed: string;
 }
 
-function EarningsPanel() {
+// Endpoint config so the dashboard panels (Earnings/Insights/Leads/Coupons) serve
+// both the organizer (their own data, default) and an admin viewing a specific
+// organizer's data via /admin/organizer/:orgId/* in the Venues Manage view.
+export interface OrganizerDashboardApi {
+  revenue: string; banking: string; analytics: string; bookings: string; leads: string;
+  couponsList: string; couponCreate: string; couponMutate: (id: number) => string; events: string;
+}
+const SELF_API: OrganizerDashboardApi = {
+  revenue: "/api/organizer/revenue", banking: "/api/organizer/banking", analytics: "/api/organizer/analytics",
+  bookings: "/api/organizer/bookings", leads: "/api/organizer/leads",
+  couponsList: "/api/organizer/coupons", couponCreate: "/api/organizer/coupons",
+  couponMutate: (id) => `/api/organizer/coupons/${id}`, events: "/api/organizer/events",
+};
+export function adminOrganizerApi(orgId: number): OrganizerDashboardApi {
+  return {
+    revenue: `/api/admin/organizer/${orgId}/revenue`, banking: `/api/admin/organizer/${orgId}/banking`,
+    analytics: `/api/admin/organizer/${orgId}/analytics`, bookings: `/api/admin/organizer/${orgId}/bookings`,
+    leads: `/api/admin/organizer/${orgId}/leads`, couponsList: `/api/admin/organizer/${orgId}/coupons`,
+    couponCreate: `/api/admin/organizer/${orgId}/coupons`, couponMutate: (id) => `/api/admin/organizer-coupon/${id}`,
+    events: `/api/admin/organizer/${orgId}/events`,
+  };
+}
+// Per-event admin config — Earnings/Insights/Leads/Coupons scoped to ONE event,
+// usable before assignment (data is event-keyed and follows the event on assign).
+// Banking is hidden (organizer-level); leads = the event's bookers.
+export function adminEventApi(eventId: number): OrganizerDashboardApi {
+  return {
+    revenue: `/api/admin/organizer-event/${eventId}/revenue`, banking: "",
+    analytics: `/api/admin/organizer-event/${eventId}/analytics`, bookings: `/api/admin/organizer-event/${eventId}/bookings`,
+    leads: `/api/admin/organizer-event/${eventId}/leads`, couponsList: `/api/admin/organizer-event/${eventId}/coupons`,
+    couponCreate: `/api/admin/organizer-event/${eventId}/coupons`, couponMutate: (id) => `/api/admin/organizer-coupon/${id}`,
+    events: "",
+  };
+}
+
+export function EarningsPanel({ api = SELF_API, showBanking = true }: { api?: OrganizerDashboardApi; showBanking?: boolean } = {}) {
   const { toast } = useToast();
   const [rev, setRev] = useState<RevenuePayload | null>(null);
   const [bank, setBank] = useState<BankingPayload | null>(null);
@@ -1358,17 +1415,17 @@ function EarningsPanel() {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(() => {
-    apiGet<RevenuePayload>("/api/organizer/revenue").then(setRev).catch(() => {});
-    apiGet<BankingPayload>("/api/organizer/banking").then((b) => {
+    apiGet<RevenuePayload>(api.revenue).then(setRev).catch(() => {});
+    if (showBanking) apiGet<BankingPayload>(api.banking).then((b) => {
       setBank(b);
       if (b.banking) setForm({ accountHolderName: b.banking.accountHolderName, bankName: b.banking.bankName, accountNumber: b.banking.accountNumber, ifscCode: b.banking.ifscCode });
     }).catch(() => {});
-  }, []);
+  }, [api, showBanking]);
   useEffect(() => { load(); }, [load]);
 
   const saveBank = async () => {
     setSaving(true);
-    try { await apiPut("/api/organizer/banking", form); toast({ title: "Banking details saved" }); load(); }
+    try { await apiPut(api.banking, form); toast({ title: "Banking details saved" }); load(); }
     catch (e: any) { toast({ title: "Save failed", description: e?.message, variant: "destructive" }); }
     finally { setSaving(false); }
   };
@@ -1426,6 +1483,7 @@ function EarningsPanel() {
       </div>
 
       {/* Banking */}
+      {showBanking && (
       <GlassCard className="p-5 space-y-4">
         <h2 className="font-serif text-lg flex items-center gap-2"><Banknote className="h-4 w-4 text-primary" /> Payout / banking details</h2>
         <div className="grid sm:grid-cols-2 gap-3">
@@ -1449,6 +1507,7 @@ function EarningsPanel() {
           </div>
         )}
       </GlassCard>
+      )}
     </div>
   );
 }
@@ -1468,16 +1527,16 @@ interface BookingRow {
   checkedIn: boolean; attendee: string; phone: string; email: string; eventTitle: string; ticketType: string;
 }
 
-function InsightsPanel({ events }: { events: OrganizerEvent[] }) {
+export function InsightsPanel({ events, api = SELF_API }: { events: OrganizerEvent[]; api?: OrganizerDashboardApi }) {
   const [an, setAn] = useState<Analytics | null>(null);
   const [rows, setRows] = useState<BookingRow[]>([]);
   const [eventFilter, setEventFilter] = useState("all");
 
-  useEffect(() => { apiGet<Analytics>("/api/organizer/analytics").then(setAn).catch(() => {}); }, []);
+  useEffect(() => { apiGet<Analytics>(api.analytics).then(setAn).catch(() => {}); }, [api]);
   useEffect(() => {
     const q = eventFilter === "all" ? "" : `?eventId=${eventFilter}`;
-    apiGet<BookingRow[]>(`/api/organizer/bookings${q}`).then(setRows).catch(() => {});
-  }, [eventFilter]);
+    apiGet<BookingRow[]>(`${api.bookings}${q}`).then(setRows).catch(() => {});
+  }, [eventFilter, api]);
 
   const exportCsv = () => {
     const header = ["Booking", "Event", "Ticket", "Attendee", "Phone", "Email", "Qty", "Amount", "Date", "CheckedIn"];
@@ -1575,9 +1634,9 @@ interface LeadView {
 }
 interface LeadsPayload { totalViews: number; bookedCount: number; views: LeadView[]; }
 
-function LeadsPanel() {
+export function LeadsPanel({ api = SELF_API }: { api?: OrganizerDashboardApi } = {}) {
   const [data, setData] = useState<LeadsPayload | null>(null);
-  useEffect(() => { apiGet<LeadsPayload>("/api/organizer/leads").then(setData).catch(() => {}); }, []);
+  useEffect(() => { apiGet<LeadsPayload>(api.leads).then(setData).catch(() => {}); }, [api]);
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -1637,22 +1696,22 @@ interface Coupon {
   active: boolean; maxUses: number | null; usedCount: number; expiresAt: string | null;
 }
 
-function CouponsPanel({ events }: { events: OrganizerEvent[] }) {
+export function CouponsPanel({ events, api = SELF_API, lockedEventId = null }: { events: OrganizerEvent[]; api?: OrganizerDashboardApi; lockedEventId?: number | null }) {
   const { toast } = useToast();
   const [rows, setRows] = useState<Coupon[]>([]);
   const [form, setForm] = useState({ code: "", discountType: "percent", discountValue: "10", eventId: "all", maxUses: "", expiresAt: "" });
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(() => { apiGet<Coupon[]>("/api/organizer/coupons").then(setRows).catch(() => {}); }, []);
+  const load = useCallback(() => { apiGet<Coupon[]>(api.couponsList).then(setRows).catch(() => {}); }, [api]);
   useEffect(() => { load(); }, [load]);
 
   const create = async () => {
     if (!form.code.trim()) { toast({ title: "Enter a code", variant: "destructive" }); return; }
     setSaving(true);
     try {
-      await apiPost("/api/organizer/coupons", {
+      await apiPost(api.couponCreate, {
         code: form.code, discountType: form.discountType, discountValue: Number(form.discountValue),
-        eventId: form.eventId === "all" ? null : Number(form.eventId),
+        eventId: lockedEventId != null ? lockedEventId : (form.eventId === "all" ? null : Number(form.eventId)),
         maxUses: form.maxUses ? Number(form.maxUses) : null,
         expiresAt: form.expiresAt || null,
       });
@@ -1662,8 +1721,8 @@ function CouponsPanel({ events }: { events: OrganizerEvent[] }) {
     } catch (e: any) { toast({ title: "Create failed", description: e?.message, variant: "destructive" }); }
     finally { setSaving(false); }
   };
-  const toggle = async (c: Coupon) => { try { await apiPatch(`/api/organizer/coupons/${c.id}`, { active: !c.active }); load(); } catch {} };
-  const remove = async (c: Coupon) => { try { await apiDelete(`/api/organizer/coupons/${c.id}`); load(); } catch {} };
+  const toggle = async (c: Coupon) => { try { await apiPatch(api.couponMutate(c.id), { active: !c.active }); load(); } catch {} };
+  const remove = async (c: Coupon) => { try { await apiDelete(api.couponMutate(c.id)); load(); } catch {} };
 
   const inputCls = "mt-1 bg-white/[0.04] border-white/10 text-white";
   return (
@@ -1677,6 +1736,7 @@ function CouponsPanel({ events }: { events: OrganizerEvent[] }) {
       <GlassCard className="p-5 space-y-3">
         <div className="grid sm:grid-cols-2 gap-3">
           <div><Label className="text-white/70 text-xs uppercase tracking-wider">Code</Label><Input className={inputCls} value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="NEON20" /></div>
+          {lockedEventId == null && (
           <div>
             <Label className="text-white/70 text-xs uppercase tracking-wider">Event</Label>
             <Select value={form.eventId} onValueChange={(v) => setForm((f) => ({ ...f, eventId: v }))}>
@@ -1684,6 +1744,7 @@ function CouponsPanel({ events }: { events: OrganizerEvent[] }) {
               <SelectContent><SelectItem value="all">All events</SelectItem>{events.map((e) => <SelectItem key={e.id} value={String(e.id)}>{e.title}</SelectItem>)}</SelectContent>
             </Select>
           </div>
+          )}
           <div>
             <Label className="text-white/70 text-xs uppercase tracking-wider">Type</Label>
             <Select value={form.discountType} onValueChange={(v) => setForm((f) => ({ ...f, discountType: v }))}>
