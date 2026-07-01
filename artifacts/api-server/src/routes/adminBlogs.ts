@@ -4,8 +4,17 @@ import { eq, desc } from "drizzle-orm";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { z } from "zod";
 import { respondInvalid } from "../lib/validationError";
+import { pingIndexNow, indexNowOrigin } from "../lib/indexNow";
 
 const router: IRouter = Router();
+
+// Fire-and-forget: tell Bing/Yandex/Copilot to crawl a published post right away
+// (instant, on top of the 15-min IndexNow sweep). Non-throwing + prod-only.
+function pingBlog(blog: { slug?: string | null; published?: boolean | null } | undefined): void {
+  if (blog?.published && blog.slug) {
+    pingIndexNow(`${indexNowOrigin()}/blogs/${encodeURIComponent(blog.slug)}`);
+  }
+}
 
 const BlogBody = z.object({
   title: z.string().min(1).max(255),
@@ -29,6 +38,7 @@ router.post("/admin/blogs", requireAuth(["admin"]), async (req, res) => {
   const parsed = BlogBody.safeParse(req.body);
   if (!parsed.success) return respondInvalid(res, parsed.error);
   const [blog] = await db.insert(blogsTable).values(parsed.data).returning();
+  pingBlog(blog);
   res.json(blog);
 });
 
@@ -42,6 +52,7 @@ router.patch("/admin/blogs/:id", requireAuth(["admin"]), async (req, res) => {
     .set(parsed.data)
     .where(eq(blogsTable.id, id))
     .returning();
+  pingBlog(blog);
   res.json(blog);
 });
 
