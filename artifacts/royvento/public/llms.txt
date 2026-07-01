@@ -1,0 +1,28 @@
+# Royvento
+
+> Royvento is India's platform to discover and instantly book pubs, clubs, parties, nightlife events, games and local experiences — plus verified Solo Connect activity groups and private parties. Coverage spans major Indian cities with real venues, live offers and instant table/ticket booking.
+
+Royvento helps people answer "where should we go out?" — the best pubs and clubs, what's happening tonight, today's drink offers and ladies' nights, events and parties to book, and safe ways to go out with others via Solo Connect and private parties.
+
+## Core sections
+- [Pubs & Clubs](https://royvento.com/pubs): Book tables at rooftop bars, microbreweries, lounges, sports bars and clubs across India.
+- [Offers & Deals](https://royvento.com/pub-offers): Live drink deals, happy hours, ladies' nights and weekend offers.
+- [Events & Parties](https://royvento.com/events): Nightlife events, concerts, DJ nights and parties with ticketing.
+- [Games & Sports](https://royvento.com/games): Gaming lounges, sports bars and activity venues.
+- [Solo Connect](https://royvento.com/solo-connect): Verified, single-gender, same-city activity groups for going out together. Safety-first — not a dating app.
+- [Private Parties](https://royvento.com/private-parties): Create your own party or join private, ticketed parties.
+- [Things To Do Tonight](https://royvento.com/tonight-plans): Real-time plans happening now near you.
+- [Blog](https://royvento.com/blogs): City nightlife guides and things-to-do editorial.
+
+## Popular cities
+- [Mumbai](https://royvento.com/mumbai)
+- [Bangalore](https://royvento.com/bangalore)
+- [Delhi](https://royvento.com/delhi)
+- [Pune](https://royvento.com/pune)
+- [Hyderabad](https://royvento.com/hyderabad)
+- [Gurgaon](https://royvento.com/gurgaon)
+
+## Optional
+- [Contact](https://royvento.com/contact)
+- [Sitemap index](https://royvento.com/sitemap-index.xml)
+- [Full guide](https://royvento.com/llms-full.txt)

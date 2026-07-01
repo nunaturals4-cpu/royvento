@@ -315,6 +315,7 @@ router.get("/sitemap-events.xml", async (req, res) => {
         title: eventsTable.title,
         city: eventsTable.city,
         eventDate: eventsTable.eventDate,
+        approvedAt: eventsTable.approvedAt,
         createdAt: eventsTable.createdAt,
       })
       .from(eventsTable)
@@ -336,7 +337,7 @@ router.get("/sitemap-events.xml", async (req, res) => {
           city: r.city,
           date: r.eventDate,
         }),
-        lastmod: toIsoDate(r.createdAt),
+        lastmod: toIsoDate(r.approvedAt ?? r.createdAt),
         changefreq: "daily",
         priority: 0.8,
       }));

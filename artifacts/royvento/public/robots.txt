@@ -1,33 +1,50 @@
 # Royvento — robots.txt
 # Sitemap index lives on the API server and is exposed at the site root via
-# the shared proxy (see artifacts/api-server/.replit-artifact/artifact.toml).
+# the shared proxy. Royvento WANTS to be crawled and cited by AI answer engines,
+# so search, AI-retrieval and AI-training crawlers share the same open ruleset
+# below (public content allowed; auth/thin/faceted paths disallowed).
 
+# Search engines + AI answer engines (retrieval) + AI training crawlers.
+# Multiple User-agent lines share the single ruleset that follows.
 User-agent: *
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: ClaudeBot
+User-agent: Claude-Web
+User-agent: anthropic-ai
+User-agent: Google-Extended
+User-agent: Applebot
+User-agent: Applebot-Extended
+User-agent: Amazonbot
+User-agent: Meta-ExternalAgent
+User-agent: cohere-ai
+User-agent: CCBot
+User-agent: Bytespider
 Allow: /
 Disallow: /admin
 Disallow: /dashboard
 Disallow: /profile
 Disallow: /wishlist
 Disallow: /notifications
+Disallow: /bookings
 Disallow: /payment-result
 Disallow: /reset-password
 Disallow: /forgot-password
+Disallow: /login
+Disallow: /register
+Disallow: /split-expense
 Disallow: /*?*sort=
 Disallow: /*?*page=
 Disallow: /*?*utm_
 Allow: /sitemap-index.xml
 
-# Allow AI crawlers — Royvento wants to be cited in AI answers.
-User-agent: GPTBot
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
+# Curated summaries for AI answer engines:
+#   https://royvento.com/llms.txt
+#   https://royvento.com/llms-full.txt
 
 Sitemap: https://royvento.com/sitemap-index.xml

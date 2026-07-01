@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import router from "./routes";
 import sitemapRouter from "./routes/sitemap";
 import legacyRedirectsRouter from "./routes/legacyRedirects";
+import { makeHtmlSeoRouter } from "./routes/htmlSeo";
 import { logger } from "./lib/logger";
 import { SESSION_SECRET } from "./lib/auth";
 import path from "path";
@@ -92,6 +93,24 @@ app.use(
   }),
 );
 app.set("trust proxy", 1);
+
+// ─── Canonical host redirect (SEO C3) ─────────────────────────────────────────
+//
+// Force a single canonical origin in production: apex host, https, no `www.`.
+// Prevents www/apex + http/https duplicate-URL signals from splitting ranking
+// authority and stops crawlers indexing non-canonical variants. Only runs in
+// production and only when the host/proto is actually non-canonical, so it is a
+// no-op for correctly-addressed requests (and never touches local dev).
+app.use((req, res, next) => {
+  if (process.env["NODE_ENV"] !== "production") return next();
+  const host = (req.get("host") ?? "").toLowerCase();
+  const proto = req.get("x-forwarded-proto") ?? req.protocol ?? "https";
+  const isRoyvento = host === "royvento.com" || host === "www.royvento.com";
+  if (isRoyvento && (host.startsWith("www.") || proto !== "https")) {
+    return res.redirect(301, `https://royvento.com${req.originalUrl}`);
+  }
+  return next();
+});
 
 // ─── Response compression ──────────────────────────────────────────────────────
 //
@@ -192,6 +211,9 @@ if (frontendDist) {
   logger.info({ frontendDist }, "Serving frontend dist");
   app.use(
     express.static(frontendDist, {
+      // Let "/" fall through to the SEO enrichment router / SPA catch-all
+      // instead of auto-serving the raw index.html, so bots get enriched HTML.
+      index: false,
       setHeaders(res, filePath) {
         // Vite emits content-hashed filenames under /assets, so those bytes
         // never change for a given URL — cache them for a year, immutably,
@@ -216,6 +238,18 @@ if (frontendDist) {
 app.use("/api", (_req, res) => {
   res.status(404).json({ error: "Not found" });
 });
+
+// ─── Dynamic rendering for crawlers (SEO C1/C2) ───────────────────────────────
+//
+// Enriches the served HTML (per-route <title>, meta, canonical, OG/Twitter,
+// JSON-LD and a crawlable text body) for search engines, AI answer-engine
+// crawlers and social scrapers on public content routes. Human visitors and any
+// unmatched route fall through untouched to the SPA catch-all below, so the
+// interactive experience is byte-for-byte unchanged. Mounted AFTER the static
+// mount (real files win) and BEFORE the catch-all.
+if (frontendDist) {
+  app.use(makeHtmlSeoRouter(path.join(frontendDist, "index.html")));
+}
 
 // SPA catch-all: serve index.html for all non-API GET requests so client-side
 // routing (wouter) works on direct navigation / page refresh.
