@@ -8,6 +8,7 @@ import router from "./routes";
 import sitemapRouter from "./routes/sitemap";
 import legacyRedirectsRouter from "./routes/legacyRedirects";
 import { makeHtmlSeoRouter } from "./routes/htmlSeo";
+import { getIndexNowKey } from "./lib/indexNow";
 import { logger } from "./lib/logger";
 import { SESSION_SECRET } from "./lib/auth";
 import path from "path";
@@ -213,6 +214,13 @@ app.use("/api", globalApiLimiter, router);
 // only forwards these paths to api-server because they are listed in
 // .replit-artifact/artifact.toml's services.paths.
 app.use(sitemapRouter);
+
+// IndexNow ownership key file — must be served at /<key>.txt returning the key,
+// so Bing/Yandex can verify our IndexNow submissions. The key is public by
+// design (not a secret). Registered at the root like the sitemap.
+app.get(`/${getIndexNowKey()}.txt`, (_req, res) => {
+  res.type("text/plain").send(getIndexNowKey());
+});
 
 // HTTP 301 redirects for legacy vendor/partner URLs to the canonical
 // /pubs/{city}/{slug}-{id} URL. The shared proxy forwards /vendors/* and

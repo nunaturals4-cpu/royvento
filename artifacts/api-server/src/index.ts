@@ -6,6 +6,7 @@ import { runExpoPushReceiptPoll } from "./jobs/expoPushReceipts";
 import { runPointsExpiry } from "./jobs/pointsExpiry";
 import { runTonightDigest, runStartingSoonReminders } from "./jobs/tonightNotifications";
 import { runSoloGroupExpiry } from "./jobs/soloGroupExpiry";
+import { runIndexNowSweep } from "./jobs/indexNow";
 import cron from "node-cron";
 import { db, usersTable, vendorsTable, eventsTable, wishlistsTable, organizersTable } from "@workspace/db";
 import { eq, or, sql, inArray } from "drizzle-orm";
@@ -1428,6 +1429,22 @@ const server = app.listen(port, (err) => {
       logger.error({ err }, "Tonight starting-soon reminder job failed"),
     );
   }, { timezone: "Asia/Kolkata" });
+
+  // IndexNow — every 15 min, push newly-published venues/events/blogs to
+  // Bing/Yandex/Copilot so they get crawled fast. Delta-based (only new content
+  // since the last run), so it respects IndexNow etiquette. See jobs/indexNow.
+  cron.schedule("*/15 * * * *", () => {
+    runIndexNowSweep().catch((err) =>
+      logger.error({ err }, "IndexNow sweep job failed"),
+    );
+  });
+  // One bootstrap sweep ~30s after boot: submits the current public catalog once
+  // (first run) so the existing venues are announced immediately after deploy.
+  setTimeout(() => {
+    runIndexNowSweep().catch((err) =>
+      logger.error({ err }, "IndexNow boot sweep failed"),
+    );
+  }, 30_000);
 
 });
 
