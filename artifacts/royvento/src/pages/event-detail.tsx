@@ -50,6 +50,58 @@ function loadRazorpay(): Promise<boolean> {
   });
 }
 
+// Cover-charge savings math (mirrors the partner dashboard). Each included
+// offer's `discountedPrice` is its regular à-la-carte value, so "real cost" is
+// the sum of those values and the saving is how much cheaper the single package
+// price is versus buying everything separately. `price` is stored in paise.
+function coverSavings(plan: { price?: number; lineItems?: { qty?: number; discountedPrice?: number }[] | null }, qty = 1) {
+  const units = Math.max(1, qty || 1);
+  const realCost = (plan.lineItems ?? []).reduce(
+    (sum, i) => sum + Math.max(0, Number(i.discountedPrice) || 0) * Math.max(1, Number(i.qty) || 1),
+    0,
+  ) * units;
+  const pkg = Math.max(0, (Number(plan.price) || 0) / 100) * units;
+  const savings = Math.max(0, realCost - pkg);
+  const pct = realCost > 0 ? Math.round((savings / realCost) * 100) : 0;
+  return { realCost, pkg, savings, pct };
+}
+
+// 24h "21:00" → "9:00 PM".
+function fmtTime(hhmm: string): string {
+  if (!hhmm) return "";
+  const [h, m] = hhmm.split(":").map(Number);
+  const suffix = (h ?? 0) < 12 ? "AM" : "PM";
+  const hr = (h ?? 0) % 12 || 12;
+  return `${hr}:${String(m ?? 0).padStart(2, "0")} ${suffix}`;
+}
+
+const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+// Whether a drink plan applies on a given yyyy-mm-dd booking date: inside its
+// valid date range (if set) and on its selected weekdays (empty = every day).
+// Used to hide offers that don't run on the day the guest picked.
+function planAppliesOnDate(
+  plan: { days?: string[]; validFrom?: string | null; validUntil?: string | null },
+  dateStr: string,
+): boolean {
+  if (!dateStr) return true;
+  if (plan.validFrom && dateStr < plan.validFrom) return false;
+  if (plan.validUntil && dateStr > plan.validUntil) return false;
+  const days = Array.isArray(plan.days) ? plan.days : [];
+  if (days.length === 0) return true;
+  const dow = DAY_ABBRS[new Date(`${dateStr}T12:00:00`).getDay()];
+  return days.includes(dow);
+}
+
+// Short "Fri–Sun · 9:00 PM – 12:00 AM" style label for when an offer applies.
+function fmtPlanWhen(plan: { days?: string[]; timeFrom?: string; timeTo?: string }): string {
+  const parts: string[] = [];
+  const days = Array.isArray(plan.days) ? plan.days : [];
+  parts.push(days.length === 0 ? "Every day" : formatDayRanges(days));
+  if (plan.timeFrom && plan.timeTo) parts.push(`${fmtTime(plan.timeFrom)} – ${fmtTime(plan.timeTo)}`);
+  else if (plan.timeFrom) parts.push(`from ${fmtTime(plan.timeFrom)}`);
+  return parts.join(" · ");
+}
+
 function getPlanSummary(plan: { type: string; gender: string; productName?: string; lineItems?: { name: string }[] | null }, t: (key: string, opts?: Record<string, unknown>) => string): string {
   if (plan.type === "welcome") return plan.gender === "female" ? t("events.drink_welcome_ladies") : t("events.drink_welcome_all");
   if (plan.type === "unlimited") return plan.gender === "female" ? t("events.drink_unlimited_ladies") : t("events.drink_unlimited_all");
@@ -79,7 +131,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     query: { enabled: !!event?.vendor?.id } as any,
   });
   const { data: me } = useGetMe({ query: { retry: false } as any });
-  const { data: announcements = [] } = useQuery<any[]>({
+  const { data: announcements = [], isFetched: announcementsFetched } = useQuery<any[]>({
     queryKey: ["event-announcements", id],
     queryFn: () => apiGet(`/api/events/${id}/announcements`),
     enabled: !!id,
@@ -106,7 +158,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   // Approved organizer events hosted at this venue — surfaced under the
   // "Event Ticket" booking type so guests can book them from the venue page.
   // Each links out to the organizer event's own booking flow.
-  const { data: hostedEvents = [] } = useQuery<any[]>({
+  const { data: hostedEvents = [], isFetched: hostedEventsFetched } = useQuery<any[]>({
     queryKey: ["vendor-hosted-events", vendorId],
     queryFn: () => apiGet<any[]>(`/api/vendors/${vendorId}/organizer-events`),
     enabled: (event as any)?.type === "pub" && !!vendorId,
@@ -409,6 +461,24 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     if (a.announceDate) setDate(a.announceDate);
   }, [deepLinkBook, deepLinkAid, announcements]);
 
+  // Default the booking type by what the venue actually offers, in priority
+  // order: Cover Charges → Event Ticket → Ticket Booking. Runs once, after all
+  // three sources have loaded, and never overrides an explicit deep link
+  // (?book=event) or a choice the guest already made.
+  const defaultModeApplied = useRef(false);
+  useEffect(() => {
+    if (defaultModeApplied.current) return;
+    if (isLoading || !event || (event as any)?.type !== "pub") return;
+    if (deepLinkBook) return; // deep links pick their own mode
+    if (!drinkPlansFetched || !announcementsFetched || !hostedEventsFetched) return;
+    defaultModeApplied.current = true;
+    // Prefer Cover Charges only when a package actually runs on the initial date.
+    const hasCover = drinkPlans.some((p: any) => p.type === "cover_charge" && planAppliesOnDate(p, date));
+    const hasEventTicket = announcements.some((a: any) => a.announceDate) || hostedEvents.length > 0;
+    const next = hasCover ? "cover_charge" : hasEventTicket ? "event_booking" : "ticket";
+    if (next !== "ticket") setPubMode(next);
+  }, [isLoading, event, deepLinkBook, drinkPlansFetched, announcementsFetched, hostedEventsFetched, drinkPlans, announcements, hostedEvents, date]);
+
   // Clear any applied coupon if the selected booking date becomes a
   // free-entry day (subtotal becomes ₹0 and the server refuses to consume
   // a coupon). Mirrors the isFreeEntryDay computation below but is hoisted
@@ -441,6 +511,14 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     if (dg.includes("couple")) setTicketCouple(0);
   }, [event]);
 
+  // Drop the chosen cover-charge package if it doesn't run on the newly picked
+  // date, so a guest can't book a package that isn't available that day.
+  useEffect(() => {
+    if (!coverChargePlanId) return;
+    const plan = (drinkPlans as any[]).find((p) => String(p.id) === coverChargePlanId);
+    if (plan && !planAppliesOnDate(plan, date)) setCoverChargePlanId("");
+  }, [date, coverChargePlanId, drinkPlans]);
+
   if (isLoading) return <div className="container mx-auto px-4 py-20">Loading…</div>;
   if (!event) return <div className="container mx-auto px-4 py-20">{t("events.not_found")}</div>;
 
@@ -465,6 +543,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   // least one package exists for this venue.
   const coverChargePlans = (drinkPlans as any[]).filter((p) => p.type === "cover_charge");
   const hasCoverCharges = coverChargePlans.length > 0;
+  // Only the packages that actually run on the date the guest picked (weekday +
+  // valid range). Empty when nothing is available that day.
+  const coverChargePlansForDate = coverChargePlans.filter((p) => planAppliesOnDate(p, date));
   const selectedCoverChargePlan = coverChargePlans.find((p) => String(p.id) === coverChargePlanId);
 
   const formatHour = (t: string): string => {
@@ -1974,8 +2055,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     {/* What the partner/admin added in "Drink Plans & Offers" — shown
                         under Ticket Booking so guests see what's included before paying. */}
                     {pubMode === "ticket" && (() => {
-                      const freePlans = (drinkPlans as any[]).filter((p) => p.type === "welcome" || p.type === "unlimited");
-                      const ticketPlans = (drinkPlans as any[]).filter((p) => p.type === "ticket");
+                      const freePlans = (drinkPlans as any[]).filter((p) => (p.type === "welcome" || p.type === "unlimited") && planAppliesOnDate(p, date));
+                      const ticketPlans = (drinkPlans as any[]).filter((p) => p.type === "ticket" && planAppliesOnDate(p, date));
                       if (freePlans.length === 0 && ticketPlans.length === 0) return null;
                       const PlanGroup = ({ plans, accent, label, Icon }: { plans: any[]; accent: "primary" | "amber"; label: string; Icon: typeof Wine }) => {
                         if (plans.length === 0) return null;
@@ -2006,6 +2087,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                                         ))}
                                       </div>
                                     )}
+                                    <p className="mt-1.5 flex items-center gap-1 text-[10px] text-white/45">
+                                      <Clock className="h-2.5 w-2.5 shrink-0" />{fmtPlanWhen(p)}
+                                    </p>
                                   </li>
                                 );
                               })}
@@ -2043,49 +2127,83 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       <div className="space-y-3 mt-2">
                         <div>
                           <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Select Package <span className="text-primary normal-case">*</span></p>
+                          {coverChargePlansForDate.length === 0 ? (
+                            <div className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-5 text-center">
+                              <CalIcon className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
+                              <p className="text-sm text-muted-foreground">No cover charge packages available on this date.</p>
+                              <p className="text-xs text-muted-foreground/70 mt-1">Try another day to see available packages.</p>
+                            </div>
+                          ) : (
                           <div className="grid grid-cols-1 gap-2">
-                            {coverChargePlans.map((p: any) => {
+                            {coverChargePlansForDate.map((p: any) => {
                               const active = String(p.id) === coverChargePlanId;
                               const offers = (p.lineItems ?? []).filter((it: any) => it.name);
+                              const sv = coverSavings(p);
                               return (
                                 <button
                                   key={p.id}
                                   type="button"
                                   onClick={() => setCoverChargePlanId(String(p.id))}
-                                  className={`group relative text-left rounded-xl border p-3 flex items-center gap-3 transition-all duration-200 ${
+                                  aria-pressed={active}
+                                  className={`group relative w-full text-left rounded-2xl border p-4 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
                                     active
-                                      ? "border-primary bg-primary/10 shadow-[0_0_20px_-10px_hsl(var(--primary))]"
-                                      : "border-white/10 bg-black/20 hover:border-primary/40 hover:bg-black/30"
+                                      ? "border-primary/60 bg-gradient-to-br from-primary/[0.14] via-primary/[0.06] to-transparent ring-1 ring-primary/40 shadow-[0_10px_40px_-16px_hsl(var(--primary))]"
+                                      : "border-white/10 bg-white/[0.02] hover:border-white/25 hover:bg-white/[0.045]"
                                   }`}
                                 >
-                                  <span className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-all ${active ? "bg-gradient-to-br from-primary to-primary/70 text-primary-foreground" : "bg-white/[0.04] border border-white/10 text-primary"}`}>
-                                    <Crown className="h-3.5 w-3.5" />
-                                  </span>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-xs text-foreground uppercase tracking-wide truncate">{p.productName || "Package"}</p>
-                                    {(p.peoplePerPackage ?? 0) > 0 && (
-                                      <p className="text-[11px] text-primary mt-0.5 flex items-center gap-1"><Users className="h-3 w-3 shrink-0" />{p.peoplePerPackage === 1 ? "For 1 person" : `For ${p.peoplePerPackage} people`}</p>
-                                    )}
-                                    {offers.length > 0 && (
-                                      <div className="flex flex-wrap gap-1 mt-1">
-                                        {offers.slice(0, 3).map((it: any, i: number) => (
-                                          <span key={i} className="inline-flex items-center rounded-full bg-white/[0.06] border border-white/10 px-2 py-0.5 text-[10px] text-white/70">{it.name}</span>
-                                        ))}
-                                        {offers.length > 3 && <span className="text-[10px] text-muted-foreground self-center">+{offers.length - 3}</span>}
+                                  {active && (
+                                    <span className="absolute -top-2.5 -right-2.5 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg ring-2 ring-background">
+                                      <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                                    </span>
+                                  )}
+                                  <div className="flex items-start gap-3.5">
+                                    <span className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 transition-all ${active ? "bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-md shadow-primary/20" : "bg-white/[0.05] border border-white/10 text-primary group-hover:border-primary/30"}`}>
+                                      <Crown className="h-5 w-5" />
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <p className="font-bold text-sm text-foreground tracking-wide truncate">{p.productName || "Package"}</p>
+                                          {(p.peoplePerPackage ?? 0) > 0 && (
+                                            <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1.5">
+                                              <Users className="h-3 w-3 shrink-0 text-primary/90" />
+                                              {p.peoplePerPackage === 1 ? "For 1 person" : `For ${p.peoplePerPackage} people`}
+                                            </p>
+                                          )}
+                                          {offers.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5 mt-2">
+                                              {offers.slice(0, 4).map((it: any, i: number) => (
+                                                <span key={i} className="inline-flex items-center gap-1 rounded-lg bg-white/[0.07] border border-white/[0.14] px-2 py-1 text-[11px] font-medium text-white/90">
+                                                  <Check className="h-2.5 w-2.5 text-primary shrink-0" strokeWidth={3} />{it.name}
+                                                </span>
+                                              ))}
+                                              {offers.length > 4 && <span className="text-[11px] text-muted-foreground self-center">+{offers.length - 4} more</span>}
+                                            </div>
+                                          )}
+                                          <p className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground/70">
+                                            <Clock className="h-2.5 w-2.5 shrink-0" />{fmtPlanWhen(p)}
+                                          </p>
+                                        </div>
+                                        <div className="shrink-0 text-right">
+                                          {sv.savings > 0 && (
+                                            <p className="text-sm text-muted-foreground line-through tabular-nums leading-none mb-1">{formatINR(sv.realCost)}</p>
+                                          )}
+                                          <p className="font-bold text-lg text-foreground leading-none tabular-nums">{formatINR(Number(p.price) / 100)}</p>
+                                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mt-1">per package</p>
+                                          {sv.savings > 0 && (
+                                            <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-[11px] font-bold text-emerald-300">
+                                              <Sparkle className="h-3 w-3 shrink-0" /> Save {formatINR(sv.savings)}{sv.pct > 0 ? ` · ${sv.pct}% off` : ""}
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
-                                    )}
+                                    </div>
                                   </div>
-                                  <div className="shrink-0 text-right">
-                                    <p className="font-bold text-sm text-foreground">{formatINR(Number(p.price) / 100)}</p>
-                                    <p className="text-[10px] text-muted-foreground">/ pkg</p>
-                                  </div>
-                                  <span className={`h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${active ? "border-primary" : "border-muted-foreground/40"}`}>
-                                    {active && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-                                  </span>
                                 </button>
                               );
                             })}
                           </div>
+                          )}
                           {fieldErrors.coverChargePlanId && <p className="text-xs text-destructive mt-1.5">{fieldErrors.coverChargePlanId}</p>}
                         </div>
                         <div className="flex items-center gap-3">
@@ -2098,17 +2216,35 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                               className="h-7 w-7 rounded-md flex items-center justify-center text-base font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors select-none">+</button>
                           </div>
                         </div>
-                        {selectedCoverChargePlan && (
-                          <div className="rounded-xl border border-primary/25 bg-primary/8 px-3 py-2.5 flex items-center justify-between gap-4">
-                            <div className="min-w-0">
-                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total</p>
-                              <p className="text-xs text-white/60 mt-0.5 truncate">
-                                {formatINR(Number(selectedCoverChargePlan.price) / 100)} × {Math.max(1, coverChargeQty)} {Math.max(1, coverChargeQty) === 1 ? "package" : "packages"}
-                              </p>
-                            </div>
-                            <span className="font-bold text-base text-foreground shrink-0">{formatINR((Number(selectedCoverChargePlan.price) / 100) * Math.max(1, coverChargeQty))}</span>
-                          </div>
-                        )}
+                        {selectedCoverChargePlan && (() => {
+                          const sv = coverSavings(selectedCoverChargePlan, coverChargeQty);
+                          return (
+                            <>
+                              {sv.savings > 0 && (
+                                <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2.5 flex items-center justify-between gap-4">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-bold text-emerald-300 flex items-center gap-1.5">
+                                      <Sparkle className="h-3.5 w-3.5 shrink-0" /> You save {formatINR(sv.savings)}
+                                    </p>
+                                    <p className="text-[11px] text-white/60 mt-0.5 truncate">
+                                      vs. {formatINR(sv.realCost)} buying these offers separately
+                                    </p>
+                                  </div>
+                                  <span className="text-xl font-bold text-emerald-300 tabular-nums shrink-0">{sv.pct}%</span>
+                                </div>
+                              )}
+                              <div className="rounded-xl border border-primary/25 bg-primary/8 px-3 py-2.5 flex items-center justify-between gap-4">
+                                <div className="min-w-0">
+                                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total</p>
+                                  <p className="text-xs text-white/60 mt-0.5 truncate">
+                                    {formatINR(Number(selectedCoverChargePlan.price) / 100)} × {Math.max(1, coverChargeQty)} {Math.max(1, coverChargeQty) === 1 ? "package" : "packages"}
+                                  </p>
+                                </div>
+                                <span className="font-bold text-base text-foreground shrink-0">{formatINR((Number(selectedCoverChargePlan.price) / 100) * Math.max(1, coverChargeQty))}</span>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
                     {pubMode === "event_booking" && (

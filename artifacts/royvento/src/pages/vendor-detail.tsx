@@ -17,6 +17,7 @@ import {
   Star, MapPin, Navigation, Clock, GlassWater, Music2, Utensils, Bell,
   Heart, ChevronLeft, ChevronRight, X, ImagePlus, Users, Calendar,
   Camera, Tag, Phone, User, CalendarDays, CheckCircle2, Ticket, Share2,
+  TrendingUp, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -103,7 +104,37 @@ interface DrinkPlan {
   lineItems?: DrinkPlanLineItem[] | null;
   drinksOfferLabel?: string;
   foodDiscountLabel?: string;
+  validFrom?: string | null;
   validUntil?: string | null;
+  peoplePerPackage?: number | null;
+}
+
+const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+// Whether a plan runs on a given yyyy-mm-dd date: within its valid range (if set)
+// and on its selected weekdays (empty = every day).
+function planAppliesOnDate(plan: DrinkPlan, dateStr: string): boolean {
+  if (!dateStr) return true;
+  if (plan.validFrom && dateStr < plan.validFrom) return false;
+  if (plan.validUntil && dateStr > plan.validUntil) return false;
+  const days = Array.isArray(plan.days) ? plan.days : [];
+  if (days.length === 0) return true;
+  const dow = DAY_ABBRS[new Date(`${dateStr}T12:00:00`).getDay()];
+  return days.includes(dow);
+}
+
+// Cover-charge savings math. Each included offer's `discountedPrice` is its
+// regular à-la-carte value, so "real cost" is the sum of those values and the
+// saving is how much cheaper the single package price is versus buying
+// everything separately. `price` is stored in paise.
+function coverSavings(plan: DrinkPlan) {
+  const realCost = (plan.lineItems ?? []).reduce(
+    (sum, i) => sum + Math.max(0, i.discountedPrice || 0) * Math.max(1, i.qty || 1),
+    0,
+  );
+  const pkg = Math.max(0, plan.price / 100);
+  const savings = Math.max(0, realCost - pkg);
+  const pct = realCost > 0 ? Math.round((savings / realCost) * 100) : 0;
+  return { realCost, pkg, savings, pct };
 }
 
 const PLAN_TYPE_LABELS: Record<string, string> = {
@@ -111,6 +142,7 @@ const PLAN_TYPE_LABELS: Record<string, string> = {
   unlimited: "Unlimited Drinks",
   ticket: "Included with Ticket",
   custom: "Custom Package",
+  cover_charge: "Cover Charge",
 };
 
 const TABS = [
@@ -176,6 +208,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
   const [bookNotes, setBookNotes] = useState("");
   const [bookLoading, setBookLoading] = useState(false);
   const [bookSuccess, setBookSuccess] = useState(false);
+  const [selectedPackageId, setSelectedPackageId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -235,6 +268,13 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
   const barMenuImages: string[] = ((vendor as unknown as { barMenuUrls?: string[] }).barMenuUrls ?? []).filter(Boolean);
   const maxCapacity = (vendor as Vendor & { maxCapacity?: number; maxGuests?: number }).maxCapacity
     ?? (vendor as Vendor & { maxCapacity?: number; maxGuests?: number }).maxGuests;
+
+  // Cover-charge packages guests can pick while booking a table — only those
+  // that actually run on the date the guest picked (weekday + valid range).
+  const coverPlans = drinkPlans.filter(
+    (p) => p.type === "cover_charge" && p.price > 0 && planAppliesOnDate(p, bookDate),
+  );
+  const selectedPackage = coverPlans.find((p) => p.id === selectedPackageId) ?? null;
 
   type PubEventExt = {
     freeEntry?: boolean; freeEntryRules?: string;
@@ -303,10 +343,14 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
     }
     setBookLoading(true);
     try {
+      const packageNote = selectedPackage
+        ? `Package: ${selectedPackage.productName} (₹${(selectedPackage.price / 100).toLocaleString()})`
+        : "";
+      const notes = [packageNote, bookNotes.trim()].filter(Boolean).join("\n");
       await apiPost(`/api/events/${pubEvent.id}/bookings`, {
         name: bookName, phone: bookPhone, date: bookDate,
         occasion: bookOccasion, guestType: bookGuestType,
-        guestCount: bookGuestCount, notes: bookNotes,
+        guestCount: bookGuestCount, notes,
       });
       setBookSuccess(true);
       toast({ title: "Table booked!", description: "We'll confirm your booking shortly." });
@@ -1083,6 +1127,79 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                 </div>
 
                 <div className="space-y-5">
+                  {/* Cover-charge packages — pick one and see how much you save */}
+                  {coverPlans.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                        <Sparkles className="h-4 w-4 text-primary" /> Add a package <span className="text-muted-foreground font-normal">(optional — save money)</span>
+                      </label>
+                      <div className="space-y-2">
+                        {coverPlans.map((plan) => {
+                          const s = coverSavings(plan);
+                          const active = selectedPackageId === plan.id;
+                          return (
+                            <button
+                              key={plan.id}
+                              type="button"
+                              onClick={() => setSelectedPackageId(active ? null : plan.id)}
+                              className={[
+                                "w-full text-left rounded-xl border p-4 transition-colors",
+                                active
+                                  ? "border-primary bg-primary/10"
+                                  : "border-input hover:border-primary/50 hover:bg-primary/5",
+                              ].join(" ")}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-sm flex items-center gap-2">
+                                    {plan.productName}
+                                    {(plan.peoplePerPackage ?? 0) > 0 && (
+                                      <span className="rounded-full bg-white/5 border border-white/10 px-2 py-0.5 text-[10px] text-muted-foreground font-medium">
+                                        for {plan.peoplePerPackage}
+                                      </span>
+                                    )}
+                                  </p>
+                                  {plan.lineItems && plan.lineItems.length > 0 && (
+                                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                      {plan.lineItems.map((i) => i.name).join(" · ")}
+                                    </p>
+                                  )}
+                                  <p className="text-[11px] text-muted-foreground/70 mt-1 flex items-center gap-1">
+                                    <Clock className="h-3 w-3 shrink-0" />
+                                    {formatDayRanges(plan.days ?? [])}{(plan.timeFrom && plan.timeTo) ? ` · ${fmtTime(plan.timeFrom)} – ${fmtTime(plan.timeTo)}` : ""}
+                                  </p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  {s.savings > 0 && (
+                                    <p className="text-[11px] text-muted-foreground line-through tabular-nums">₹{s.realCost.toLocaleString()}</p>
+                                  )}
+                                  <p className="font-bold tabular-nums">₹{s.pkg.toLocaleString()}</p>
+                                </div>
+                              </div>
+                              {s.savings > 0 && (
+                                <div className="mt-2 inline-flex items-center gap-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-400">
+                                  <TrendingUp className="h-3 w-3" /> Save ₹{s.savings.toLocaleString()}{s.pct > 0 ? ` · ${s.pct}% off` : ""}
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {selectedPackage && (() => {
+                        const s = coverSavings(selectedPackage);
+                        return s.savings > 0 ? (
+                          <div className="mt-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-emerald-300">You're saving ₹{s.savings.toLocaleString()}</p>
+                              <p className="text-xs text-muted-foreground">vs. ₹{s.realCost.toLocaleString()} buying it all separately</p>
+                            </div>
+                            <span className="text-2xl font-bold text-emerald-300 tabular-nums shrink-0">{s.pct}%</span>
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  )}
+
                   {/* Date */}
                   <div>
                     <label className="block text-sm font-medium mb-1.5">

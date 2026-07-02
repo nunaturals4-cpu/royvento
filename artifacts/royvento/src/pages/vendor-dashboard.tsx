@@ -5605,6 +5605,62 @@ function LineItemsEditor({
   );
 }
 
+// Cover-charge savings math. Each included offer's `discountedPrice` doubles as
+// its regular à-la-carte value, so "real cost" is the sum of those values and
+// the saving is how much cheaper the single package price is versus buying
+// everything separately.
+function coverSavings(items: DrinkPlanLineItem[], packageRupees: number) {
+  const realCost = items.reduce(
+    (sum, i) => sum + (i.discountedPrice === "" ? 0 : Math.max(0, Number(i.discountedPrice) || 0)) * Math.max(1, i.qty || 1),
+    0,
+  );
+  const pkg = Math.max(0, packageRupees || 0);
+  const savings = Math.max(0, realCost - pkg);
+  const pct = realCost > 0 ? Math.round((savings / realCost) * 100) : 0;
+  return { realCost, pkg, savings, pct, hasValue: realCost > 0 };
+}
+
+// Live "real cost vs. package price" preview shown while a partner builds a
+// cover-charge package, so they can see exactly how much guests save.
+function CoverSavingsSummary({ items, packageRupees }: { items: DrinkPlanLineItem[]; packageRupees: string }) {
+  const { realCost, pkg, savings, pct, hasValue } = coverSavings(items, Number(packageRupees) || 0);
+  if (!hasValue) {
+    return (
+      <p className="mt-2 text-[11px] text-muted-foreground/70">
+        Tip: enter the regular price next to each offer to preview how much guests save by buying the package.
+      </p>
+    );
+  }
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-2">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300">
+        <TrendingUp className="h-3.5 w-3.5" /> Savings preview
+      </div>
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">Real cost (bought separately)</span>
+        <span className="tabular-nums line-through text-muted-foreground">₹{realCost.toLocaleString()}</span>
+      </div>
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">Package price</span>
+        <span className="tabular-nums font-semibold">₹{pkg.toLocaleString()}</span>
+      </div>
+      <div className="h-px bg-white/10" />
+      {savings > 0 ? (
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold text-emerald-300">Guests save</span>
+          <span className="tabular-nums text-lg font-bold text-emerald-300">
+            ₹{savings.toLocaleString()}{pct > 0 ? <span className="text-sm font-semibold"> · {pct}% off</span> : null}
+          </span>
+        </div>
+      ) : (
+        <p className="text-[11px] text-amber-300/80">
+          Your package price is at or above the real cost — lower it below ₹{realCost.toLocaleString()} to show guests a saving.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── Coupons Panel ────────────────────────────────────────────────────────────
 
 interface VendorCoupon {
@@ -7076,7 +7132,9 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                 </div>
                 <div>
                   <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Offers included <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
-                  <LineItemsEditor items={coverChargeItems} onChange={setCoverChargeItems} showPrice={false} addLabel="Add offer" />
+                  <p className="mb-2 text-[11px] text-muted-foreground/70">Enter each offer's regular price (what it costs on its own). We add these up to show guests how much they save with the package.</p>
+                  <LineItemsEditor items={coverChargeItems} onChange={setCoverChargeItems} showPrice addLabel="Add offer" />
+                  <CoverSavingsSummary items={coverChargeItems} packageRupees={coverChargePrice} />
                 </div>
                 <div>
                   <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Applicable days <span className="normal-case text-muted-foreground/60">(leave blank for all days)</span></Label>
@@ -7162,7 +7220,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
         ) : (
           <div className="space-y-3">
             {plans.map((plan) => (
-              <div key={plan.id} className="rounded-xl border border-white/10 bg-black/20 overflow-hidden">
+              <div key={plan.id} className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.045] to-transparent hover:border-white/20 transition-colors overflow-hidden">
                 {editingId === plan.id ? (
                   <form onSubmit={handleSaveEdit} className="p-5 space-y-4">
                     <h4 className="text-sm font-semibold text-primary">Editing plan</h4>
@@ -7232,7 +7290,9 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                         </div>
                         <div>
                           <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Offers included <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
-                          <LineItemsEditor items={editItems} onChange={setEditItems} showPrice={false} addLabel="Add offer" />
+                          <p className="mb-2 text-[11px] text-muted-foreground/70">Enter each offer's regular price so guests can see the package saving.</p>
+                          <LineItemsEditor items={editItems} onChange={setEditItems} showPrice addLabel="Add offer" />
+                          <CoverSavingsSummary items={editItems} packageRupees={editPackagePrice} />
                         </div>
                       </div>
                     )}
@@ -7310,62 +7370,94 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                     </div>
                   </form>
                 ) : (
-                  <div className="flex items-start justify-between gap-4 px-5 py-4">
+                  <div className="flex items-start gap-4 p-4 sm:p-5">
+                    {/* Leading visual — deal image, or a type medallion when none */}
+                    {plan.imageUrl ? (
+                      <img src={plan.imageUrl} alt="" className="h-16 w-16 rounded-xl object-cover border border-white/10 shrink-0" />
+                    ) : (
+                      <span className="h-16 w-16 rounded-xl bg-gradient-to-br from-primary/15 to-primary/[0.03] border border-primary/20 flex items-center justify-center shrink-0 text-primary">
+                        {(() => {
+                          const I = plan.type === "cover_charge" ? Crown : plan.type === "ticket" ? TicketIcon : plan.type === "unlimited" ? GlassWater : plan.type === "welcome" ? Wine : Tag;
+                          return <I className="h-6 w-6" />;
+                        })()}
+                      </span>
+                    )}
+
+                    {/* Content */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wider">
+                      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                        <span className="rounded-full bg-primary/10 border border-primary/25 px-2.5 py-0.5 text-[10px] font-bold text-primary uppercase tracking-wider">
                           {PLAN_TYPE_BADGE[plan.type] ?? plan.type}
                         </span>
                         {plan.gender === "female" && (
-                          <span className="rounded-full bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 text-[10px] text-pink-400 font-medium">
+                          <span className="rounded-full bg-pink-500/10 border border-pink-500/25 px-2.5 py-0.5 text-[10px] text-pink-400 font-semibold">
                             Girls only
                           </span>
                         )}
                         {plan.gender === "all" && (plan.type === "welcome" || plan.type === "unlimited") && (
-                          <span className="rounded-full bg-white/5 border border-white/10 px-2 py-0.5 text-[10px] text-muted-foreground font-medium">
+                          <span className="rounded-full bg-white/5 border border-white/10 px-2.5 py-0.5 text-[10px] text-muted-foreground font-medium">
                             All guests
                           </span>
                         )}
                         {plan.price > 0 && (
-                          <span className="rounded-full bg-white/5 text-muted-foreground border border-white/10 px-2 py-0.5 text-[10px] font-medium">
-                            ₹{(plan.price / 100).toFixed(0)}
+                          <span className="rounded-full bg-white/[0.08] text-foreground border border-white/15 px-2.5 py-0.5 text-[10px] font-bold tabular-nums">
+                            ₹{(plan.price / 100).toLocaleString()}
                           </span>
                         )}
                         {plan.type === "cover_charge" && (plan.peoplePerPackage ?? 0) > 0 && (
-                          <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] text-primary font-medium">
-                            {plan.peoplePerPackage}/pkg
+                          <span className="inline-flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2.5 py-0.5 text-[10px] text-muted-foreground font-medium">
+                            <Users className="h-2.5 w-2.5" /> For {plan.peoplePerPackage}
                           </span>
                         )}
                         {plan.validUntil && (
                           plan.validUntil < _istFmt.format(new Date()) ? (
-                            <span className="rounded-full bg-red-500/10 border border-red-500/30 px-2 py-0.5 text-[10px] text-red-400 font-medium">
+                            <span className="rounded-full bg-red-500/10 border border-red-500/30 px-2.5 py-0.5 text-[10px] text-red-400 font-semibold">
                               Expired {plan.validUntil}
                             </span>
                           ) : (
-                            <span className="rounded-full bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 text-[10px] text-amber-400 font-medium">
+                            <span className="rounded-full bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 text-[10px] text-amber-400 font-medium">
                               Until {plan.validUntil}
                             </span>
                           )
                         )}
                       </div>
-                      {/* Show legacy productName when there are no line items */}
+
+                      {/* Legacy product name when there are no line items */}
                       {(!plan.lineItems || plan.lineItems.length === 0) && plan.productName && plan.type !== "welcome" && plan.type !== "unlimited" && (
-                        <p className="text-sm font-medium">{plan.productName}</p>
+                        <p className="text-sm font-semibold text-foreground">{plan.productName}</p>
                       )}
+
+                      {/* Included offers / items as chips */}
                       {plan.lineItems && plan.lineItems.length > 0 && (
-                        <ul className="mt-1 space-y-0.5">
+                        <div className="flex flex-wrap gap-1.5">
                           {plan.lineItems.map((item, i) => (
-                            <li key={i} className="text-xs text-muted-foreground flex gap-2">
-                              <span className="font-medium text-foreground/80">{item.name}</span>
-                              {item.discountedPrice > 0 && <span>₹{item.discountedPrice}</span>}
-                            </li>
+                            <span key={i} className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.06] border border-white/[0.12] px-2.5 py-1 text-[11px] text-white/90">
+                              <Check className="h-2.5 w-2.5 text-primary shrink-0" strokeWidth={3} />
+                              <span className="font-medium">{item.name}</span>
+                              {item.discountedPrice > 0 && <span className="text-muted-foreground tabular-nums">₹{item.discountedPrice.toLocaleString()}</span>}
+                            </span>
                           ))}
-                        </ul>
+                        </div>
                       )}
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1">
-                        <span>{formatDayRanges(plan.days)}</span>
+
+                      {/* Savings pill — cover charge only */}
+                      {plan.type === "cover_charge" && (() => {
+                        const s = coverSavings(
+                          (plan.lineItems ?? []).map((i) => ({ name: i.name, qty: i.qty, discountedPrice: i.discountedPrice })),
+                          plan.price / 100,
+                        );
+                        return s.savings > 0 ? (
+                          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-[11px] font-bold text-emerald-300">
+                            <TrendingUp className="h-3 w-3 shrink-0" /> Guests save ₹{s.savings.toLocaleString()}{s.pct > 0 ? ` · ${s.pct}% off` : ""}
+                          </div>
+                        ) : null;
+                      })()}
+
+                      {/* Footer meta */}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground mt-2.5">
+                        <span className="inline-flex items-center gap-1"><CalendarCheck className="h-3 w-3" />{formatDayRanges(plan.days)}</span>
                         {plan.timeFrom && plan.timeTo && (
-                          <span className="flex items-center gap-1">
+                          <span className="inline-flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             {fmtTime(plan.timeFrom)} – {fmtTime(plan.timeTo)}
                           </span>
@@ -7373,10 +7465,9 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                         {plan.description && <span className="italic text-muted-foreground/70">{plan.description}</span>}
                       </div>
                     </div>
+
+                    {/* Actions */}
                     <div className="flex items-center gap-2 shrink-0">
-                      {plan.imageUrl && (
-                        <img src={plan.imageUrl} alt="deal" className="h-12 w-16 rounded-lg object-cover border border-white/10 shrink-0" />
-                      )}
                       <button type="button" onClick={() => startEdit(plan)}
                         className="rounded-lg border border-white/15 p-2 text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors" title="Edit plan">
                         <Pencil className="h-4 w-4" />
