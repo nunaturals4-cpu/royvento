@@ -417,10 +417,19 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
       res.status(404).json({ error: "Vendor profile not found" });
       return;
     }
-    // A venue rename must reflect everywhere — propagate to the denormalized copy
-    // on organizer events hosted at this venue.
+    // A venue rename should reflect on the denormalized copy on organizer events
+    // hosted at this venue — but this is a best-effort secondary write. It must
+    // never fail the profile save itself (the vendor row is already updated), so
+    // any error here (e.g. schema drift on organizer_events) is logged, not thrown.
     if (updates["businessName"] !== undefined) {
-      await db.update(organizerEventsTable).set({ venueName: v.businessName }).where(eq(organizerEventsTable.venueId, v.id));
+      try {
+        await db.update(organizerEventsTable).set({ venueName: v.businessName }).where(eq(organizerEventsTable.venueId, v.id));
+      } catch (propErr) {
+        (req as { log?: { warn: (o: unknown, m: string) => void } }).log?.warn?.(
+          { err: propErr },
+          "Vendor rename: could not propagate venue_name to organizer_events (non-fatal)",
+        );
+      }
     }
     res.json(await serializeVendor(v));
   } catch (err) {

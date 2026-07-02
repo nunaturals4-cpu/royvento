@@ -939,6 +939,10 @@ async function applyPendingSchemaChanges() {
     // venue_id points at the host vendor; that venue's partner approves the
     // event (venue_approval_status) before it goes public. Idempotent.
     await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "country" varchar(100) NOT NULL DEFAULT 'India'`);
+    // venue_name is a denormalized copy of the host venue's business name. It was
+    // only ever in the CREATE TABLE, so tables created before it existed lack the
+    // column — add it here so the vendor-rename propagation query succeeds on prod.
+    await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "venue_name" varchar(255) NOT NULL DEFAULT ''`);
     await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "venue_id" integer`);
     await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "venue_approval_status" varchar(20) NOT NULL DEFAULT ''`);
     await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "venue_rejection_reason" text NOT NULL DEFAULT ''`);
