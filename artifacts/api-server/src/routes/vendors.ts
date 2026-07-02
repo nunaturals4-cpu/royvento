@@ -91,6 +91,29 @@ function computeCrmTrial(v: VendorRow) {
   return { crmTrialDaysRemaining, crmTrialActive: crmTrialDaysRemaining > 0 };
 }
 
+// Max lengths of the vendors table's varchar columns (mirror the drizzle
+// schema). A value longer than its limit makes Postgres throw "value too long",
+// which otherwise bubbles up as an opaque 500 on profile save. We validate up
+// front and return a clean, field-specific 400 instead.
+const VENDOR_FIELD_LIMITS: Record<string, number> = {
+  businessName: 255,
+  category: 100,
+  location: 255,
+  state: 100,
+  city: 100,
+  country: 100,
+};
+function checkVendorFieldLengths(data: Record<string, unknown>): Record<string, string> {
+  const errs: Record<string, string> = {};
+  for (const [field, max] of Object.entries(VENDOR_FIELD_LIMITS)) {
+    const val = data[field];
+    if (typeof val === "string" && val.length > max) {
+      errs[field] = `Must be ${max} characters or fewer.`;
+    }
+  }
+  return errs;
+}
+
 async function serializeVendor(v: VendorRow) {
   const [summary, pubEvents] = await Promise.all([
     getVendorRating(v.id),
@@ -292,6 +315,11 @@ router.post("/vendors/me", requireAuth(), async (req, res) => {
     res.status(400).json({ error: "City and state are required" });
     return;
   }
+  const createLengthErrors = checkVendorFieldLengths(parsed.data as Record<string, unknown>);
+  if (Object.keys(createLengthErrors).length > 0) {
+    res.status(400).json({ error: "Some fields are too long — please shorten them.", fieldErrors: createLengthErrors });
+    return;
+  }
   const existing = await db
     .select()
     .from(vendorsTable)
@@ -352,6 +380,11 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
     (parsed.data.city !== undefined && !parsed.data.city.trim())
   ) {
     res.status(400).json({ error: "City and state cannot be empty" });
+    return;
+  }
+  const lengthErrors = checkVendorFieldLengths(parsed.data as Record<string, unknown>);
+  if (Object.keys(lengthErrors).length > 0) {
+    res.status(400).json({ error: "Some fields are too long — please shorten them.", fieldErrors: lengthErrors });
     return;
   }
   const updates: Record<string, unknown> = {};

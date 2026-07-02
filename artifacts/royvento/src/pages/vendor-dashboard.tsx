@@ -656,7 +656,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     <form onSubmit={submit} className="rounded-3xl glass-card-strong p-8 space-y-4">
         <div>
           <Label>Business name</Label>
-          <Input value={businessName} onChange={(e) => { setName(e.target.value); profileFormErrors.clearField("businessName"); }} aria-invalid={!!profileFormErrors.fieldError("businessName")} className={fieldClass("bg-black/40 border-white/10", profileFormErrors.fieldError("businessName"))} />
+          <Input value={businessName} maxLength={255} onChange={(e) => { setName(e.target.value); profileFormErrors.clearField("businessName"); }} aria-invalid={!!profileFormErrors.fieldError("businessName")} className={fieldClass("bg-black/40 border-white/10", profileFormErrors.fieldError("businessName"))} />
           {profileFormErrors.fieldError("businessName") && <p className="text-xs text-destructive mt-1">{profileFormErrors.fieldError("businessName")}</p>}
         </div>
         <div>
@@ -5605,6 +5605,25 @@ function LineItemsEditor({
   );
 }
 
+// "For guests" audience picker (All Guests / Girls Only) — shared across the
+// Free Drinks, Included with Ticket, Cover Charges and Food & Drink Discounts
+// forms so every deal can be targeted the same way.
+function ForGuestsRadio({ value, onChange, name }: { value: "all" | "female"; onChange: (v: "all" | "female") => void; name: string }) {
+  return (
+    <div>
+      <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">For guests</Label>
+      <div className="flex gap-3">
+        {([["all", "All Guests"], ["female", "Girls Only"]] as const).map(([val, label]) => (
+          <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
+            <input type="radio" name={name} value={val} checked={value === val} onChange={() => onChange(val)} className="accent-primary" />
+            {label}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Cover-charge savings math. Each included offer's `discountedPrice` doubles as
 // its regular à-la-carte value, so "real cost" is the sum of those values and
 // the saving is how much cheaper the single package price is versus buying
@@ -5941,6 +5960,7 @@ interface VendorOffer {
   discountType: OfferDiscountType;
   discountValue: string;
   freeItemName: string;
+  gender: "all" | "female";
   days: OfferDay[];
   timeFrom: string;
   timeTo: string;
@@ -5964,6 +5984,7 @@ interface OfferFormState {
   discountType: OfferDiscountType;
   discountValue: string;
   freeItemName: string;
+  gender: "all" | "female";
   days: OfferDay[];
   timeFrom: string;
   timeTo: string;
@@ -5980,6 +6001,7 @@ const BLANK_OFFER: OfferFormState = {
   discountType: "percent",
   discountValue: "20",
   freeItemName: "",
+  gender: "all",
   days: [],
   timeFrom: "",
   timeTo: "",
@@ -6054,6 +6076,7 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
       discountType: o.discountType,
       discountValue: String(Number(o.discountValue)),
       freeItemName: o.freeItemName,
+      gender: o.gender ?? "all",
       days: o.days,
       timeFrom: o.timeFrom,
       timeTo: o.timeTo,
@@ -6103,6 +6126,7 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
         discountType: form.discountType,
         discountValue: ["bogo", "free_item"].includes(form.discountType) ? 0 : Number(form.discountValue) || 0,
         freeItemName: form.freeItemName,
+        gender: form.gender,
         days: form.days,
         timeFrom: form.timeFrom,
         timeTo: form.timeTo,
@@ -6306,6 +6330,21 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
               </div>
             </div>
             <div className="sm:col-span-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">For guests</Label>
+              <div className="flex gap-2">
+                {([["all", "All Guests"], ["female", "Girls Only"]] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setForm({ ...form, gender: val })}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${form.gender === val ? "bg-amber-500/20 text-amber-300 border-amber-500/40" : "bg-black/40 text-muted-foreground border-white/10 hover:text-foreground"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="sm:col-span-2">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">
                 Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
                 <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the offer card at 1:1 (square). Your whole image is displayed, nothing is cropped. Leave empty to use your venue cover photo.</span>
@@ -6387,7 +6426,10 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
                             o.category === "drink" ? <Wine className="h-4 w-4 text-rose-300 mt-0.5 shrink-0" /> : <Utensils className="h-4 w-4 text-emerald-300 mt-0.5 shrink-0" />
                           )}
                           <div className="min-w-0">
-                            <div className="font-medium truncate">{o.title}</div>
+                            <div className="font-medium truncate flex items-center gap-1.5">
+                              {o.title}
+                              {o.gender === "female" && <span className="rounded-full bg-pink-500/10 border border-pink-500/25 px-1.5 py-0.5 text-[9px] text-pink-400 font-semibold uppercase tracking-wide shrink-0">Girls only</span>}
+                            </div>
                             {o.description && <div className="text-xs text-muted-foreground line-clamp-1">{o.description}</div>}
                           </div>
                         </div>
@@ -6610,6 +6652,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
   // Add form — Included with Ticket section
   const [ticketChecked, setTicketChecked] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [ticketGender, setTicketGender] = useState<"all" | "female">("all");
   const [ticketItems, setTicketItems] = useState<DrinkPlanLineItem[]>([emptyItem()]);
   const [ticketDrinksOffer, setTicketDrinksOffer] = useState("");
   const [ticketFoodDiscount, setTicketFoodDiscount] = useState("");
@@ -6624,6 +6667,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
 
   // Add form — Cover Charges section
   const [coverChargeChecked, setCoverChargeChecked] = useState(false);
+  const [coverChargeGender, setCoverChargeGender] = useState<"all" | "female">("all");
   const [coverChargeName, setCoverChargeName] = useState("");
   const [coverChargePrice, setCoverChargePrice] = useState("");
   const [coverChargePeople, setCoverChargePeople] = useState("");
@@ -6688,11 +6732,11 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
     setFeDrinksOffer(""); setFeFoodDiscount(""); setFeValidUntil(""); setFeValidFrom("");
     setFeDays([]); setFeTimeFrom(""); setFeTimeTo(""); setFeDescription("");
     setFeImageFile(null); setFeImagePreview("");
-    setTicketChecked(false); setTicketItems([emptyItem()]);
+    setTicketChecked(false); setTicketGender("all"); setTicketItems([emptyItem()]);
     setTicketDrinksOffer(""); setTicketFoodDiscount(""); setTicketValidUntil(""); setTicketValidFrom("");
     setTicketDays([]); setTicketTimeFrom(""); setTicketTimeTo(""); setTicketDescription("");
     setTicketImageFile(null); setTicketImagePreview("");
-    setCoverChargeChecked(false); setCoverChargeName(""); setCoverChargePrice(""); setCoverChargePeople("");
+    setCoverChargeChecked(false); setCoverChargeGender("all"); setCoverChargeName(""); setCoverChargePrice(""); setCoverChargePeople("");
     setCoverChargeItems([emptyItem()]);
     setCoverChargeValidUntil(""); setCoverChargeValidFrom("");
     setCoverChargeDays([]); setCoverChargeTimeFrom(""); setCoverChargeTimeTo(""); setCoverChargeDescription("");
@@ -6776,7 +6820,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
       }
       if (ticketChecked) {
         await apiPost(writeBasePath, {
-          type: "ticket", productName: "Included with Ticket", gender: "all", price: 0,
+          type: "ticket", productName: "Included with Ticket", gender: ticketGender, price: 0,
           lineItems: ticketItems.filter((i) => i.name.trim()).map(itemForWire),
           days: ticketDays, timeFrom: ticketTimeFrom.trim(), timeTo: ticketTimeTo.trim(),
           description: ticketDescription.trim(),
@@ -6789,7 +6833,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
       }
       if (coverChargeChecked) {
         await apiPost(writeBasePath, {
-          type: "cover_charge", productName: coverChargeName.trim(), gender: "all",
+          type: "cover_charge", productName: coverChargeName.trim(), gender: coverChargeGender,
           price: Math.round(Number(coverChargePrice) * 100),
           peoplePerPackage: coverChargePeople ? Math.max(0, Number(coverChargePeople) || 0) : null,
           lineItems: coverChargeItems.filter((i) => i.name.trim()).map(itemForWire),
@@ -6839,7 +6883,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
       const updated: DrinkPlan = await apiPatch(`${writeBasePath}/${editingId}`, {
         type: editType,
         productName: isTicket ? "Included with Ticket" : isFreeEntry ? (editType === "welcome" ? "Free Drink" : "Unlimited Drinks") : editProductName,
-        gender: (isTicket || isCoverCharge) ? "all" : editGender,
+        gender: editGender,
         price: (isTicket || isFreeEntry) ? 0 : isCoverCharge ? Math.round(Number(editPackagePrice) * 100) : (editingPlan?.price ?? 0),
         ...(isCoverCharge ? { peoplePerPackage: editPackagePeople ? Math.max(0, Number(editPackagePeople) || 0) : null } : {}),
         ...((isTicket || isCoverCharge) ? { lineItems: filledTicketItems } : {}),
@@ -7023,6 +7067,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
             </label>
             {ticketChecked && (
               <div className="mt-4 pl-7 space-y-3">
+                <ForGuestsRadio value={ticketGender} onChange={setTicketGender} name="ticketGender" />
                 <div>
                   <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">
                     Items included <span className="normal-case text-muted-foreground/60">(name, discounted price)</span>
@@ -7106,6 +7151,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
             </label>
             {coverChargeChecked && (
               <div className="mt-4 pl-7 space-y-3">
+                <ForGuestsRadio value={coverChargeGender} onChange={setCoverChargeGender} name="coverChargeGender" />
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
                     <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Package name <span className="text-destructive">*</span></Label>
@@ -7257,17 +7303,21 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
 
                     {/* Ticket edit controls */}
                     {editType === "ticket" && (
-                      <div>
-                        <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">
-                          Items included <span className="normal-case text-muted-foreground/60">(name, discounted price)</span>
-                        </Label>
-                        <LineItemsEditor items={editItems} onChange={setEditItems} />
+                      <div className="space-y-3">
+                        <ForGuestsRadio value={editGender} onChange={setEditGender} name="editTicketGender" />
+                        <div>
+                          <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">
+                            Items included <span className="normal-case text-muted-foreground/60">(name, discounted price)</span>
+                          </Label>
+                          <LineItemsEditor items={editItems} onChange={setEditItems} />
+                        </div>
                       </div>
                     )}
 
                     {/* Cover charge edit controls */}
                     {editType === "cover_charge" && (
                       <div className="space-y-3">
+                        <ForGuestsRadio value={editGender} onChange={setEditGender} name="editCoverGender" />
                         <div className="grid sm:grid-cols-2 gap-4">
                           <div>
                             <Label>Package name</Label>

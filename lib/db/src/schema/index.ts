@@ -1136,6 +1136,9 @@ export const vendorOffersTable = pgTable(
     startsAt: timestamp("starts_at", { withTimezone: true }),
     endsAt: timestamp("ends_at", { withTimezone: true }),
     active: boolean("active").notNull().default(true),
+    // Who the offer is for: "all" guests or "female" (girls only) — mirrors the
+    // drink_plans.gender convention so the customer UI can tag each deal.
+    gender: varchar("gender", { length: 20 }).notNull().default("all"),
     // Optional per-offer deal image. Null/empty = the customer card falls back
     // to the venue's cover photo (mirrors drink_plans.image_url behaviour).
     imageUrl: text("image_url"),

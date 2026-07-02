@@ -2163,7 +2163,10 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
-                                          <p className="font-bold text-sm text-foreground tracking-wide truncate">{p.productName || "Package"}</p>
+                                          <p className="font-bold text-sm text-foreground tracking-wide truncate flex items-center gap-1.5">
+                                            {p.productName || "Package"}
+                                            {p.gender === "female" && <span className="rounded-full bg-pink-500/10 border border-pink-500/30 px-1.5 py-0.5 text-[9px] font-semibold text-pink-400 uppercase tracking-wide shrink-0">Girls only</span>}
+                                          </p>
                                           {(p.peoplePerPackage ?? 0) > 0 && (
                                             <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1.5">
                                               <Users className="h-3 w-3 shrink-0 text-primary/90" />
@@ -2783,6 +2786,48 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     </div>
                   </div>
                 </div>
+
+                {/* ── Food & Drink Discounts — informational box (offers · days · times · dates) ── */}
+                {isPub && smartOffers.length > 0 && (
+                  <div className="mt-5 rounded-2xl glass-card-strong p-5 space-y-3">
+                    <div>
+                      <h3 className="font-serif text-lg tracking-tight flex items-center gap-2">
+                        <Utensils className="h-4 w-4 text-primary" /> Food &amp; Drink Discounts
+                      </h3>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Available at this venue — plan your visit.</p>
+                    </div>
+                    <div className="space-y-2.5">
+                      {smartOffers.map((o: any) => {
+                        const v = Number(o.discountValue) || 0;
+                        const badge = o.discountType === "percent" ? `${v}% OFF`
+                          : o.discountType === "fixed" ? `₹${v} OFF`
+                          : o.discountType === "bogo" ? "BUY 1 GET 1"
+                          : o.discountType === "free_item" ? (o.freeItemName ? `FREE: ${o.freeItemName}` : "FREE ITEM")
+                          : "OFFER";
+                        const validity = (o.startsAt || o.endsAt)
+                          ? `${o.startsAt ? new Date(o.startsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Now"} – ${o.endsAt ? new Date(o.endsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Open"}`
+                          : null;
+                        return (
+                          <div key={o.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-sm font-semibold text-foreground truncate flex items-center gap-1.5 min-w-0">
+                                {o.category === "drink" ? <Wine className="h-3.5 w-3.5 text-rose-300 shrink-0" /> : <Utensils className="h-3.5 w-3.5 text-emerald-300 shrink-0" />}
+                                <span className="truncate">{o.title}</span>
+                              </p>
+                              <span className="shrink-0 text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/40">{badge}</span>
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                              <span className="inline-flex items-center gap-1"><CalIcon className="h-3 w-3" />{formatDayRanges(o.days ?? [])}</span>
+                              <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{(o.timeFrom && o.timeTo) ? `${fmtTime(o.timeFrom)} – ${fmtTime(o.timeTo)}` : "All day"}</span>
+                              {validity && <span className="inline-flex items-center gap-1 text-muted-foreground/80">Valid {validity}</span>}
+                              {o.gender === "female" && <span className="inline-flex items-center rounded-full bg-pink-500/10 border border-pink-500/30 px-2 py-0.5 text-[10px] font-semibold text-pink-400">Girls only</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* ── Trust badges footer (spans full width) ── */}
