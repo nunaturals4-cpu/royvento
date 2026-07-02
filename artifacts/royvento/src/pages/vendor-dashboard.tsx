@@ -3410,6 +3410,11 @@ interface Announcement {
   body: string;
   announceDate: string;
   announceTime: string;
+  endDate: string;
+  endTime: string;
+  priority: number;
+  ctaLabel: string;
+  ctaUrl: string;
   imageUrl: string;
   genre: string;
   eventType: string;
@@ -3422,7 +3427,7 @@ interface Announcement {
 const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
 const ANN_EVENT_TYPES = [...ANNOUNCEMENT_CATEGORIES];
 
-const emptyAnnForm = { organizerName: "", contactDetails: "", title: "", body: "", announceDate: "", announceTime: "", imageUrl: "", genre: "", eventType: "", price: "" };
+const emptyAnnForm = { organizerName: "", contactDetails: "", title: "", body: "", announceDate: "", announceTime: "", endDate: "", endTime: "", priority: "", ctaLabel: "", ctaUrl: "", imageUrl: "", genre: "", eventType: "", price: "" };
 
 // ─── organizer events hosted at this venue (partner approves to go public) ──
 
@@ -3606,7 +3611,7 @@ export function AnnouncementsPanel({ adminVendorId }: { adminVendorId?: number }
     setEditing(a);
     setImageFile(null);
     setImagePreview(a.imageUrl || "");
-    setForm({ organizerName: a.organizerName ?? "", contactDetails: a.contactDetails ?? "", title: a.title, body: a.body, announceDate: a.announceDate, announceTime: a.announceTime, imageUrl: a.imageUrl, genre: a.genre ?? "", eventType: a.eventType ?? "", price: a.price != null && Number(a.price) > 0 ? String(a.price) : "" });
+    setForm({ organizerName: a.organizerName ?? "", contactDetails: a.contactDetails ?? "", title: a.title, body: a.body, announceDate: a.announceDate, announceTime: a.announceTime, endDate: a.endDate ?? "", endTime: a.endTime ?? "", priority: a.priority != null && Number(a.priority) > 0 ? String(a.priority) : "", ctaLabel: a.ctaLabel ?? "", ctaUrl: a.ctaUrl ?? "", imageUrl: a.imageUrl, genre: a.genre ?? "", eventType: a.eventType ?? "", price: a.price != null && Number(a.price) > 0 ? String(a.price) : "" });
   };
 
   const applyFile = (file: File) => {
@@ -3735,14 +3740,41 @@ export function AnnouncementsPanel({ adminVendorId }: { adminVendorId?: number }
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label htmlFor="ann-date">Date</Label>
+            <Label htmlFor="ann-date">Start Date</Label>
             <Input id="ann-date" type="date" value={form.announceDate} onChange={(e) => { setForm((f) => ({ ...f, announceDate: e.target.value })); annFormErrors.clearField("announceDate"); }} aria-invalid={!!annFormErrors.fieldError("announceDate")} className={fieldClass("bg-black/40 border-white/10 mt-1", annFormErrors.fieldError("announceDate"))} />
             {annFormErrors.fieldError("announceDate") && <p className="text-xs text-destructive mt-1">{annFormErrors.fieldError("announceDate")}</p>}
           </div>
           <div>
-            <Label htmlFor="ann-time">Time</Label>
+            <Label htmlFor="ann-time">Start Time</Label>
             <Input id="ann-time" type="time" value={form.announceTime} onChange={(e) => { setForm((f) => ({ ...f, announceTime: e.target.value })); annFormErrors.clearField("announceTime"); }} aria-invalid={!!annFormErrors.fieldError("announceTime")} className={fieldClass("bg-black/40 border-white/10 mt-1", annFormErrors.fieldError("announceTime"))} />
             {annFormErrors.fieldError("announceTime") && <p className="text-xs text-destructive mt-1">{annFormErrors.fieldError("announceTime")}</p>}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="ann-end-date">End Date <span className="text-muted-foreground text-xs font-normal">(auto-removes after)</span></Label>
+            <Input id="ann-end-date" type="date" value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} className="bg-black/40 border-white/10 mt-1" />
+          </div>
+          <div>
+            <Label htmlFor="ann-end-time">End Time</Label>
+            <Input id="ann-end-time" type="time" value={form.endTime} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))} className="bg-black/40 border-white/10 mt-1" />
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="ann-priority">Priority <span className="text-muted-foreground text-xs font-normal">(higher shows first)</span></Label>
+          <Input id="ann-priority" type="number" min={0} step={1} value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))} placeholder="0" className="bg-black/40 border-white/10 mt-1" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="ann-cta-label">Button Label <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+            <Input id="ann-cta-label" value={form.ctaLabel} onChange={(e) => setForm((f) => ({ ...f, ctaLabel: e.target.value }))} placeholder="e.g. Book now" maxLength={100} className="bg-black/40 border-white/10 mt-1" />
+          </div>
+          <div>
+            <Label htmlFor="ann-cta-url">Button Link <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+            <Input id="ann-cta-url" value={form.ctaUrl} onChange={(e) => setForm((f) => ({ ...f, ctaUrl: e.target.value }))} placeholder="Leave blank to open Book a Table" maxLength={1024} className="bg-black/40 border-white/10 mt-1" />
           </div>
         </div>
 

@@ -670,6 +670,16 @@ export const announcementsTable = pgTable(
     body: text("body").notNull().default(""),
     announceDate: varchar("announce_date", { length: 20 }).notNull().default(""),
     announceTime: varchar("announce_time", { length: 20 }).notNull().default(""),
+    // Active window end. When set and passed, the announcement (and its linked
+    // event) auto-drops from the venue profile and public surfaces.
+    endDate: varchar("end_date", { length: 20 }).notNull().default(""),
+    endTime: varchar("end_time", { length: 20 }).notNull().default(""),
+    // Higher priority sorts first on the venue profile Announcements section.
+    priority: integer("priority").notNull().default(0),
+    // Optional call-to-action shown on the card. ctaUrl empty = default action
+    // (event → Book a Table with the event preselected; else scroll to booking).
+    ctaLabel: varchar("cta_label", { length: 100 }).notNull().default(""),
+    ctaUrl: varchar("cta_url", { length: 1024 }).notNull().default(""),
     imageUrl: text("image_url").notNull().default(""),
     isFeaturedSlider: boolean("is_featured_slider").notNull().default(false),
     genre: varchar("genre", { length: 100 }).notNull().default(""),

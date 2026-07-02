@@ -52,6 +52,11 @@ const AnnouncementBody = z.object({
   body: z.string().optional().default(""),
   announceDate: z.string().optional().default(""),
   announceTime: z.string().optional().default(""),
+  endDate: z.string().optional().default(""),
+  endTime: z.string().optional().default(""),
+  priority: z.coerce.number().int().min(0).max(1000).optional().default(0),
+  ctaLabel: z.string().max(100).optional().default(""),
+  ctaUrl: z.string().max(1024).optional().default(""),
   imageUrl: z.string().optional().default(""),
   genre: z.string().optional().default(""),
   eventType: z.string().optional().default(""),
@@ -59,6 +64,37 @@ const AnnouncementBody = z.object({
   contactDetails: z.string().max(255).optional().default(""),
   price: z.coerce.number().min(0).max(99999.99).optional().default(0),
 });
+
+// IST "now" as sortable date/time strings for active-window checks.
+function istNowStamp(): { date: string; time: string } {
+  const now = new Date();
+  const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  const time = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false }).format(now);
+  return { date, time };
+}
+
+// An announcement is active until its end date/time passes. Open-ended (no end
+// date) is always active. Empty end time on the end date = end of that day.
+function isActiveWindow(a: { endDate?: string | null; endTime?: string | null }): boolean {
+  const endDate = (a.endDate ?? "").trim();
+  if (!endDate) return true;
+  const { date: nowDate, time: nowTime } = istNowStamp();
+  if (endDate > nowDate) return true;
+  if (endDate < nowDate) return false;
+  const endTime = (a.endTime ?? "").trim() || "23:59";
+  return endTime >= nowTime;
+}
+
+// Venue-profile ordering: priority (high first), then soonest start; dateless last.
+function byPriorityThenStart(a: any, b: any): number {
+  const pa = Number(a.priority ?? 0), pb = Number(b.priority ?? 0);
+  if (pa !== pb) return pb - pa;
+  const da = (a.announceDate ?? "").trim(), dbb = (b.announceDate ?? "").trim();
+  if (!da && !dbb) return 0;
+  if (!da) return 1;
+  if (!dbb) return -1;
+  return da.localeCompare(dbb);
+}
 
 router.get("/partner/announcements", requireAuth(["vendor", "admin"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
@@ -88,6 +124,11 @@ router.post("/partner/announcements", requireAuth(["vendor", "admin"]), async (r
       body: parsed.data.body,
       announceDate: parsed.data.announceDate,
       announceTime: parsed.data.announceTime,
+      endDate: parsed.data.endDate,
+      endTime: parsed.data.endTime,
+      priority: parsed.data.priority,
+      ctaLabel: parsed.data.ctaLabel,
+      ctaUrl: parsed.data.ctaUrl,
       imageUrl: parsed.data.imageUrl,
       genre: parsed.data.genre,
       eventType: parsed.data.eventType,
@@ -170,6 +211,7 @@ router.get("/announcements/recent", async (_req, res) => {
     FROM announcements a
     JOIN vendors v ON v.id = a.vendor_id
     WHERE (a.announce_date = '' OR a.announce_date >= ${today})
+      AND (a.end_date = '' OR a.end_date >= ${today})
       AND a.approval_status = 'approved'
       AND v.status = 'approved'
       AND v.hidden = false
@@ -177,7 +219,7 @@ router.get("/announcements/recent", async (_req, res) => {
         SELECT 1 FROM events e
         WHERE e.id = a.event_id AND e.hidden = false AND e.approval_status = 'approved'
       ))
-    ORDER BY a.created_at DESC
+    ORDER BY a.priority DESC, a.created_at DESC
     LIMIT 10
   `);
   return res.json(rows.rows);
@@ -210,6 +252,7 @@ router.get("/announcements/slider", async (_req, res) => {
     FROM announcements a
     JOIN vendors v ON v.id = a.vendor_id
     WHERE (a.announce_date = '' OR a.announce_date >= ${today})
+      AND (a.end_date = '' OR a.end_date >= ${today})
       AND a.is_featured_slider = true
       AND a.approval_status = 'approved'
       AND v.status = 'approved'
@@ -218,7 +261,7 @@ router.get("/announcements/slider", async (_req, res) => {
         SELECT 1 FROM events e
         WHERE e.id = a.event_id AND e.hidden = false AND e.approval_status = 'approved'
       ))
-    ORDER BY a.created_at DESC
+    ORDER BY a.priority DESC, a.created_at DESC
     LIMIT 10
   `);
 
@@ -250,6 +293,7 @@ router.get("/announcements/slider", async (_req, res) => {
     FROM announcements a
     JOIN vendors v ON v.id = a.vendor_id
     WHERE (a.announce_date = '' OR a.announce_date >= ${today})
+      AND (a.end_date = '' OR a.end_date >= ${today})
       AND a.approval_status = 'approved'
       AND v.status = 'approved'
       AND v.hidden = false
@@ -257,7 +301,7 @@ router.get("/announcements/slider", async (_req, res) => {
         SELECT 1 FROM events e
         WHERE e.id = a.event_id AND e.hidden = false AND e.approval_status = 'approved'
       ))
-    ORDER BY a.created_at DESC
+    ORDER BY a.priority DESC, a.created_at DESC
     LIMIT 10
   `);
   return res.json(recent.rows);
@@ -462,8 +506,8 @@ router.get("/vendors/:vendorId/announcements", async (req, res) => {
       ),
     )
     .orderBy(desc(announcementsTable.createdAt))
-    .limit(5);
-  return res.json(rows);
+    .limit(50);
+  return res.json(rows.filter(isActiveWindow).sort(byPriorityThenStart).slice(0, 10));
 });
 
 router.get("/events/:eventId/announcements", async (req, res) => {
@@ -494,7 +538,9 @@ router.get("/events/:eventId/announcements", async (req, res) => {
       ),
     )
     .orderBy(desc(announcementsTable.createdAt));
-  return res.json(rows);
+  // Drop announcements whose active window has ended, then order by priority
+  // (high first) and soonest start — powers the venue-profile Announcements tab.
+  return res.json(rows.filter(isActiveWindow).sort(byPriorityThenStart));
 });
 
 export default router;

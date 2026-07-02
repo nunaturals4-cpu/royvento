@@ -711,6 +711,7 @@ router.get("/vendors/:vendorId/organizer-events", async (req, res) => {
       e.id, e.title, e.slug, e.category, e.short_description AS "shortDescription",
       e.cover_image_url AS "coverImageUrl", e.banner_url AS "bannerUrl",
       e.city, e.start_date AS "startDate", e.start_time AS "startTime",
+      e.end_date AS "endDate", e.end_time AS "endTime",
       o.name AS "organizerName", o.verified AS "organizerVerified"
     FROM organizer_events e
     JOIN organizers o ON o.id = e.organizer_id
@@ -718,6 +719,8 @@ router.get("/vendors/:vendorId/organizer-events", async (req, res) => {
       AND e.approval_status = 'approved'
       AND e.venue_approval_status = 'approved'
       AND o.hidden IS NOT TRUE
+      -- Auto-drop events whose end date has passed (open-ended if null).
+      AND (e.end_date IS NULL OR e.end_date >= CURRENT_DATE)
     ORDER BY e.start_date ASC NULLS LAST, e.created_at DESC
   `);
   return res.json(rows.rows);

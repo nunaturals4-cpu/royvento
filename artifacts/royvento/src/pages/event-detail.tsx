@@ -30,7 +30,7 @@ import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet,
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { SquareImage } from "@/components/SquareImage";
 import { FollowButton } from "@/components/FollowButton";
-import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket, Check, Crown, ShieldCheck, Headphones, Zap, Share2 } from "lucide-react";
+import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket, Check, Crown, ShieldCheck, Headphones, Zap, Share2, Megaphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDayRanges } from "@/lib/days";
@@ -100,6 +100,41 @@ function fmtPlanWhen(plan: { days?: string[]; timeFrom?: string; timeTo?: string
   parts.push(days.length === 0 ? "Every day" : formatDayRanges(days));
   if (plan.timeFrom && plan.timeTo) parts.push(`${fmtTime(plan.timeFrom)} – ${fmtTime(plan.timeTo)}`);
   else if (plan.timeFrom) parts.push(`from ${fmtTime(plan.timeFrom)}`);
+  return parts.join(" · ");
+}
+
+// IST "now" as sortable date/time strings, for announcement active-window checks.
+function istNowStamp(): { date: string; time: string } {
+  const now = new Date();
+  return {
+    date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(now),
+    time: new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false }).format(now),
+  };
+}
+
+// True until the announcement's end date/time passes (open-ended if no end date).
+// Empty end time on the end date means end-of-day.
+function announcementNotExpired(endDate?: string | null, endTime?: string | null): boolean {
+  const ed = (endDate ?? "").trim();
+  if (!ed) return true;
+  const { date, time } = istNowStamp();
+  if (ed > date) return true;
+  if (ed < date) return false;
+  return ((endTime ?? "").trim() || "23:59") >= time;
+}
+
+// "Sat, 12 Apr · 9:00 PM" style label from an ISO date + HH:MM time.
+function fmtWhenStamp(dateStr?: string | null, timeStr?: string | null): string {
+  const d = (dateStr ?? "").trim();
+  const parts: string[] = [];
+  if (d) {
+    const dt = new Date(`${d}T00:00:00`);
+    parts.push(dt.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }));
+  } else {
+    parts.push("Ongoing");
+  }
+  const tm = (timeStr ?? "").trim();
+  if (tm) parts.push(fmtTime(tm));
   return parts.join(" · ");
 }
 
@@ -235,7 +270,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const [hoursExpanded, setHoursExpanded] = useState(false);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const pubTabRef = useRef<HTMLDivElement>(null);
-  const [pubTab, setPubTab] = useState<"overview" | "happyHours" | "reviews" | "photos" | "offers" | "book">("overview");
+  const [pubTab, setPubTab] = useState<"overview" | "happyHours" | "reviews" | "photos" | "offers" | "announcements" | "book">("overview");
   const switchPubTab = (tab: typeof pubTab) => {
     setPubTab(tab);
     requestAnimationFrame(() => pubTabRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -625,6 +660,74 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     if (!b.announceDate) return -1;
     return new Date(a.announceDate).getTime() - new Date(b.announceDate).getTime();
   });
+
+  // Unified "Announcements" tab feed: the venue's own announcements + organizer
+  // events hosted here. Only active (not-yet-expired) items, ordered by priority
+  // (high first) then soonest start; dateless/ongoing items sort last.
+  const annFallbackImg: string | null = (ev.imageUrl || ev.vendor?.coverImageUrl || ev.vendor?.bannerImage) ?? null;
+  const announcementCards = [
+    ...(announcements as any[]).map((a) => ({
+      key: `a-${a.id}`,
+      kind: "announcement" as const,
+      raw: a,
+      title: a.title as string,
+      description: (a.body ?? "") as string,
+      imageUrl: (a.imageUrl || annFallbackImg) as string | null,
+      startDate: (a.announceDate ?? "") as string,
+      startTime: (a.announceTime ?? "") as string,
+      endDate: (a.endDate ?? "") as string,
+      endTime: (a.endTime ?? "") as string,
+      priority: Number(a.priority ?? 0),
+      ctaLabel: (a.ctaLabel ?? "") as string,
+      ctaUrl: (a.ctaUrl ?? "") as string,
+      price: Number(a.price ?? 0),
+    })),
+    ...(hostedEvents as any[]).map((e) => ({
+      key: `e-${e.id}`,
+      kind: "event" as const,
+      raw: e,
+      title: e.title as string,
+      description: (e.shortDescription ?? "") as string,
+      imageUrl: (e.coverImageUrl || e.bannerUrl || annFallbackImg) as string | null,
+      startDate: (e.startDate ?? "") as string,
+      startTime: (e.startTime ?? "") as string,
+      endDate: (e.endDate ?? "") as string,
+      endTime: (e.endTime ?? "") as string,
+      priority: 0,
+      ctaLabel: "",
+      ctaUrl: "",
+      price: 0,
+    })),
+  ]
+    .filter((c) => announcementNotExpired(c.endDate, c.endTime))
+    .sort((a, b) => {
+      if (a.priority !== b.priority) return b.priority - a.priority;
+      if (!a.startDate && !b.startDate) return 0;
+      if (!a.startDate) return 1;
+      if (!b.startDate) return -1;
+      return a.startDate.localeCompare(b.startDate);
+    });
+
+  // Click behavior: an explicit CTA link wins; otherwise open Book a Table with
+  // the Event booking type preselected and this event/announcement selected.
+  const openAnnouncement = (card: (typeof announcementCards)[number]) => {
+    const url = (card.ctaUrl ?? "").trim();
+    if (url) {
+      if (/^https?:\/\//i.test(url)) window.open(url, "_blank", "noopener,noreferrer");
+      else setLocation(url);
+      return;
+    }
+    setPubMode("event_booking");
+    if (card.kind === "event") {
+      setSelectedHostedEventId(String(card.raw.id));
+      setSelectedAnnouncementId("");
+    } else {
+      setSelectedAnnouncementId(String(card.raw.id));
+      setSelectedHostedEventId("");
+      if (card.startDate) setDate(card.startDate);
+    }
+    switchPubTab("book");
+  };
 
   // Event bookings price off the announcement's per-person price, or — for a
   // hosted organizer event — the chosen ticket tier's price. 0 = free entry.
@@ -1342,6 +1445,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               { id: "reviews" as const, label: "Reviews" },
               { id: "photos" as const, label: "Photos" },
               ...(isPub ? [{ id: "offers" as const, label: "Food & Drink Offers" }] : []),
+              ...(isPub && announcementCards.length > 0 ? [{ id: "announcements" as const, label: "Announcements" }] : []),
               { id: "book" as const, label: "Book a Table" },
             ] as { id: typeof pubTab; label: string }[]).map((tab) => (
               <button
@@ -1964,6 +2068,62 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
             coverFallback={event.imageUrl || vendorCover || ev.vendor?.bannerImage || null}
             onBookClick={() => switchPubTab("book")}
           />
+        )}
+
+        {/* ─── ANNOUNCEMENTS TAB ─── */}
+        {pubTab === "announcements" && isPub && (
+          <div className="max-w-5xl mx-auto">
+            <div className="mb-6">
+              <h2 className="font-serif text-2xl sm:text-3xl tracking-tight flex items-center gap-2">
+                <Megaphone className="h-6 w-6 text-primary" /> Announcements
+              </h2>
+              <p className="text-muted-foreground text-sm mt-1">What's on at {venueName} — events & updates. Tap an event to book.</p>
+            </div>
+            {announcementCards.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-16 text-center">
+                <Megaphone className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-muted-foreground">No active announcements right now.</p>
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-4">
+                {announcementCards.map((c) => {
+                  const isEvent = c.kind === "event" || c.price > 0 || !!c.startDate;
+                  const ctaText = c.ctaLabel?.trim() || (c.ctaUrl?.trim() ? "Learn more" : isEvent ? "Book now" : "View");
+                  return (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={() => openAnnouncement(c)}
+                      className="group text-left rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden hover:border-primary/40 hover:bg-white/[0.04] transition-all flex flex-col"
+                    >
+                      {c.imageUrl ? (
+                        <div className="relative aspect-[16/9] overflow-hidden">
+                          <img src={c.imageUrl} alt={c.title} loading="lazy" className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          {c.kind === "event" && (
+                            <span className="absolute top-2 left-2 rounded-full bg-primary/90 text-primary-foreground px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Event</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="aspect-[16/9] bg-gradient-to-br from-primary/25 to-black/40 flex items-center justify-center"><Megaphone className="h-8 w-8 text-white/40" /></div>
+                      )}
+                      <div className="p-4 flex-1 flex flex-col">
+                        <p className="font-semibold text-base text-foreground leading-tight">{c.title}</p>
+                        {c.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{c.description}</p>}
+                        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                          <span className="inline-flex items-center gap-1"><CalIcon className="h-3 w-3" />{fmtWhenStamp(c.startDate, c.startTime)}</span>
+                          {c.endDate && <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />Until {fmtWhenStamp(c.endDate, c.endTime)}</span>}
+                          {c.price > 0 && <span className="rounded-full bg-white/5 border border-white/10 px-2 py-0.5 font-semibold text-foreground">{formatINR(c.price)}</span>}
+                        </div>
+                        <span className="mt-3 inline-flex items-center gap-1.5 self-start rounded-lg bg-primary/15 border border-primary/30 px-3 py-1.5 text-xs font-semibold text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                          {ctaText} <ArrowRight className="h-3.5 w-3.5" />
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
 
         {/* ─── BOOK A TABLE TAB ─── */}

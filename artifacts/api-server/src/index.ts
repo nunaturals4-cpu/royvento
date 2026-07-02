@@ -751,6 +751,12 @@ async function applyPendingSchemaChanges() {
     // Organizer name + contact details shown on the announcement.
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "organizer_name" varchar(255) NOT NULL DEFAULT ''`);
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "contact_details" varchar(255) NOT NULL DEFAULT ''`);
+    // ── Announcement active window (end), priority + CTA (venue profile section) ──
+    await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "end_date" varchar(20) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "end_time" varchar(20) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "priority" integer NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "cta_label" varchar(100) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "cta_url" varchar(1024) NOT NULL DEFAULT ''`);
     // ── vendor_requests.phone (partner application contact number) ──────────
     // Collected on the Become a Partner form; seeds the new partner profile's
     // contact phone on approval. Idempotent; mirrors lib/db/src/schema/index.ts.
