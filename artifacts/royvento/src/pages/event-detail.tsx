@@ -475,7 +475,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     defaultModeApplied.current = true;
     // Prefer Cover Charges only when a package actually runs on the initial date.
     const hasCover = drinkPlans.some((p: any) => p.type === "cover_charge" && planAppliesOnDate(p, date));
-    const hasEventTicket = announcements.some((a: any) => a.announceDate) || hostedEvents.length > 0;
+    const hasEventTicket = announcements.length > 0 || hostedEvents.length > 0;
     const next = hasCover ? "cover_charge" : hasEventTicket ? "event_booking" : "ticket";
     if (next !== "ticket") setPubMode(next);
   }, [isLoading, event, deepLinkBook, drinkPlansFetched, announcementsFetched, hostedEventsFetched, drinkPlans, announcements, hostedEvents, date]);
@@ -615,9 +615,16 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
 
   const selectedAnnouncement = announcements.find((a: any) => String(a.id) === selectedAnnouncementId);
   const eventDateMismatch = !!(selectedAnnouncement?.announceDate && date && date !== selectedAnnouncement.announceDate);
-  const sortedAnnouncements: any[] = [...announcements]
-    .filter((a: any) => a.announceDate)
-    .sort((a: any, b: any) => new Date(a.announceDate).getTime() - new Date(b.announceDate).getTime());
+  // Every approved announcement is bookable as an "Event Ticket". Dated ones are
+  // sorted soonest-first; dateless ("ongoing") ones are kept and listed after —
+  // previously they were filtered out entirely, so a dateless announcement never
+  // appeared as a booking option even after admin approval.
+  const sortedAnnouncements: any[] = [...announcements].sort((a: any, b: any) => {
+    if (!a.announceDate && !b.announceDate) return 0;
+    if (!a.announceDate) return 1;
+    if (!b.announceDate) return -1;
+    return new Date(a.announceDate).getTime() - new Date(b.announceDate).getTime();
+  });
 
   // Event bookings price off the announcement's per-person price, or — for a
   // hosted organizer event — the chosen ticket tier's price. 0 = free entry.
