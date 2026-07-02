@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useParams, Link, useLocation, useSearch } from "wouter";
 import { SEO, buildBreadcrumbList } from "@/components/SEO";
 import { RichText } from "@/components/RichText";
+import { CarouselRow } from "@/components/CarouselRow";
 import { eventDetailSlug, pubDetailSlug } from "@/lib/seo-slug";
 import {
   useGetEvent,
@@ -2796,8 +2797,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       </h3>
                       <p className="text-[11px] text-muted-foreground mt-0.5">Available at this venue — plan your visit.</p>
                     </div>
-                    <div className="space-y-2.5">
-                      {smartOffers.map((o: any) => {
+                    {(() => {
+                      const renderOffer = (o: any) => {
                         const v = Number(o.discountValue) || 0;
                         const badge = o.discountType === "percent" ? `${v}% OFF`
                           : o.discountType === "fixed" ? `₹${v} OFF`
@@ -2808,7 +2809,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                           ? `${o.startsAt ? new Date(o.startsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Now"} – ${o.endsAt ? new Date(o.endsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Open"}`
                           : null;
                         return (
-                          <div key={o.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                          <div key={o.id} className="h-full rounded-xl border border-white/10 bg-black/20 p-3">
                             <div className="flex items-start justify-between gap-2">
                               <p className="text-sm font-semibold text-foreground truncate flex items-center gap-1.5 min-w-0">
                                 {o.category === "drink" ? <Wine className="h-3.5 w-3.5 text-rose-300 shrink-0" /> : <Utensils className="h-3.5 w-3.5 text-emerald-300 shrink-0" />}
@@ -2824,8 +2825,18 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                             </div>
                           </div>
                         );
-                      })}
-                    </div>
+                      };
+                      // One offer → plain card. Multiple → swipeable slider (one per view).
+                      if (smartOffers.length === 1) return renderOffer(smartOffers[0]);
+                      return (
+                        <CarouselRow itemClassName="w-full" gapClass="gap-3" className="-mx-1 px-1">
+                          {smartOffers.map(renderOffer)}
+                        </CarouselRow>
+                      );
+                    })()}
+                    {smartOffers.length > 1 && (
+                      <p className="text-[10px] text-muted-foreground/60 text-center">Swipe to see all {smartOffers.length} offers →</p>
+                    )}
                   </div>
                 )}
               </div>
