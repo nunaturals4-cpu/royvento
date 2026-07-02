@@ -404,21 +404,29 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
     const val = parsed.data[k];
     if (val !== undefined) updates[k] = val;
   }
-  const [v] = await db
-    .update(vendorsTable)
-    .set(updates)
-    .where(eq(vendorsTable.userId, user.id))
-    .returning();
-  if (!v) {
-    res.status(404).json({ error: "Vendor profile not found" });
-    return;
+  // Wrap the writes so an unexpected DB error (constraint, value overflow, etc.)
+  // returns a real, actionable message instead of an opaque 500 from the global
+  // error middleware — the profile save is a hot partner path.
+  try {
+    const [v] = await db
+      .update(vendorsTable)
+      .set(updates)
+      .where(eq(vendorsTable.userId, user.id))
+      .returning();
+    if (!v) {
+      res.status(404).json({ error: "Vendor profile not found" });
+      return;
+    }
+    // A venue rename must reflect everywhere — propagate to the denormalized copy
+    // on organizer events hosted at this venue.
+    if (updates["businessName"] !== undefined) {
+      await db.update(organizerEventsTable).set({ venueName: v.businessName }).where(eq(organizerEventsTable.venueId, v.id));
+    }
+    res.json(await serializeVendor(v));
+  } catch (err) {
+    (req as { log?: { error: (o: unknown, m: string) => void } }).log?.error({ err }, "Failed to save vendor profile");
+    res.status(500).json({ error: `Could not save profile: ${err instanceof Error ? err.message : "please try again."}` });
   }
-  // A venue rename must reflect everywhere — propagate to the denormalized copy
-  // on organizer events hosted at this venue.
-  if (updates["businessName"] !== undefined) {
-    await db.update(organizerEventsTable).set({ venueName: v.businessName }).where(eq(organizerEventsTable.venueId, v.id));
-  }
-  res.json(await serializeVendor(v));
 });
 
 // Crowd level is now admin-managed. Partners can read but not write.
