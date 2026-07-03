@@ -149,6 +149,8 @@ async function canChat(party: PartyRow, userId: number): Promise<boolean> {
 function partyToPublic(p: PartyRow, ticket: TicketRow | null, viewerId: number | null) {
   const sold = ticket?.soldCount ?? 0;
   const capacity = p.capacity || ticket?.quantity || 0;
+  const isOrganizer = viewerId != null && viewerId === p.organizerUserId;
+  const soldOut = capacity > 0 && sold >= capacity;
   return {
     id: p.id,
     organizerUserId: p.organizerUserId,
@@ -162,7 +164,7 @@ function partyToPublic(p: PartyRow, ticket: TicketRow | null, viewerId: number |
     visibility: p.visibility,
     // The invite token is the join gate for private parties — only ever
     // revealed to the organizer (who builds the share link). "" for everyone else.
-    inviteToken: viewerId != null && viewerId === p.organizerUserId ? p.inviteToken : "",
+    inviteToken: isOrganizer ? p.inviteToken : "",
     venueName: p.venueName,
     address: p.address,
     city: p.city,
@@ -186,9 +188,14 @@ function partyToPublic(p: PartyRow, ticket: TicketRow | null, viewerId: number |
     updatedAt: p.updatedAt.toISOString(),
     ticketType: ticket?.type ?? "free",
     ticketPrice: ticket?.price ?? "0",
-    soldCount: sold,
-    seatsLeft: capacity > 0 ? Math.max(0, capacity - sold) : null,
-    isOrganizer: viewerId != null && viewerId === p.organizerUserId,
+    // Ticket inventory (how many sold / how many pending) is PRIVATE to the host.
+    // Public viewers never receive exact numbers — only whether the party is sold
+    // out (seatsLeft 0) so the client can still disable booking; otherwise null.
+    soldCount: isOrganizer ? sold : 0,
+    seatsLeft: isOrganizer
+      ? (capacity > 0 ? Math.max(0, capacity - sold) : null)
+      : (soldOut ? 0 : null),
+    isOrganizer,
   };
 }
 

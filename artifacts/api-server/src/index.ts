@@ -635,6 +635,21 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "base_fee" integer DEFAULT 0`);
     await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "hidden" boolean NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "bar_menu_urls" text[] NOT NULL DEFAULT '{}'`);
+    // ── Venue "About" details (cuisines / facilities / things-to-know / faqs) ──
+    // Powers the pub event-profile Overview sections. Idempotent; mirrors
+    // lib/db/src/schema/index.ts.
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "cuisines" text[] NOT NULL DEFAULT '{}'`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "facilities" text[] NOT NULL DEFAULT '{}'`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "languages" text[] NOT NULL DEFAULT '{}'`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "duration_info" varchar(60) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "ticket_age" varchar(40) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "entry_age" varchar(40) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "venue_layout" varchar(20) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "seating_arrangement" varchar(20) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "kids_allowed" boolean`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "pets_allowed" boolean`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "faqs" jsonb NOT NULL DEFAULT '[]'::jsonb`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "terms_conditions" text NOT NULL DEFAULT ''`);
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "capacity" integer`);
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true`);
     await db.execute(sql`

@@ -122,6 +122,19 @@ const UpdatePartnerProfileBody = z.object({
   menuUrl: z.string().optional(),
   menuUrls: z.array(z.string()).optional(),
   barMenuUrls: z.array(z.string()).optional(),
+  // ── Venue "About" details ──
+  cuisines: z.array(z.string().max(60)).max(30).optional(),
+  facilities: z.array(z.string().max(60)).max(60).optional(),
+  languages: z.array(z.string().max(40)).max(20).optional(),
+  durationInfo: z.string().max(60).optional(),
+  ticketAge: z.string().max(40).optional(),
+  entryAge: z.string().max(40).optional(),
+  venueLayout: z.string().max(20).optional(),
+  seatingArrangement: z.string().max(20).optional(),
+  kidsAllowed: z.boolean().nullable().optional(),
+  petsAllowed: z.boolean().nullable().optional(),
+  faqs: z.array(z.object({ question: z.string().max(200), answer: z.string().max(2000) })).max(30).optional(),
+  termsConditions: z.string().max(10000).optional(),
 });
 
 router.patch(
@@ -165,6 +178,30 @@ router.patch(
       updates["menuUrls"] = parsed.data.menuUrls;
     if (parsed.data.barMenuUrls !== undefined)
       updates["barMenuUrls"] = parsed.data.barMenuUrls;
+    if (parsed.data.cuisines !== undefined)
+      updates["cuisines"] = parsed.data.cuisines;
+    if (parsed.data.facilities !== undefined)
+      updates["facilities"] = parsed.data.facilities;
+    if (parsed.data.languages !== undefined)
+      updates["languages"] = parsed.data.languages;
+    if (parsed.data.durationInfo !== undefined)
+      updates["durationInfo"] = parsed.data.durationInfo;
+    if (parsed.data.ticketAge !== undefined)
+      updates["ticketAge"] = parsed.data.ticketAge;
+    if (parsed.data.entryAge !== undefined)
+      updates["entryAge"] = parsed.data.entryAge;
+    if (parsed.data.venueLayout !== undefined)
+      updates["venueLayout"] = parsed.data.venueLayout;
+    if (parsed.data.seatingArrangement !== undefined)
+      updates["seatingArrangement"] = parsed.data.seatingArrangement;
+    if (parsed.data.kidsAllowed !== undefined)
+      updates["kidsAllowed"] = parsed.data.kidsAllowed;
+    if (parsed.data.petsAllowed !== undefined)
+      updates["petsAllowed"] = parsed.data.petsAllowed;
+    if (parsed.data.faqs !== undefined)
+      updates["faqs"] = parsed.data.faqs;
+    if (parsed.data.termsConditions !== undefined)
+      updates["termsConditions"] = parsed.data.termsConditions;
     const [v] = await db
       .update(vendorsTable)
       .set(updates)

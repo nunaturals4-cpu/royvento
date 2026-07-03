@@ -262,7 +262,21 @@ export function PartyDetail() {
                   <FactPill icon={CalendarDays} text={party.partyDate || "Date TBA"} />
                   {(party.startTime || party.endTime) && <FactPill icon={Clock} text={`${party.startTime || "—"}${party.endTime ? ` – ${party.endTime}` : ""}`} />}
                   <FactPill icon={Users} text={joinBadge(party.joinType)} />
-                  <FactPill icon={Ticket} text={seatsLeft != null ? `${seatsLeft} of ${party.capacity} left` : "Open entry"} />
+                  {/* Capacity: only the host sees exact remaining/sold numbers.
+                      Public viewers get a status word so ticket inventory stays
+                      private (the API also withholds the real counts from them). */}
+                  <FactPill
+                    icon={Ticket}
+                    text={
+                      party.capacity > 0
+                        ? party.isOrganizer && seatsLeft != null
+                          ? `${seatsLeft} of ${party.capacity} left`
+                          : soldOut
+                            ? "Sold out"
+                            : "Limited seats"
+                        : "Open entry"
+                    }
+                  />
                 </div>
               </div>
             </div>
@@ -334,8 +348,10 @@ export function PartyDetail() {
                   </span>
                 </div>
 
-                {/* Capacity meter */}
-                {seatsLeft != null && party.capacity > 0 && (
+                {/* Capacity meter — booked/left counts are private to the host.
+                    Public viewers never see how many tickets are sold or pending;
+                    at most a neutral "Sold out" once no seats remain. */}
+                {seatsLeft != null && party.capacity > 0 && party.isOrganizer ? (
                   <div className="mt-5">
                     <div className="flex items-center justify-between text-[11px] mb-1.5" style={{ color: "rgba(255,255,255,0.55)" }}>
                       <span>{booked} booked</span>
@@ -345,7 +361,9 @@ export function PartyDetail() {
                       <div className="h-full rounded-full transition-all" style={{ width: `${fillPct}%`, background: `linear-gradient(90deg, ${PARTY}, ${GOLD})` }} />
                     </div>
                   </div>
-                )}
+                ) : soldOut ? (
+                  <div className="mt-5 text-[11px] font-semibold" style={{ color: "#fca5a5" }}>Sold out</div>
+                ) : null}
               </div>
 
               {/* Perforated divider */}

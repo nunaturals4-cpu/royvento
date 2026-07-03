@@ -2,13 +2,14 @@ import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Flame, Zap, GlassWater, Headphones, Utensils, Mic2,
-  MapPin, Clock, Sparkles, ArrowRight, X, Heart,
+  Flame, Zap, GlassWater, Utensils, Mic2,
+  MapPin, Clock, Sparkles, ArrowRight, X,
 } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CarouselRow } from "@/components/CarouselRow";
 import { NightlifeOfferCard } from "@/components/NightlifeOfferCard";
+import { OFFER_THEMES } from "@/components/offerThemes";
 
 // ── Happening Tonight ───────────────────────────────────────────────────────
 // Real-time discovery: "It's 7 PM — what can I do in the next few hours?"
@@ -46,13 +47,11 @@ interface TonightResponse {
 
 const FILTERS: { key: string; label: string; icon: React.ReactNode }[] = [
   { key: "all",   label: "All Tonight",      icon: <Sparkles className="h-3.5 w-3.5" /> },
-  { key: "date",  label: "💕 Date Night",    icon: <Heart className="h-3.5 w-3.5" /> },
   { key: "now",   label: "🔥 Happening Now", icon: <Flame className="h-3.5 w-3.5" /> },
   { key: "soon",  label: "⚡ Starting Soon",  icon: <Zap className="h-3.5 w-3.5" /> },
+  { key: "event",  label: "🎤 Events",               icon: <Mic2 className="h-3.5 w-3.5" /> },
   { key: "happy",  label: "🍻 Happy Hours",          icon: <GlassWater className="h-3.5 w-3.5" /> },
   { key: "offers", label: "🍽️ Food & Drink Offers",  icon: <Utensils className="h-3.5 w-3.5" /> },
-  { key: "dj",     label: "🎧 DJ Nights",            icon: <Headphones className="h-3.5 w-3.5" /> },
-  { key: "live",   label: "🎤 Live Events",          icon: <Mic2 className="h-3.5 w-3.5" /> },
 ];
 
 function TonightCard({ item }: { item: TonightItem }) {
@@ -75,6 +74,37 @@ function TonightCard({ item }: { item: TonightItem }) {
   const bookHref = item.kind === "game"
     ? undefined
     : `${item.href}${item.href.includes("?") ? "&" : "?"}book=1`;
+
+  // Offer & happy-hour items use the premium VIP offer card (the single standard
+  // offer-card design); every other kind keeps its photo card.
+  if (item.kind === "happyhour" || item.kind === "offer") {
+    const theme = item.kind === "happyhour" ? OFFER_THEMES.free : OFFER_THEMES.food;
+    const timeLabel = item.startTime
+      ? `${item.startTime}${item.endTime ? ` – ${item.endTime}` : ""}`
+      : "Tonight";
+    return (
+      <div className="h-full w-[300px] sm:w-[330px]">
+        <NightlifeOfferCard
+          hideImage
+          theme={theme}
+          href={item.href}
+          bookHref={bookHref}
+          title={item.subtitle}
+          venueName={item.title}
+          offerLabel={item.dealLabel?.trim() || (item.kind === "happyhour" ? "Happy Hour" : "Special Offer")}
+          offerEyebrow={item.kind === "happyhour" ? "Enjoy" : "Deal"}
+          offerIcon={<GlassWater className="h-5 w-5" />}
+          location={loc || "Tonight"}
+          statusBadge={statusBadge}
+        >
+          <div className="flex items-center gap-1.5 text-[11px] text-white/55">
+            <Clock className="h-3 w-3 shrink-0" style={{ color: theme.accent }} />
+            <span className="truncate">{timeLabel}</span>
+          </div>
+        </NightlifeOfferCard>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full w-[195px] sm:w-[210px]">
@@ -126,10 +156,14 @@ export function HappeningTonight() {
     // happy-hour cards always carry a label, so they still surface; bare venue
     // cards with nothing on them are hidden. Other experiences are unaffected.
     if (activeFilter === "all") return allItems.filter((i) => i.kind !== "pub" || !!i.dealLabel);
-    // "Date Night" has no backend tag — derive it from couple-friendly kinds
-    // (pubs, happy hours, DJ nights and live events) so it works without an API change.
-    if (activeFilter === "date") {
-      return allItems.filter((i) => ["pub", "happyhour", "dj", "event"].includes(i.kind));
+    // Events: organiser live events (tagged "live") + any event-kind item.
+    if (activeFilter === "event") {
+      return allItems.filter((i) => i.kind === "event" || i.filters.includes("live"));
+    }
+    // Starting Soon: offers/events that begin within the next few hours and have
+    // not started yet — the backend "soon" bucket drops items once they go live.
+    if (activeFilter === "soon") {
+      return allItems.filter((i) => i.bucket === "soon");
     }
     return allItems.filter((i) => i.filters.includes(activeFilter));
   }, [allItems, activeFilter]);
@@ -207,6 +241,7 @@ export function HappeningTonight() {
             <p className="text-sm text-white/55">Nothing in this category right now — try another filter.</p>
           </div>
         )}
+
       </div>
 
       {/* Recommendation reveal */}

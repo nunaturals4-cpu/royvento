@@ -1,7 +1,10 @@
-import { Wine, Ticket, Clock, Coins } from "lucide-react";
+import { Wine, Ticket, Clock, Coins, Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CarouselRow } from "@/components/CarouselRow";
 import { NightlifeOfferCard } from "@/components/NightlifeOfferCard";
+import { OfferDayPills } from "@/components/OfferDayPills";
+import { OfferSectionHeader } from "@/components/OfferSectionHeader";
+import { OFFER_THEMES, type OfferTheme } from "@/components/offerThemes";
 import { formatDayRanges } from "@/lib/days";
 import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-react";
 
@@ -62,6 +65,17 @@ function summarizePlan(plan: DrinkDealPlanLike): { badge: string; headline: stri
   return { badge: "DRINKS DEAL", headline: plan.productName || "Drinks discount" };
 }
 
+/* Small gold eyebrow shown above the highlighted offer value (luxury mode). */
+function offerEyebrowFor(type: string): string {
+  switch (type) {
+    case "welcome":      return "Enjoy";
+    case "unlimited":    return "Enjoy";
+    case "ticket":       return "Bundle";
+    case "cover_charge": return "Entry";
+    default:             return "Offer";
+  }
+}
+
 function pickPrimaryPlan(plans: DrinkPlanSummary[]): DrinkPlanSummary {
   return plans[0]!;
 }
@@ -87,6 +101,10 @@ export interface DrinkDealCardProps {
   href?: string;
   /** When set, adds a "Book now" button that deep-links to the venue booking. */
   bookHref?: string;
+  /** Luxury no-image mode (Pub Offers page) — offer + days become the hero. */
+  hideImage?: boolean;
+  /** Per-category colour theme for VIP ticket mode (offerThemes.ts). */
+  theme?: OfferTheme;
   onClick?: () => void;
 }
 
@@ -96,6 +114,8 @@ export function DrinkDealCard({
   fallbackImage,
   href,
   bookHref,
+  hideImage = false,
+  theme,
   onClick,
 }: DrinkDealCardProps) {
   const { t } = useTranslation();
@@ -111,12 +131,16 @@ export function DrinkDealCard({
   const dealText = isTicket && items.length > 0
     ? items.slice(0, 2).map((it) => it.name).join(" · ") + (items.length > 2 ? " +more" : "")
     : headline;
+  // Cover charges & tickets bundle "what's included" in lineItems — surface it.
+  const includedText = items.map((it) => it.name).join(" · ");
+  const showIncluded = (isCoverCharge || isTicket) && includedText.length > 0;
 
+  const iconSize = hideImage ? "h-5 w-5" : "h-3.5 w-3.5";
   const offerIcon = isCoverCharge
-    ? <Coins className="h-3.5 w-3.5" />
+    ? <Coins className={iconSize} />
     : isTicket
-      ? <Ticket className="h-3.5 w-3.5" />
-      : <Wine className="h-3.5 w-3.5" />;
+      ? <Ticket className={iconSize} />
+      : <Wine className={iconSize} />;
   const priceLabel = isCoverCharge && (plan.price ?? 0) > 0 ? `₹${((plan.price ?? 0) / 100).toFixed(0)}` : undefined;
   const statusBadge = gender ? (
     <span className="rounded-full bg-pink-500/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-md">{gender}</span>
@@ -124,7 +148,22 @@ export function DrinkDealCard({
 
   // Clean day · time footer row — mirrors the Happening Tonight card style.
   const daysLabel = formatDayRanges(plan.days ?? []);
-  const extras = (
+  const extras = hideImage ? (
+    /* VIP ticket mode — included items (cover charges & tickets) + pills + time. */
+    <div className="flex flex-col gap-1.5">
+      {showIncluded && (
+        <div className="flex items-start gap-1.5 text-[11px] leading-snug text-white/65">
+          <Check className="mt-[1px] h-3 w-3 shrink-0" style={{ color: theme?.accent }} />
+          <span className="line-clamp-2">{includedText}</span>
+        </div>
+      )}
+      <OfferDayPills days={plan.days} accent={theme?.accent} glow={theme?.glow} />
+      <div className="flex items-center gap-1.5 text-[11px] text-white/55">
+        <Clock className="h-3 w-3 shrink-0" style={{ color: theme?.accent }} />
+        <span className="truncate">{timeStr ?? "All day"}</span>
+      </div>
+    </div>
+  ) : (
     <div className="mt-auto flex items-center gap-1.5 pt-0.5 text-[12px] text-white/55">
       <Clock className="h-3.5 w-3.5 shrink-0 text-[#D4AF37]" />
       <span className="truncate">{daysLabel}{timeStr ? ` · ${timeStr}` : ""}</span>
@@ -135,13 +174,17 @@ export function DrinkDealCard({
     <NightlifeOfferCard
       href={href}
       bookHref={bookHref}
+      hideImage={hideImage}
+      theme={theme}
       imageUrl={imageUrl}
-      title={dealText}
+      title={hideImage ? headline : dealText}
       venueName={title}
       offerLabel={badge}
+      offerEyebrow={hideImage ? offerEyebrowFor(plan.type) : undefined}
       offerIcon={offerIcon}
       priceLabel={priceLabel}
       statusBadge={statusBadge}
+      imageAspectClass="aspect-[4/3]"
     >
       {extras}
     </NightlifeOfferCard>
@@ -160,10 +203,11 @@ export function DrinkDealCard({
 }
 
 /* ─── Vendor tile (wraps DrinkDealCard with offer → href) ────────────────── */
-function DealTile({ offer, plans, accent = "primary" }: { offer: VendorDrinkOffer; plans: DrinkPlanSummary[]; accent?: Accent }) {
+function DealTile({ offer, plans, accent = "primary", hideImage = false, theme }: { offer: VendorDrinkOffer; plans: DrinkPlanSummary[]; accent?: Accent; hideImage?: boolean; theme?: OfferTheme }) {
   const primary = pickPrimaryPlan(plans) as PlanWithDates;
   const offerWithImg = offer as OfferWithImage;
   const href = offer.pubEventId ? `/events/${offer.pubEventId}?book=1` : `/vendors/${offer.vendorId}`;
+  const bookHref = offer.pubEventId ? `/events/${offer.pubEventId}?book=1` : `/vendors/${offer.vendorId}?book=1`;
   const fallbackImage =
     toImg(offerWithImg.imageUrl) ?? toImg((offer as VendorDrinkOffer).coverImageUrl) ?? null;
 
@@ -175,6 +219,9 @@ function DealTile({ offer, plans, accent = "primary" }: { offer: VendorDrinkOffe
       accent={accent}
       extraPlansCount={plans.length - 1}
       href={href}
+      bookHref={hideImage ? bookHref : undefined}
+      hideImage={hideImage}
+      theme={theme}
     />
   );
 }
@@ -187,8 +234,10 @@ interface SectionProps {
   subtitle: string;
 }
 
-function DealPanel({ vendors, accent, title, subtitle }: SectionProps) {
-  const Icon = accent === "amber" ? Ticket : (accent === "violet" || accent === "darkred") ? Coins : Wine;
+function DealPanel({ vendors, accent, title, subtitle, hideImage = false, theme, sectionIcon }: SectionProps & { hideImage?: boolean; theme?: OfferTheme; sectionIcon?: typeof Wine }) {
+  const Icon = sectionIcon ?? (accent === "amber" ? Ticket : (accent === "violet" || accent === "darkred") ? Coins : Wine);
+
+  // Legacy (non-VIP) header box, kept for any image-mode reuse.
   const headerBox = accent === "amber"
     ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
     : accent === "violet"
@@ -199,19 +248,24 @@ function DealPanel({ vendors, accent, title, subtitle }: SectionProps) {
 
   return (
     <div>
-      {/* Section header */}
-      <div className="flex items-center gap-2.5 mb-1.5">
-        <span className={`flex h-7 w-7 items-center justify-center rounded-lg border ${headerBox}`}>
-          <Icon className="h-3.5 w-3.5" />
-        </span>
-        <h3 className="text-base md:text-lg font-bold tracking-tight">{title}</h3>
-      </div>
-      <p className="text-xs text-muted-foreground mb-5 ml-[2.25rem]">{subtitle}</p>
+      {hideImage && theme ? (
+        <OfferSectionHeader theme={theme} Icon={Icon} title={title} subtitle={subtitle} viewAllHref="/pubs" />
+      ) : (
+        <>
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <span className={`flex h-7 w-7 items-center justify-center rounded-lg border ${headerBox}`}>
+              <Icon className="h-3.5 w-3.5" />
+            </span>
+            <h3 className="text-base md:text-lg font-bold tracking-tight">{title}</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-5 ml-[2.25rem]">{subtitle}</p>
+        </>
+      )}
 
       {/* Single-row rail with arrows — scroll for more, never wraps. */}
-      <CarouselRow itemClassName="w-[160px] sm:w-[200px] md:w-[220px]" gapClass="gap-3 md:gap-4">
+      <CarouselRow itemClassName={hideImage ? "w-[310px] sm:w-[345px]" : "w-[150px] sm:w-[180px] md:w-[200px]"} gapClass="gap-3 md:gap-4">
         {vendors.map((v) => (
-          <DealTile key={v.offer.vendorId} offer={v.offer} plans={v.plans} accent={accent} />
+          <DealTile key={v.offer.vendorId} offer={v.offer} plans={v.plans} accent={accent} hideImage={hideImage} theme={theme} />
         ))}
       </CarouselRow>
     </div>
@@ -226,7 +280,10 @@ export function FreeDrinkSection({ vendors }: { vendors: VendorWithPlans[] }) {
       vendors={vendors}
       accent="primary"
       title="Free Drinks"
-      subtitle="Tap on any deal to view venue & book"
+      subtitle="Complimentary welcome & unlimited pours"
+      hideImage
+      theme={OFFER_THEMES.free}
+      sectionIcon={Wine}
     />
   );
 }
@@ -238,7 +295,10 @@ export function TicketSection({ vendors }: { vendors: VendorWithPlans[] }) {
       vendors={vendors}
       accent="amber"
       title="Included With Ticket"
-      subtitle="Tap on any deal to view venue & book"
+      subtitle="Food & drinks bundled with entry"
+      hideImage
+      theme={OFFER_THEMES.ticket}
+      sectionIcon={Ticket}
     />
   );
 }
@@ -250,7 +310,10 @@ export function CoverChargeSection({ vendors }: { vendors: VendorWithPlans[] }) 
       vendors={vendors}
       accent="primary"
       title="Cover Charges"
-      subtitle="Tap on any deal to view venue & book"
+      subtitle="Seamless entry, redeemable at the bar"
+      hideImage
+      theme={OFFER_THEMES.cover}
+      sectionIcon={Coins}
     />
   );
 }

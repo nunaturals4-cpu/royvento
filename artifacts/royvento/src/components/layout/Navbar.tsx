@@ -10,7 +10,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
 import { Logo } from "@/components/Logo";
-import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Globe, Palette, Check, Gift, Receipt } from "lucide-react";
+import {
+  Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Globe, Palette, Check, Gift, Receipt,
+  Moon, CalendarDays, Wine, Music, Gamepad2, UserPlus, PartyPopper, Info, Newspaper, Mail,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { apiGet, apiPatch } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CityPickerModal } from "@/components/CityPickerModal";
@@ -20,7 +24,6 @@ import { LANGUAGES } from "@/components/ui/LanguageSwitcher";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/components/ThemeProvider";
 import { THEMES } from "@/components/ui/ThemeSwitcher";
-import { NAV_ITEMS } from "@/lib/navItems";
 
 interface Notification {
   id: number;
@@ -28,6 +31,122 @@ interface Notification {
   message: string;
   isRead: boolean;
   createdAt: string;
+}
+
+// ── Premium navigation model ──────────────────────────────────────────────
+// Each leaf carries a line icon + a short subtitle so the mega-dropdown reads
+// like a product menu (Airbnb/Notion) rather than a plain list. `navKey` maps to
+// the admin per-item hide settings (site_settings.hidden_nav_links); leaves with
+// no key are always shown (e.g. About / Blog / Contact).
+interface NavLeaf {
+  href: string;
+  label: string;
+  sub: string;
+  Icon: LucideIcon;
+  navKey?: string;
+}
+type NavGroup =
+  | { kind: "link"; label: string; href: string; navKey?: string }
+  | { kind: "menu"; label: string; items: NavLeaf[] };
+
+// Shared pill styling for a top-level nav entry (trigger or plain link), so the
+// bar reads as one refined segmented control. Active = understated frosted-glass
+// pill (luxury, not nightlife); idle = ghost that warms subtly on hover. The
+// brand accent is expressed only as a small dot (see ActiveDot), never a glow.
+function navPillClass(active: boolean): string {
+  return [
+    "relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium tracking-[0.015em] transition-all duration-300 ease-out outline-none",
+    active
+      ? "text-white bg-white/[0.07] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08),0_1px_2px_rgba(0,0,0,0.35)]"
+      : "text-white/85 hover:text-white hover:bg-white/[0.045]",
+  ].join(" ");
+}
+
+// Understated luxury accent — a single soft dot instead of a bright red glow.
+function ActiveDot() {
+  return (
+    <span
+      className="h-[5px] w-[5px] shrink-0 rounded-full bg-primary/90"
+      style={{ boxShadow: "0 0 6px rgba(var(--theme-glow-rgb),0.55)" }}
+      aria-hidden="true"
+    />
+  );
+}
+
+// A single floating mega-dropdown. Opens on hover (with a hover-bridge so the
+// pointer can travel from trigger to panel) and on keyboard focus. The panel is
+// a dark-charcoal glass card that fades + slides in.
+function NavMenu({ label, active, children }: { label: string; active: boolean; children: React.ReactNode }) {
+  return (
+    <div className="relative group flex h-full items-center">
+      <button type="button" aria-haspopup="true" className={navPillClass(active)}>
+        {active && <ActiveDot />}
+        {label}
+        <ChevronDown
+          className="h-4 w-4 shrink-0 transition-transform duration-300 ease-out group-hover:rotate-180"
+          strokeWidth={2.5}
+          style={{ color: "#E8C15A" }}
+        />
+      </button>
+
+      {/* Hover bridge (pt-3) keeps hover alive across the gap to the panel. */}
+      <div className="invisible absolute left-0 top-full z-50 translate-y-1.5 pt-3.5 opacity-0 transition-all duration-200 ease-out group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
+        <div
+          className="relative min-w-[308px] overflow-hidden rounded-[20px] p-2.5"
+          style={{
+            background: "linear-gradient(180deg, #161616 0%, #111111 100%)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
+          }}
+        >
+          {/* Soft accent glow bloom in the corner for depth. */}
+          <div
+            className="pointer-events-none absolute -top-6 right-6 h-24 w-24 rounded-full blur-2xl"
+            style={{ background: "rgba(var(--theme-glow-rgb),0.10)" }}
+          />
+          <div className="relative">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// One row inside a mega-dropdown: iconed, titled, with a descriptive subtitle.
+function NavMenuItem({ leaf, active, onNavigate }: { leaf: NavLeaf; active: boolean; onNavigate?: () => void }) {
+  const { Icon } = leaf;
+  return (
+    <Link
+      href={leaf.href}
+      onClick={onNavigate}
+      className={`group/item flex items-center gap-3.5 rounded-2xl px-3 py-3 transition-all duration-200 focus:outline-none ${
+        active ? "bg-white/[0.05]" : "hover:bg-white/[0.045] focus:bg-white/[0.055]"
+      }`}
+    >
+      <span
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition-all duration-300 ease-out ${
+          active
+            ? "border-white/[0.1] bg-gradient-to-br from-white/[0.09] to-white/[0.02]"
+            : "border-white/[0.06] bg-gradient-to-br from-white/[0.05] to-transparent group-hover/item:border-white/[0.12] group-hover/item:from-white/[0.08]"
+        }`}
+      >
+        <Icon
+          className="h-[18px] w-[18px] transition-all duration-300 ease-out group-hover/item:scale-110"
+          style={{ color: "#E8C15A" }}
+        />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className={`block text-[13.5px] font-medium leading-tight tracking-[0.01em] ${active ? "text-white" : "text-white/90"}`}>
+            {leaf.label}
+          </span>
+          {active && <span className="h-1 w-1 rounded-full bg-primary/90" style={{ boxShadow: "0 0 6px rgba(var(--theme-glow-rgb),0.6)" }} />}
+        </span>
+        <span className="mt-1 block text-[11.5px] leading-snug text-white/40">{leaf.sub}</span>
+      </span>
+      {/* Subtle chevron affordance that slides in on hover. */}
+      <ChevronDown className="h-3.5 w-3.5 -rotate-90 text-white/0 transition-all duration-200 group-hover/item:translate-x-0.5 group-hover/item:text-white/30" aria-hidden="true" />
+    </Link>
+  );
 }
 
 export function Navbar() {
@@ -151,9 +270,53 @@ export function Navbar() {
   // NAV_ITEMS list and filtered by the admin-controlled per-item hide settings.
   // (Solo Connect stays visible to everyone — the premium gate is enforced on
   // the page, not by hiding the nav entry — unless an admin hides it here.)
-  const navItems = NAV_ITEMS
-    .filter((item) => !hiddenNavLinks.includes(item.key))
-    .map((item) => ({ href: item.href, label: t(item.labelKey, item.label) }));
+  // Grouped, premium mega-navigation. Leaves keep their `navKey` so the existing
+  // admin per-item hide settings still apply; a group whose leaves are all hidden
+  // collapses away. `NAV_ITEMS` remains the source of truth for which keys exist.
+  const navGroups: NavGroup[] = [
+    { kind: "link", label: t("nav.home", "Home"), href: "/", navKey: "home" },
+    {
+      kind: "menu",
+      label: t("nav.discover", "Discover"),
+      items: [
+        { href: "/tonight-plans", label: t("nav.tonight", "Tonight"), sub: t("nav.tonight_sub", "What's on right now"), Icon: Moon, navKey: "tonight-plans" },
+        { href: "/events", label: t("nav.events", "Events"), sub: t("nav.events_sub", "Live shows & gigs"), Icon: CalendarDays, navKey: "events" },
+        { href: "/pub-offers", label: t("nav.happy_hour", "Happy Hour"), sub: t("nav.happy_hour_sub", "Drink deals & offers"), Icon: Wine, navKey: "pub-offers" },
+      ],
+    },
+    {
+      kind: "menu",
+      label: t("nav.venues", "Venues"),
+      items: [
+        { href: "/pubs", label: t("nav.pubs", "Pubs & Clubs"), sub: t("nav.pubs_sub", "Bars, clubs & lounges"), Icon: Music, navKey: "pubs" },
+      ],
+    },
+    {
+      kind: "menu",
+      label: t("nav.experiences", "Experiences"),
+      items: [
+        { href: "/games", label: t("nav.games", "Games & Sports"), sub: t("nav.games_sub", "Play, watch & compete"), Icon: Gamepad2, navKey: "games" },
+        { href: "/solo-connect", label: t("nav.solo_connect", "Solo Connect"), sub: t("nav.solo_connect_sub", "Meet like-minded people"), Icon: UserPlus, navKey: "solo-connect" },
+        { href: "/private-parties", label: t("nav.private_parties_short", "Private Parties"), sub: t("nav.private_parties_sub", "Host or join a party"), Icon: PartyPopper, navKey: "private-parties" },
+      ],
+    },
+    {
+      kind: "menu",
+      label: t("nav.more", "More"),
+      items: [
+        { href: "/about", label: t("nav.about", "About Us"), sub: t("nav.about_sub", "Our story & mission"), Icon: Info },
+        { href: "/blogs", label: t("nav.blog", "Blog"), sub: t("nav.blog_sub", "Guides & stories"), Icon: Newspaper },
+        { href: "/contact", label: t("nav.contact", "Contact"), sub: t("nav.contact_sub", "We're here to help"), Icon: Mail },
+      ],
+    },
+  ];
+
+  // Apply admin hide settings, then drop any menu left with no visible leaves.
+  const visibleGroups: NavGroup[] = navGroups
+    .map((g) =>
+      g.kind === "menu" ? { ...g, items: g.items.filter((it) => !it.navKey || !hiddenNavLinks.includes(it.navKey)) } : g,
+    )
+    .filter((g) => (g.kind === "menu" ? g.items.length > 0 : !g.navKey || !hiddenNavLinks.includes(g.navKey)));
   // "List Your Venue" must land partners on the Become-a-Partner form without a
   // double click: logged-in users go straight there; logged-out users are routed
   // through login with a `next` param so they bounce back automatically after
@@ -183,11 +346,11 @@ export function Navbar() {
         <div
           className={`relative transition-all duration-300 ${
             scrolled
-              ? "bg-background/95 backdrop-blur-xl shadow-md shadow-black/30"
-              : "bg-background"
-          } border-b border-border/60`}
+              ? "border-white/[0.07] bg-[#0d0d0f]/80 shadow-[0_10px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl"
+              : "border-border/50 bg-background/70 backdrop-blur-md"
+          } border-b`}
         >
-          <div className="container mx-auto px-4 md:px-6 h-[68px] flex items-center gap-3 md:gap-5">
+          <div className="container mx-auto px-4 md:px-8 h-[70px] flex items-center gap-3 md:gap-6">
             {/* Hamburger — mobile/tablet only, far LEFT */}
             <Button
               variant="ghost"
@@ -476,41 +639,48 @@ export function Navbar() {
           </div>
         </div>
 
-        {/* ───────────── TIER 2 — primary nav (left) · utility links (right) ───────────── */}
+        {/* ───────────── TIER 2 — premium mega-nav (left) · utility links (right) ───────────── */}
         {/* Individual items here can be hidden site-wide from Admin → Site Settings. */}
         <div
-          className={`hidden lg:block border-b border-border/50 transition-all duration-300 ${
-            scrolled ? "bg-background/90 backdrop-blur-xl" : "bg-card/40"
+          className={`hidden lg:block border-b transition-all duration-300 ${
+            scrolled ? "border-white/[0.06] bg-[#0d0d0f]/70 backdrop-blur-2xl" : "border-border/40 bg-transparent"
           }`}
         >
-          <div className="container mx-auto px-4 md:px-6 h-11 flex items-center justify-between">
-            <nav className="flex items-center gap-5 xl:gap-7 text-sm font-medium">
-              {navItems.map((item) => {
-                const active = isActive(item.href);
+          <div className="container mx-auto flex h-[56px] items-center justify-between px-4 md:px-8">
+            {/* Segmented capsule — groups the primary nav into one refined control. */}
+            <nav className="flex items-center gap-1 rounded-full border border-white/[0.07] bg-gradient-to-b from-white/[0.04] to-white/[0.012] p-1 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_12px_rgba(0,0,0,0.25)]">
+              {visibleGroups.map((g) => {
+                if (g.kind === "link") {
+                  const active = isActive(g.href);
+                  return (
+                    <Link
+                      key={g.label}
+                      href={g.href}
+                      aria-current={active ? "page" : undefined}
+                      className={navPillClass(active)}
+                    >
+                      {active && <ActiveDot />}
+                      {g.label}
+                    </Link>
+                  );
+                }
+                const groupActive = g.items.some((it) => isActive(it.href));
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className={`relative py-1 transition-colors ${
-                      active ? "text-primary font-semibold" : "text-foreground/80 hover:text-primary"
-                    }`}
-                  >
-                    {item.label}
-                    {active && (
-                      <span className="pointer-events-none absolute -bottom-[5px] left-0 right-0 h-0.5 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--theme-glow-rgb),0.7)]" />
-                    )}
-                  </Link>
+                  <NavMenu key={g.label} label={g.label} active={groupActive}>
+                    {g.items.map((it) => (
+                      <NavMenuItem key={it.href} leaf={it} active={isActive(it.href)} />
+                    ))}
+                  </NavMenu>
                 );
               })}
             </nav>
 
-            <nav className="flex items-center gap-6 text-sm">
+            <nav className="flex items-center gap-2 text-[13px]">
               {utilityItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="text-white hover:text-primary transition-colors"
+                  className="inline-flex items-center rounded-full border border-white/[0.14] bg-white/[0.05] px-4 py-[7px] font-medium text-white transition-all duration-200 hover:border-white/25 hover:bg-white/[0.1]"
                 >
                   {item.label}
                 </Link>
@@ -546,41 +716,70 @@ export function Navbar() {
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
               </button>
 
-              {/* Mobile primary nav links (already filtered by admin hide settings) */}
-              <nav className="flex flex-col">
-                {navItems.map(({ href, label }) => {
-                  const active = isActive(href);
+              {/* Mobile grouped nav — mirrors the desktop mega-menu with iconed,
+                  subtitled rows. Already filtered by the admin hide settings. */}
+              <nav className="flex flex-col gap-4">
+                {visibleGroups.map((g) => {
+                  if (g.kind === "link") {
+                    const active = isActive(g.href);
+                    return (
+                      <Link
+                        key={g.label}
+                        href={g.href}
+                        onClick={() => setMobileOpen(false)}
+                        aria-current={active ? "page" : undefined}
+                        className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] font-semibold transition-colors ${
+                          active ? "bg-primary/10 text-primary" : "text-white hover:bg-white/[0.04] hover:text-primary"
+                        }`}
+                      >
+                        {g.label}
+                      </Link>
+                    );
+                  }
                   return (
-                    <Link
-                      key={href}
-                      href={href}
-                      onClick={() => setMobileOpen(false)}
-                      aria-current={active ? "page" : undefined}
-                      className={`flex items-center gap-3 py-3.5 text-base font-medium transition-colors border-b border-border/40 ${
-                        active ? "text-primary" : "text-white hover:text-primary"
-                      }`}
-                    >
-                      <span
-                        className={`h-5 w-1 rounded-full transition-all ${active ? "bg-primary" : "bg-transparent"}`}
-                        aria-hidden="true"
-                      />
-                      {label}
-                    </Link>
+                    <div key={g.label}>
+                      <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
+                        {g.label}
+                      </p>
+                      <div className="flex flex-col">
+                        {g.items.map((it) => {
+                          const active = isActive(it.href);
+                          const { Icon } = it;
+                          return (
+                            <Link
+                              key={it.href}
+                              href={it.href}
+                              onClick={() => setMobileOpen(false)}
+                              aria-current={active ? "page" : undefined}
+                              className="group/m flex items-start gap-3 rounded-2xl px-3 py-2.5 transition-colors hover:bg-white/[0.04]"
+                            >
+                              <span
+                                className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-colors ${
+                                  active
+                                    ? "border-primary/40 bg-primary/10"
+                                    : "border-white/[0.07] bg-white/[0.03] group-hover/m:border-primary/30"
+                                }`}
+                              >
+                                <Icon className="h-[17px] w-[17px]" style={{ color: "#E8C15A" }} />
+                              </span>
+                              <span className="min-w-0 pt-0.5">
+                                <span className={`block text-[14px] font-medium leading-tight ${active ? "text-primary" : "text-white/90"}`}>
+                                  {it.label}
+                                </span>
+                                <span className="mt-0.5 block text-[11.5px] leading-snug text-white/45">{it.sub}</span>
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
                   );
                 })}
-                <Link
-                  href="/blogs"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-3 py-3.5 text-base font-medium text-white hover:text-primary transition-colors border-b border-border/40"
-                >
-                  <span className="h-5 w-1 rounded-full bg-transparent" aria-hidden="true" />
-                  {t("nav.blogs", "Blogs")}
-                </Link>
                 {user && (
                   <Link
                     href="/notifications"
                     onClick={() => setMobileOpen(false)}
-                    className="flex items-center justify-between py-3.5 pl-4 text-base font-medium text-muted-foreground hover:text-foreground transition-colors border-b border-border/40"
+                    className="flex items-center justify-between rounded-2xl px-3 py-3 text-[15px] font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white"
                   >
                     <span>{t("nav.notifications")}</span>
                     {unreadCount > 0 && (

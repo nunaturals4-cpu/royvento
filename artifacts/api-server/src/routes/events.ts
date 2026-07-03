@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { getEventRatings } from "../lib/aggregates";
+import { serializeVenueAbout } from "./vendors";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { respondInvalid } from "../lib/validationError";
 
@@ -381,6 +382,7 @@ router.get("/events/:eventId", async (req, res) => {
           menuUrl: (v as unknown as { menuUrl?: string | null }).menuUrl ?? "",
           menuUrls: (v as unknown as { menuUrls?: string[] | null }).menuUrls ?? [],
           barMenuUrls: (v as unknown as { barMenuUrls?: string[] | null }).barMenuUrls ?? [],
+          ...serializeVenueAbout(v),
           baseFeePercent: v.baseFeePercent ?? "3.50",
           baseFeeEnabled: v.baseFeeEnabled ?? true,
           createdAt: v.createdAt.toISOString(),

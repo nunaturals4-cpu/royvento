@@ -17,8 +17,12 @@ import {
   Star, MapPin, Navigation, Clock, GlassWater, Music2, Utensils, Bell,
   Heart, ChevronLeft, ChevronRight, X, ImagePlus, Users, Calendar,
   Camera, Tag, Phone, User, CalendarDays, CheckCircle2, Ticket, Share2,
-  TrendingUp, Sparkles,
+  TrendingUp, Sparkles, Wine, Coins,
 } from "lucide-react";
+import { DrinkDealCard } from "@/components/DrinkDealCards";
+import { OfferSectionHeader } from "@/components/OfferSectionHeader";
+import { OFFER_THEMES } from "@/components/offerThemes";
+import { CarouselRow } from "@/components/CarouselRow";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
@@ -511,7 +515,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
 
       {/* ── Announcements Strip ── */}
       {announcements.length > 0 && (
-        <div className="border-y border-primary/10 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 py-4">
+        <div className="border-y border-primary/10 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 py-2.5">
           <div className="container mx-auto px-4 md:px-6 flex items-center gap-4">
             <button
               onClick={() => switchTab("happyHours")}
@@ -521,9 +525,9 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
             </button>
             <div className="flex gap-3 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {announcements.map((a) => (
-                <div key={a.id} className="shrink-0 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 min-w-[160px] max-w-[220px] space-y-1">
-                  <span className="flex items-center gap-1 text-[10px] font-semibold text-amber-500 uppercase tracking-wider"><Bell className="h-3 w-3" /> Announcement</span>
-                  <span className="block text-sm font-medium text-foreground line-clamp-2">{a.title}</span>
+                <div key={a.id} className="shrink-0 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-1.5 min-w-[150px] max-w-[210px] space-y-0.5">
+                  <span className="flex items-center gap-1 text-[9px] font-semibold text-amber-500 uppercase tracking-wider"><Bell className="h-2.5 w-2.5" /> Announcement</span>
+                  <span className="block text-[13px] font-medium text-foreground line-clamp-2">{a.title}</span>
                 </div>
               ))}
             </div>
@@ -783,12 +787,32 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                       <p className="font-semibold text-emerald-400">Free Entry Available</p>
                     </div>
                   )}
-                  {extPubEvent?.freeEntryRules && (
-                    <div className="rounded-xl border border-white/10 bg-card px-5 py-4">
-                      <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-2">Entry Rules</p>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{extPubEvent.freeEntryRules}</p>
-                    </div>
-                  )}
+                  {extPubEvent?.freeEntryRules && (() => {
+                    // freeEntryRules may be a plain string OR the parsed object
+                    // { enabled, genders, days, beforeTime } — never render the
+                    // object directly (React child crash).
+                    const raw = extPubEvent.freeEntryRules as unknown;
+                    let text = "";
+                    if (typeof raw === "string") {
+                      text = raw;
+                    } else if (raw && typeof raw === "object") {
+                      const r = raw as { genders?: string[]; days?: string[]; beforeTime?: string };
+                      const genders = Array.isArray(r.genders) && r.genders.length ? r.genders.join(" & ") : "";
+                      const days = Array.isArray(r.days) && r.days.length ? formatDayRanges(r.days) : "";
+                      text = [
+                        genders ? `Free for ${genders}` : "Free entry",
+                        days ? `on ${days}` : "",
+                        r.beforeTime ? `before ${r.beforeTime}` : "",
+                      ].filter(Boolean).join(" ");
+                    }
+                    if (!text) return null;
+                    return (
+                      <div className="rounded-xl border border-white/10 bg-card px-5 py-4">
+                        <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-2">Entry Rules</p>
+                        <p className="text-sm text-muted-foreground leading-relaxed capitalize">{text}</p>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-white/10 bg-card/50 px-5 py-10 text-center">
@@ -809,57 +833,43 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                   <GlassWater className="h-9 w-9 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-muted-foreground text-sm">No drink deals at this time.</p>
                 </div>
-              ) : (
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {drinkPlans.map((plan) => (
-                    <div key={plan.id} className="rounded-xl border border-white/10 bg-card px-5 py-4 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wider">
-                          {PLAN_TYPE_LABELS[plan.type] ?? plan.type}
-                        </span>
-                        {plan.gender === "female" && (
-                          <span className="rounded-full bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 text-[10px] text-pink-400 font-medium">Ladies only</span>
-                        )}
-                        {plan.gender === "all" && (plan.type === "welcome" || plan.type === "unlimited") && (
-                          <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-400 font-medium">All guests</span>
-                        )}
-                        {plan.price > 0 && (
-                          <span className="rounded-full bg-white/5 text-muted-foreground border border-white/10 px-2 py-0.5 text-[10px] font-medium">₹{(plan.price / 100).toFixed(0)}</span>
-                        )}
-                      </div>
-                      {(!plan.lineItems || plan.lineItems.length === 0) && plan.productName && plan.type !== "welcome" && plan.type !== "unlimited" && (
-                        <p className="text-sm font-semibold">{plan.productName}</p>
-                      )}
-                      {plan.lineItems && plan.lineItems.length > 0 && (
-                        <ul className="space-y-1 mt-1">
-                          {plan.lineItems.map((item, i) => (
-                            <li key={i} className="flex items-center gap-3 text-sm">
-                              <span className="font-medium">{item.name}</span>
-                              {item.discountedPrice > 0 ? <span className="text-xs text-emerald-400">₹{item.discountedPrice}</span> : <span className="text-xs text-emerald-400">Free</span>}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {(plan.timeFrom || plan.timeTo || true) && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {formatDayRanges(plan.days ?? []).split(", ").map((range) => (
-                            <span key={range} className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">{range}</span>
-                          ))}
-                          {(plan.timeFrom || plan.timeTo) && (
-                            <span className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white flex items-center gap-1">
-                              <Clock className="h-2.5 w-2.5 shrink-0" />
-                              {[plan.timeFrom ? fmtTime(plan.timeFrom) : null, plan.timeTo ? fmtTime(plan.timeTo) : null].filter(Boolean).join(" – ")}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      {plan.description && (
-                        <p className="text-xs text-muted-foreground/80 leading-relaxed">{plan.description}</p>
-                      )}
+              ) : (() => {
+                // Grouped premium VIP offer cards — the single standard offer-card
+                // design, shared with the Pub Offers page (per-section theme).
+                const freePlans = drinkPlans.filter((p) => p.type === "welcome" || p.type === "unlimited");
+                const ticketPlans = drinkPlans.filter((p) => p.type === "ticket");
+                const coverPlansAll = drinkPlans.filter((p) => p.type === "cover_charge");
+                const otherPlans = drinkPlans.filter((p) => !["welcome", "unlimited", "ticket", "cover_charge"].includes(p.type));
+                const coverFallback = vendor.coverImageUrl || vendor.bannerImage || null;
+                const DealSection = ({ Icon, label, plans, theme }: { Icon: typeof Wine; label: string; plans: typeof drinkPlans; theme: typeof OFFER_THEMES.free }) => {
+                  if (plans.length === 0) return null;
+                  return (
+                    <div>
+                      <OfferSectionHeader theme={theme} Icon={Icon} title={label} />
+                      <CarouselRow itemClassName="w-[310px] sm:w-[345px]" gapClass="gap-3 md:gap-4">
+                        {plans.map((plan) => (
+                          <DrinkDealCard
+                            key={plan.id}
+                            plan={plan as any}
+                            fallbackImage={coverFallback}
+                            hideImage
+                            theme={theme}
+                            onClick={() => switchTab("book")}
+                          />
+                        ))}
+                      </CarouselRow>
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                };
+                return (
+                  <div className="space-y-10">
+                    <DealSection Icon={Wine} label="Free Drinks" plans={freePlans} theme={OFFER_THEMES.free} />
+                    <DealSection Icon={Ticket} label="Included With Ticket" plans={ticketPlans} theme={OFFER_THEMES.ticket} />
+                    <DealSection Icon={Coins} label="Cover Charges" plans={coverPlansAll} theme={OFFER_THEMES.cover} />
+                    <DealSection Icon={Wine} label="Drink Deals" plans={otherPlans} theme={OFFER_THEMES.drink} />
+                  </div>
+                );
+              })()}
             </section>
           </div>
         )}

@@ -162,8 +162,29 @@ async function serializeVendor(v: VendorRow) {
     menuUrls: v.menuUrls ?? [],
     barMenuUrls: (v as { barMenuUrls?: string[] | null }).barMenuUrls ?? [],
     crowdLevel: v.crowdLevel ?? null,
+    ...serializeVenueAbout(v),
   };
 }
+
+/** Venue "About" details shared by the vendor + embedded-event serializers. */
+function serializeVenueAbout(v: unknown) {
+  const r = v as Record<string, unknown>;
+  return {
+    cuisines: (r["cuisines"] as string[] | null) ?? [],
+    facilities: (r["facilities"] as string[] | null) ?? [],
+    languages: (r["languages"] as string[] | null) ?? [],
+    durationInfo: (r["durationInfo"] as string | null) ?? "",
+    ticketAge: (r["ticketAge"] as string | null) ?? "",
+    entryAge: (r["entryAge"] as string | null) ?? "",
+    venueLayout: (r["venueLayout"] as string | null) ?? "",
+    seatingArrangement: (r["seatingArrangement"] as string | null) ?? "",
+    kidsAllowed: (r["kidsAllowed"] as boolean | null) ?? null,
+    petsAllowed: (r["petsAllowed"] as boolean | null) ?? null,
+    faqs: (r["faqs"] as Array<{ question: string; answer: string }> | null) ?? [],
+    termsConditions: (r["termsConditions"] as string | null) ?? "",
+  };
+}
+export { serializeVenueAbout };
 
 function parseFreeEntryRules(raw: unknown): { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null {
   if (!raw || typeof raw !== "object") return null;

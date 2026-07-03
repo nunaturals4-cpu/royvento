@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch, useRoute } from "wouter";
 import { SEO } from "@/components/SEO";
@@ -846,6 +846,144 @@ function EventsManager({ vendor, events, refetchEvents, onSaved }: { vendor: any
   );
 }
 
+/* ─── Venue "About" details editor (Cuisines / Languages / Facilities / FAQs)
+   — self-contained, saves via /partner/profile. Rendered inside the Pub &
+   Clubs listing editors; shown on the pub's event-profile Overview. */
+const FACILITY_OPTIONS = [
+  "Lunch", "Dinner", "Home delivery", "Full bar available", "Open mic",
+  "Parking available", "DJ", "Stags allowed", "Dance floor", "Nightlife",
+  "Kid friendly", "Private dining area", "Wifi", "Large groups", "Vegetarian",
+  "Live music", "Rooftop", "Outdoor seating", "Card payment", "Valet parking",
+  "Hookah", "Air conditioned", "Wheelchair accessible", "Smoking area",
+];
+function VenueTagInput({ label, values, onChange, placeholder }: {
+  label: string; values: string[]; onChange: (v: string[]) => void; placeholder: string;
+}) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const t = draft.trim();
+    if (!t) return;
+    if (!values.some((v) => v.toLowerCase() === t.toLowerCase())) onChange([...values, t]);
+    setDraft("");
+  };
+  return (
+    <div>
+      <Label className="mb-2 block text-sm font-medium">{label}</Label>
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {values.map((v) => (
+            <span key={v} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary">
+              {v}
+              <button type="button" onClick={() => onChange(values.filter((x) => x !== v))} className="hover:text-destructive" aria-label={`Remove ${v}`}><X className="h-3 w-3" /></button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} placeholder={placeholder} />
+        <Button type="button" variant="outline" onClick={add}>Add</Button>
+      </div>
+    </div>
+  );
+}
+
+export type VenueDetailsExtraHandle = { save: () => Promise<void> };
+
+const VenueDetailsExtra = forwardRef<VenueDetailsExtraHandle, { vendor: any }>(function VenueDetailsExtra({ vendor }, ref) {
+  const { toast } = useToast();
+  const [cuisines, setCuisines] = useState<string[]>(Array.isArray(vendor?.cuisines) ? vendor.cuisines : []);
+  const [facilities, setFacilities] = useState<string[]>(Array.isArray(vendor?.facilities) ? vendor.facilities : []);
+  const [languages, setLanguages] = useState<string[]>(Array.isArray(vendor?.languages) ? vendor.languages : []);
+  const [faqs, setFaqs] = useState<{ question: string; answer: string }[]>(Array.isArray(vendor?.faqs) ? vendor.faqs : []);
+  const [saving, setSaving] = useState(false);
+
+  const toggleFacility = (f: string) =>
+    setFacilities((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]));
+
+  const buildPayload = () => ({
+    cuisines, facilities, languages,
+    faqs: faqs.filter((f) => f.question.trim() || f.answer.trim()),
+  });
+
+  // Expose an imperative save so the parent listing form's "Save changes" /
+  // "Submit for review" button persists these fields too (no separate click).
+  // No deps array → the handle is refreshed every render with the latest state.
+  useImperativeHandle(ref, () => ({
+    save: async () => { await apiPatch("/api/partner/profile", buildPayload()); },
+  }));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await apiPatch("/api/partner/profile", buildPayload());
+      toast({ title: "Venue info saved" });
+    } catch (err: unknown) {
+      toast({ title: "Venue info not saved", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-white/10 pt-5 space-y-6">
+      <p className="font-serif text-lg flex items-center gap-2">
+        <FileText className="h-4 w-4 text-primary" />More venue info
+      </p>
+      <p className="text-xs text-muted-foreground -mt-4">Shown on your venue's public profile — cuisines, languages, facilities & FAQs.</p>
+
+      {/* Cuisines */}
+      <VenueTagInput label="Cuisines" values={cuisines} onChange={setCuisines} placeholder="e.g. North Indian, Chinese, Continental" />
+
+      {/* Available facilities */}
+      <div>
+        <Label className="mb-2 block text-sm font-medium">Available facilities</Label>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {FACILITY_OPTIONS.map((f) => {
+            const on = facilities.includes(f);
+            return (
+              <button
+                key={f}
+                type="button"
+                onClick={() => toggleFacility(f)}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs transition-colors ${on ? "border-primary bg-primary/10 text-primary" : "border-white/12 text-muted-foreground hover:border-primary/40"}`}
+              >
+                <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${on ? "border-primary bg-primary text-primary-foreground" : "border-white/25"}`}>
+                  {on && <Check className="h-3 w-3" />}
+                </span>
+                <span className="truncate">{f}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Languages */}
+      <VenueTagInput label="Languages" values={languages} onChange={setLanguages} placeholder="e.g. English, Hindi" />
+
+      {/* FAQs */}
+      <div className="space-y-3">
+        <Label className="block text-sm font-medium">Frequently asked questions</Label>
+        {faqs.map((f, idx) => (
+          <div key={idx} className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
+            <div className="flex gap-2">
+              <Input value={f.question} onChange={(e) => setFaqs((prev) => prev.map((x, i) => i === idx ? { ...x, question: e.target.value } : x))} placeholder="Question" />
+              <button type="button" onClick={() => setFaqs((prev) => prev.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-destructive shrink-0" aria-label="Remove FAQ"><Trash2 className="h-4 w-4" /></button>
+            </div>
+            <Textarea value={f.answer} onChange={(e) => setFaqs((prev) => prev.map((x, i) => i === idx ? { ...x, answer: e.target.value } : x))} placeholder="Answer" rows={2} />
+          </div>
+        ))}
+        <Button type="button" variant="outline" size="sm" onClick={() => setFaqs((prev) => [...prev, { question: "", answer: "" }])}>
+          <Plus className="h-3.5 w-3.5 mr-1" />Add FAQ
+        </Button>
+      </div>
+
+      <Button type="button" disabled={saving} onClick={save} variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
+        {saving ? "Saving…" : "Save Venue Info"}
+      </Button>
+    </div>
+  );
+});
+
 function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
   vendor: any; lockedType: "pub" | "event" | null; onCancel: () => void; onSaved: () => void; onVenueSaved?: () => void;
 }) {
@@ -1088,6 +1226,8 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
     }
   };
 
+  const venueExtraRef = useRef<VenueDetailsExtraHandle | null>(null);
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (type === "pub" && !enableTickets && !enableEvents) {
@@ -1177,6 +1317,8 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
               });
             } catch { /* non-fatal */ }
           }
+          // Persist the "More venue info" fields alongside listing creation.
+          try { await venueExtraRef.current?.save(); } catch { /* non-fatal */ }
           onSaved();
         },
         onError: (e: any) => {
@@ -1805,6 +1947,8 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
         </Button>
       </div>
 
+      <VenueDetailsExtra ref={venueExtraRef} vendor={vendor} />
+
       <div className="flex gap-2">
         <Button type="submit" disabled={create.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Submit for review</Button>
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
@@ -1970,6 +2114,8 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
     if (urls.length > 0) { setGalleryImages((prev) => [...prev, ...urls]); formErrors.clearField("galleryImages"); }
   };
 
+  const venueExtraRef = useRef<VenueDetailsExtraHandle | null>(null);
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isPub && freeEntryBeforeTime && !/^([01]\d|2[0-3]):([0-5]\d)$/.test(freeEntryBeforeTime)) {
@@ -2038,6 +2184,10 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
           }
         } catch { /* non-fatal */ }
       }
+
+      // Persist the "More venue info" fields (cuisines / facilities / languages /
+      // things-to-know / FAQs) as part of the same Save changes click.
+      await venueExtraRef.current?.save();
 
       formErrors.reset();
       toast({ title: "Updated" });
@@ -2480,6 +2630,8 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
             <Button type="button" disabled={savingVenue} onClick={saveVenueDetails} variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
               {savingVenue ? "Saving…" : "Save Venue Details"}
             </Button>
+
+            <VenueDetailsExtra ref={venueExtraRef} vendor={vendor} />
           </div>
         )}
         <div className="flex gap-3 justify-end pt-2 border-t border-white/10">

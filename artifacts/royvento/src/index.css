@@ -606,6 +606,34 @@ html[data-theme="dusk"] .mix-blend-screen {
     transform: rotateX(2deg) rotateY(-2deg);
   }
 
+  /* Luxury offer ticket cards (Pub Offers). Per-card accent colour is passed
+     via the --offer-accent-* CSS variables so each category glows in its own
+     hue on hover. */
+  .offer-card {
+    transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+  }
+  .group:hover .offer-card {
+    transform: translateY(-6px);
+    border-color: var(--offer-accent-border, rgba(255, 255, 255, 0.16));
+    box-shadow:
+      0 20px 60px rgba(0, 0, 0, 0.45),
+      0 0 0 1px var(--offer-accent-border, rgba(255, 255, 255, 0.12)),
+      0 0 34px var(--offer-accent-glow, transparent);
+  }
+  /* Book Now — elegant outline pill; colour driven by CSS vars so the hover
+     tint can override the base (inline styles would win over a :hover rule). */
+  .offer-book {
+    background-color: rgba(255, 255, 255, 0.03);
+    color: var(--offer-btn-color, #D4A84B);
+    border: 1px solid var(--offer-btn-border, rgba(212, 168, 75, 0.45));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition: background-color .25s ease, box-shadow .25s ease, border-color .25s ease, transform .25s ease;
+  }
+  .group:hover .offer-book {
+    background-color: var(--offer-btn-hover-bg, rgba(212, 168, 75, 0.12));
+    box-shadow: 0 0 20px var(--offer-accent-glow, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
   /* Number / stat type */
   .stat-number {
     font-family: var(--app-font-serif);

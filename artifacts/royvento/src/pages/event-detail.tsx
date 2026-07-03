@@ -30,15 +30,36 @@ import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet,
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { SquareImage } from "@/components/SquareImage";
 import { FollowButton } from "@/components/FollowButton";
-import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket, Check, Crown, ShieldCheck, Headphones, Zap, Share2, Megaphone } from "lucide-react";
+import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket, Check, Crown, ShieldCheck, Headphones, Zap, Share2, Megaphone, HelpCircle, FileText } from "lucide-react";
+
+/* Standard Terms & Conditions shown on every pub profile by default. */
+const DEFAULT_PUB_TERMS: string[] = [
+  "Please carry a valid ID proof along with you.",
+  "No refunds on purchased ticket are possible, even in case of any rescheduling.",
+  "Security procedures, including frisking remain the right of the management.",
+  "No dangerous or potentially hazardous objects including but not limited to weapons, knives, guns, fireworks, helmets, lazer devices, bottles, musical instruments will be allowed in the venue and may be ejected with or without the owner from the venue.",
+  "The sponsors/performers/organizers are not responsible for any injury or damage occurring due to the event. Any claims regarding the same would be settled in courts in Mumbai.",
+  "People in an inebriated state may not be allowed entry.",
+  "Organizers hold the right to deny late entry to the event.",
+  "Venue rules apply.",
+];
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDayRanges } from "@/lib/days";
 import { todayIst } from "@/lib/utils";
 import { DrinkDealCard } from "@/components/DrinkDealCards";
+import { NightlifeOfferCard } from "@/components/NightlifeOfferCard";
+import { OfferDayPills } from "@/components/OfferDayPills";
+import { OfferSectionHeader } from "@/components/OfferSectionHeader";
+import { OFFER_THEMES, type OfferTheme } from "@/components/offerThemes";
 
 interface Coupon { id: number; code: string; discountPercent: number; }
 interface DiscountInfo { isNewUser: boolean; daysLeft: number; bookingDiscountPercent: number; subscriptionDiscountPercent: number; points: number; }
+
+// Hero accent palette — mirrors the Private Parties hero treatment so the event
+// profile hero reads with the same premium gold/red brand warmth.
+const HERO_GOLD = "#d4af37";
+const HERO_RED = "#b91c1c";
 
 function loadRazorpay(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -1383,37 +1404,65 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
             </Link>
           </div>
 
-          {/* ── Hero image ── */}
-          <div className="relative h-[38vw] min-h-[200px] max-h-[500px] md:h-[54vh] overflow-hidden bg-black/40">
-            {(event.imageUrl || (isPub && vendorCover)) ? (
-              <img
-                src={event.imageUrl || vendorCover}
-                alt={event.title}
-                className="h-full w-full object-cover"
-                style={{ transform: "scale(1.02)", transformOrigin: "center center" }}
-              />
-            ) : (
-              <div className="h-full w-full bg-gradient-to-br from-zinc-900 via-black to-primary/10" />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-            {/* Photo counter */}
-            {galleryImgs.length > 0 && (
-              <div className="absolute top-3 right-3">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 border border-white/15 px-2.5 py-1 text-xs text-white backdrop-blur-md">
-                  <Users className="h-3 w-3" /> 1 / {galleryImgs.length}
-                </span>
-              </div>
-            )}
-            {/* Mobile: wishlist + title at bottom */}
-            <div className="lg:hidden absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-              <h1 className="font-bold text-xl text-white">{event.title}</h1>
-              {event.rating > 0 && (
-                <div className="flex items-center gap-1 mt-1">
-                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                  <span className="text-sm font-semibold text-white">{event.rating.toFixed(1)}</span>
-                  <span className="text-xs text-white/60">({event.reviewCount} reviews)</span>
-                </div>
+          {/* ── Hero ── mirrors the Private Parties hero: a rounded photo card
+              with layered readability + brand-warmth overlays and a gold glow. */}
+          <div className="px-4 md:px-6 pt-4 md:pt-6">
+            <div
+              className="relative overflow-hidden rounded-3xl min-h-[260px] md:min-h-[440px] flex flex-col justify-end p-5 md:p-9"
+              style={{
+                border: "1px solid rgba(255,255,255,0.08)",
+                boxShadow: "0 24px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
+              }}
+            >
+              {(event.imageUrl || (isPub && vendorCover)) ? (
+                <img
+                  src={event.imageUrl || vendorCover}
+                  alt={event.title}
+                  className="absolute inset-0 h-full w-full object-cover object-center"
+                  draggable={false}
+                />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-black to-primary/10" />
               )}
+              {/* Readability + brand-warmth overlays — light up top so the photo
+                  reads clearly, darkening toward the bottom behind the text. */}
+              <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.22)" }} />
+              <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.08) 42%, rgba(0,0,0,0.68) 82%, rgba(0,0,0,0.92) 100%)" }} />
+              <div className="absolute inset-0" style={{ background: `linear-gradient(115deg, ${HERO_RED}26, transparent 55%, ${HERO_GOLD}14)` }} />
+              <div className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full blur-3xl opacity-40" style={{ background: `${HERO_GOLD}30` }} />
+
+              {/* Photo counter */}
+              {galleryImgs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => openLightbox(galleryImgs, 0)}
+                  className="absolute top-4 right-4 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/60 border border-white/15 px-2.5 py-1 text-xs text-white backdrop-blur-md transition-colors hover:bg-black/75"
+                >
+                  <Users className="h-3 w-3" /> 1 / {galleryImgs.length}
+                </button>
+              )}
+
+              {/* Mobile: title + rating over the photo (desktop uses the sidebar) */}
+              <div className="lg:hidden relative max-w-xl">
+                <h1
+                  className="font-serif text-2xl leading-snug"
+                  style={{
+                    background: "linear-gradient(180deg, #ffffff 0%, #e7d9b4 130%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }}
+                >
+                  {event.title}
+                </h1>
+                {event.rating > 0 && (
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    <span className="text-sm font-semibold text-white">{event.rating.toFixed(1)}</span>
+                    <span className="text-xs text-white/60">({event.reviewCount} reviews)</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1479,26 +1528,79 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
             {/* "About this event" section removed for a cleaner, more focused
                 event profile (less scrolling). */}
 
-            {/* Quick info pills */}
-            <div className="flex flex-wrap gap-3">
+            {/* Quick info pills — single row on mobile (Follow sits beside them);
+                wraps freely on desktop where Follow lives in the sidebar. */}
+            <div className="flex flex-nowrap items-center gap-2 lg:flex-wrap lg:gap-3">
               {loc && (
-                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card text-sm">
+                <div className="flex min-w-0 items-center gap-2 px-4 py-2.5 rounded-xl glass-card text-sm">
                   <MapPin className="h-4 w-4 text-primary shrink-0" />
-                  <span className="text-white/80">{loc}</span>
+                  <span className="truncate text-white/80">{loc}</span>
                 </div>
               )}
               {event.capacity > 0 && (
-                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card text-sm">
+                <div className="flex shrink-0 items-center gap-2 px-4 py-2.5 rounded-xl glass-card text-sm">
                   <Users className="h-4 w-4 text-primary shrink-0" />
-                  <span className="text-white/80">{t("events.capacity", { n: event.capacity })}</span>
+                  <span className="whitespace-nowrap text-white/80">{t("events.capacity", { n: event.capacity })}</span>
                 </div>
               )}
               {event.rating > 0 && (
-                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card text-sm">
+                <div className="flex shrink-0 items-center gap-2 px-4 py-2.5 rounded-xl glass-card text-sm">
                   <Star className="h-4 w-4 fill-amber-400 text-amber-400 shrink-0" />
-                  <span className="text-white/80">{event.rating.toFixed(1)} ({event.reviewCount} reviews)</span>
+                  <span className="whitespace-nowrap text-white/80">{event.rating.toFixed(1)} ({event.reviewCount} reviews)</span>
                 </div>
               )}
+              {/* Follow sits beside the info pills on mobile (desktop uses the sidebar). */}
+              <FollowButton
+                targetType={(event as any).vendor?.id ? "vendor" : "event"}
+                targetId={((event as any).vendor?.id as number | undefined) ?? event.id}
+                name={((event as any).vendor?.businessName as string | undefined) ?? event.title}
+                className="ml-auto shrink-0 !py-2.5 lg:hidden"
+              />
+            </div>
+
+            {/* About Venue — the left sidebar is hidden on mobile (`hidden lg:flex`),
+                so surface the venue description here for < lg screens only. */}
+            {event.description && (
+              <section className="lg:hidden">
+                <h2 className="font-serif text-2xl mb-4 accent-underline inline-block">About Venue</h2>
+                <RichText className="text-sm text-white/70 leading-relaxed [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4" html={event.description} />
+              </section>
+            )}
+
+            {/* Mobile-only actions — Get Directions / Save / Share live in the
+                desktop-only sidebar (`hidden lg:flex`), so surface them here for
+                < lg screens as equal secondary chips. (Follow sits beside the
+                info pills above.) */}
+            <div className="lg:hidden">
+              <div className="flex gap-2">
+                {loc && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venueName + " " + loc)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-2 py-3 text-xs font-medium text-white/80 transition-colors hover:border-primary/40 hover:text-white"
+                  >
+                    <Navigation className="h-4 w-4 text-primary" />
+                    Directions
+                  </a>
+                )}
+                {me?.user && (
+                  <button
+                    onClick={() => inWishlist ? removeFromWishlist.mutate() : addToWishlist.mutate()}
+                    disabled={addToWishlist.isPending || removeFromWishlist.isPending}
+                    className="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-2 py-3 text-xs font-medium text-white/80 transition-colors hover:border-primary/40 hover:text-white disabled:opacity-60"
+                  >
+                    <Heart className={`h-4 w-4 transition-colors ${inWishlist ? "fill-red-500 text-red-500" : "text-primary"}`} />
+                    {inWishlist ? "Saved" : "Save"}
+                  </button>
+                )}
+                <button
+                  onClick={share}
+                  className="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-2 py-3 text-xs font-medium text-white/80 transition-colors hover:border-primary/40 hover:text-white"
+                >
+                  <Share2 className="h-4 w-4 text-primary" />
+                  Share
+                </button>
+              </div>
             </div>
 
             {/* Entry restriction notice */}
@@ -1523,6 +1625,44 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                 </div>
               </section>
             ) : null}
+
+            {/* Cuisines, Languages & Available facilities */}
+            {isPub && (() => {
+              const ven = (ev.vendor ?? {}) as any;
+              const cuisines: string[] = Array.isArray(ven.cuisines) ? ven.cuisines.filter(Boolean) : [];
+              const facilities: string[] = Array.isArray(ven.facilities) ? ven.facilities.filter(Boolean) : [];
+              const langs: string[] = Array.isArray(ven.languages) ? ven.languages.filter(Boolean) : [];
+              if (cuisines.length === 0 && facilities.length === 0 && langs.length === 0) return null;
+              return (
+                <section className="space-y-8">
+                  {cuisines.length > 0 && (
+                    <div>
+                      <h2 className="font-serif text-2xl mb-3 accent-underline inline-block">Cuisines</h2>
+                      <p className="text-white/70 mt-2">{cuisines.join(", ")}</p>
+                    </div>
+                  )}
+                  {langs.length > 0 && (
+                    <div>
+                      <h2 className="font-serif text-2xl mb-3 accent-underline inline-block">Languages</h2>
+                      <p className="text-white/70 mt-2">{langs.join(", ")}</p>
+                    </div>
+                  )}
+                  {facilities.length > 0 && (
+                    <div>
+                      <h2 className="font-serif text-2xl mb-4 accent-underline inline-block">Available facilities</h2>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2.5 mt-4">
+                        {facilities.map((f) => (
+                          <div key={f} className="flex items-center gap-2 text-sm text-white/75">
+                            <span className="text-primary shrink-0">✦</span>
+                            <span className="truncate">{f}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </section>
+              );
+            })()}
 
           {/* Free entry teaser → links to Happy Hours tab */}
           {isPub && ev.freeEntryRules?.enabled && (() => {
@@ -1675,19 +1815,19 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
           {isPub && announcements.length > 0 && (
             <section>
               <h2 className="font-serif text-2xl mb-4 accent-underline inline-block">{t("events.announcements")}</h2>
-              <div className="space-y-3 mt-4">
+              <div className="space-y-2.5 mt-4">
                 {announcements.map((a: any) => (
-                  <div key={a.id} className="rounded-2xl glass-card p-5 flex gap-4 hover:border-white/15 transition-colors">
-                    {a.imageUrl && <img src={a.imageUrl} alt={a.title} className="w-16 h-16 rounded-xl object-cover shrink-0" loading="lazy" />}
+                  <div key={a.id} className="rounded-xl glass-card p-3 flex gap-2.5 hover:border-white/15 transition-colors">
+                    {a.imageUrl && <img src={a.imageUrl} alt={a.title} className="w-12 h-12 rounded-lg object-cover shrink-0" loading="lazy" />}
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-base text-white">{a.title}</p>
+                      <p className="font-semibold text-sm text-white leading-tight">{a.title}</p>
                       {a.announceDate && <p className="text-xs text-primary mt-0.5">{new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}{a.announceTime && ` · ${a.announceTime}`}</p>}
-                      {a.body && <p className="text-sm text-white/65 mt-1 leading-relaxed">{a.body}</p>}
+                      {a.body && <p className="text-[13px] text-white/65 mt-1 leading-relaxed">{a.body}</p>}
                     </div>
                     {a.announceDate && (
                       <button
                         type="button"
-                        className="shrink-0 self-center px-4 py-2 rounded-xl bg-primary/15 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all"
+                        className="shrink-0 self-center px-3.5 py-1.5 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all"
                         onClick={() => {
                           setSelectedAnnouncementId(String(a.id));
                           setDate(a.announceDate);
@@ -1739,6 +1879,53 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               </>
             )}
           </section>
+
+          {/* More — FAQ + Terms (collapsible rows) */}
+          {isPub && (() => {
+            const ven = (ev.vendor ?? {}) as any;
+            const faqs: { question: string; answer: string }[] = Array.isArray(ven.faqs) ? ven.faqs.filter((f: any) => f?.question) : [];
+            return (
+              <section>
+                <h2 className="font-serif text-2xl mb-4 accent-underline inline-block">More</h2>
+                <div className="rounded-2xl glass-card divide-y divide-white/8 overflow-hidden">
+                  {faqs.length > 0 && (
+                    <details className="group/disc">
+                      <summary className="flex items-center gap-3 px-5 py-4 cursor-pointer list-none select-none">
+                        <HelpCircle className="h-4 w-4 text-primary shrink-0" />
+                        <span className="flex-1 font-medium text-white/90">Frequently asked questions</span>
+                        <ChevronRight className="h-4 w-4 text-white/40 transition-transform group-open/disc:rotate-90" />
+                      </summary>
+                      <div className="px-5 pb-5 pt-0 space-y-4">
+                        {faqs.map((f, i) => (
+                          <div key={i}>
+                            <p className="font-medium text-white/90">{f.question}</p>
+                            {f.answer && <p className="text-sm text-white/60 mt-1 whitespace-pre-line">{f.answer}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                  <details className="group/disc">
+                    <summary className="flex items-center gap-3 px-5 py-4 cursor-pointer list-none select-none">
+                      <FileText className="h-4 w-4 text-primary shrink-0" />
+                      <span className="flex-1 font-medium text-white/90">Terms and Conditions</span>
+                      <ChevronRight className="h-4 w-4 text-white/40 transition-transform group-open/disc:rotate-90" />
+                    </summary>
+                    <div className="px-5 pb-5 pt-0">
+                      <ul className="space-y-2.5">
+                        {DEFAULT_PUB_TERMS.map((term, i) => (
+                          <li key={i} className="flex gap-2.5 text-sm text-white/60">
+                            <span className="text-primary shrink-0 mt-0.5">•</span>
+                            <span>{term}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </details>
+                </div>
+              </section>
+            );
+          })()}
 
           {similarPubs.length > 0 && (
             <section>
@@ -1856,37 +2043,35 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               const otherPlans = drinkPlans.filter((p: any) => !["welcome", "unlimited", "ticket", "cover_charge"].includes(p.type));
               const coverFallback = event.imageUrl || vendorCover || ev.vendor?.bannerImage || null;
 
-              const Section = ({ icon: Icon, label, plans, accent }: { icon: typeof Wine; label: string; plans: any[]; accent: "primary" | "amber" }) => {
+              // Premium VIP offer card — the single standard offer-card design,
+              // shared with the Pub Offers page (per-section colour theme).
+              const Section = ({ icon: Icon, label, plans, theme }: { icon: typeof Wine; label: string; plans: any[]; theme: typeof OFFER_THEMES.free }) => {
                 if (plans.length === 0) return null;
                 return (
                   <div>
-                    <div className="flex items-center gap-2.5 mb-5">
-                      <span className={`flex h-7 w-7 items-center justify-center rounded-lg border ${accent === "amber" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-primary/30 bg-primary/10 text-primary"}`}>
-                        <Icon className="h-3.5 w-3.5" />
-                      </span>
-                      <h3 className="text-base md:text-lg font-bold tracking-tight">{label}</h3>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4">
+                    <OfferSectionHeader theme={theme} Icon={Icon} title={label} />
+                    <CarouselRow itemClassName="w-[310px] sm:w-[345px]" gapClass="gap-3 md:gap-4">
                       {plans.map((plan: any) => (
                         <DrinkDealCard
                           key={plan.id}
                           plan={plan}
                           fallbackImage={coverFallback}
-                          accent={accent}
+                          hideImage
+                          theme={theme}
                           onClick={() => switchPubTab("book")}
                         />
                       ))}
-                    </div>
+                    </CarouselRow>
                   </div>
                 );
               };
 
               return (
                 <div className="space-y-10 text-left">
-                  <Section icon={Wine} label="Free Drinks" plans={freePlans} accent="primary" />
-                  <Section icon={Ticket} label="Included With Ticket" plans={ticketPlans} accent="amber" />
-                  <Section icon={Ticket} label="Cover Charges" plans={coverChargePlans} accent="amber" />
-                  <Section icon={Wine} label="Drink Deals" plans={otherPlans} accent="primary" />
+                  <Section icon={Wine} label="Free Drinks" plans={freePlans} theme={OFFER_THEMES.free} />
+                  <Section icon={Ticket} label="Included With Ticket" plans={ticketPlans} theme={OFFER_THEMES.ticket} />
+                  <Section icon={Coins} label="Cover Charges" plans={coverChargePlans} theme={OFFER_THEMES.cover} />
+                  <Section icon={Wine} label="Drink Deals" plans={otherPlans} theme={OFFER_THEMES.drink} />
                 </div>
               );
             })()}
@@ -2085,7 +2270,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                 <p className="text-muted-foreground">No active announcements right now.</p>
               </div>
             ) : (
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
                 {announcementCards.map((c) => {
                   const isEvent = c.kind === "event" || c.price > 0 || !!c.startDate;
                   const ctaText = c.ctaLabel?.trim() || (c.ctaUrl?.trim() ? "Learn more" : isEvent ? "Book now" : "View");
@@ -2094,28 +2279,27 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       key={c.key}
                       type="button"
                       onClick={() => openAnnouncement(c)}
-                      className="group text-left rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden hover:border-primary/40 hover:bg-white/[0.04] transition-all flex flex-col"
+                      className="group text-left rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden hover:border-primary/40 hover:bg-white/[0.04] transition-all flex flex-col"
                     >
                       {c.imageUrl ? (
                         <div className="relative aspect-[16/9] overflow-hidden">
                           <img src={c.imageUrl} alt={c.title} loading="lazy" className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
                           {c.kind === "event" && (
-                            <span className="absolute top-2 left-2 rounded-full bg-primary/90 text-primary-foreground px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Event</span>
+                            <span className="absolute top-1.5 left-1.5 rounded-full bg-primary/90 text-primary-foreground px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider">Event</span>
                           )}
                         </div>
                       ) : (
-                        <div className="aspect-[16/9] bg-gradient-to-br from-primary/25 to-black/40 flex items-center justify-center"><Megaphone className="h-8 w-8 text-white/40" /></div>
+                        <div className="aspect-[16/9] bg-gradient-to-br from-primary/25 to-black/40 flex items-center justify-center"><Megaphone className="h-6 w-6 text-white/40" /></div>
                       )}
-                      <div className="p-4 flex-1 flex flex-col">
-                        <p className="font-semibold text-base text-foreground leading-tight">{c.title}</p>
-                        {c.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{c.description}</p>}
-                        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                          <span className="inline-flex items-center gap-1"><CalIcon className="h-3 w-3" />{fmtWhenStamp(c.startDate, c.startTime)}</span>
-                          {c.endDate && <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />Until {fmtWhenStamp(c.endDate, c.endTime)}</span>}
-                          {c.price > 0 && <span className="rounded-full bg-white/5 border border-white/10 px-2 py-0.5 font-semibold text-foreground">{formatINR(c.price)}</span>}
+                      <div className="p-2 flex-1 flex flex-col">
+                        <p className="font-semibold text-[12.5px] text-foreground leading-tight line-clamp-1">{c.title}</p>
+                        {c.description && <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{c.description}</p>}
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+                          <span className="inline-flex items-center gap-1"><CalIcon className="h-2.5 w-2.5" />{fmtWhenStamp(c.startDate, c.startTime)}</span>
+                          {c.price > 0 && <span className="rounded-full bg-white/5 border border-white/10 px-1.5 py-0.5 font-semibold text-foreground">{formatINR(c.price)}</span>}
                         </div>
-                        <span className="mt-3 inline-flex items-center gap-1.5 self-start rounded-lg bg-primary/15 border border-primary/30 px-3 py-1.5 text-xs font-semibold text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                          {ctaText} <ArrowRight className="h-3.5 w-3.5" />
+                        <span className="mt-1.5 inline-flex items-center gap-1 self-start rounded-md bg-primary/15 border border-primary/30 px-2 py-0.5 text-[11px] font-semibold text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                          {ctaText} <ArrowRight className="h-3 w-3" />
                         </span>
                       </div>
                     </button>
@@ -3246,15 +3430,26 @@ function FoodDrinkOffersSection({ vendorId, onBookClick, coverFallback }: { vend
       ) : (
         <div className="space-y-12">
           {food.length > 0 && (
-            <OfferGroup icon={Utensils} label="Food" count={food.length} offers={food} onBookClick={onBookClick} accent="amber" coverFallback={coverFallback} />
+            <OfferGroup icon={Utensils} label="Food" count={food.length} offers={food} onBookClick={onBookClick} theme={OFFER_THEMES.food} />
           )}
           {drink.length > 0 && (
-            <OfferGroup icon={Wine} label="Drinks" count={drink.length} offers={drink} onBookClick={onBookClick} accent="primary" coverFallback={coverFallback} />
+            <OfferGroup icon={Wine} label="Drinks" count={drink.length} offers={drink} onBookClick={onBookClick} theme={OFFER_THEMES.drink} />
           )}
         </div>
       )}
     </div>
   );
+}
+
+// Split a discount into an eyebrow + big value for the VIP plate — mirrors the
+// Pub Offers discount cards so the whole app shares one offer-card language.
+function offerHero(o: VendorOfferDto): { eyebrow: string; value: string } {
+  const v = Number(o.discountValue) || 0;
+  if (o.discountType === "percent")   return { eyebrow: "Flat",  value: `${v}% OFF` };
+  if (o.discountType === "fixed")     return { eyebrow: "Flat",  value: `₹${v} OFF` };
+  if (o.discountType === "bogo")      return { eyebrow: "Offer", value: "Buy 1 Get 1" };
+  if (o.discountType === "free_item") return { eyebrow: "Free",  value: o.freeItemName || "Item" };
+  return { eyebrow: "Offer", value: "Special" };
 }
 
 function OfferGroup({
@@ -3262,30 +3457,23 @@ function OfferGroup({
   label,
   offers,
   onBookClick,
-  accent,
-  coverFallback,
+  theme,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: typeof Wine;
   label: string;
   count: number;
   offers: VendorOfferDto[];
   onBookClick: () => void;
-  accent: "primary" | "amber";
-  coverFallback?: string | null;
+  theme: OfferTheme;
 }) {
-  const accentText = accent === "amber" ? "text-amber-400" : "text-primary";
   return (
-    <div className="rounded-3xl glass-card-strong p-5 md:p-7">
-      <div className="flex items-center gap-3 mb-1">
-        <Icon className={`h-4 w-4 ${accentText}`} />
-        <h3 className="text-base md:text-lg font-bold text-foreground tracking-tight">{label}</h3>
-      </div>
-      <p className="text-xs text-muted-foreground mb-6">Tap on any deal to book a table</p>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-        {offers.map((o, i) => (
-          <PremiumOfferCard key={o.id} offer={o} onBookClick={onBookClick} featured={i === 0} accent={accent} coverFallback={coverFallback} />
+    <div>
+      <OfferSectionHeader theme={theme} Icon={Icon} title={label} subtitle="Tap on any deal to book a table" />
+      <CarouselRow itemClassName="w-[310px] sm:w-[345px]" gapClass="gap-3 md:gap-4">
+        {offers.map((o) => (
+          <PremiumOfferCard key={o.id} offer={o} onBookClick={onBookClick} theme={theme} />
         ))}
-      </div>
+      </CarouselRow>
     </div>
   );
 }
@@ -3293,89 +3481,35 @@ function OfferGroup({
 function PremiumOfferCard({
   offer,
   onBookClick,
-  featured = false,
-  accent,
-  coverFallback,
+  theme,
 }: {
   offer: VendorOfferDto;
   onBookClick: () => void;
-  featured?: boolean;
-  accent: "primary" | "amber";
-  coverFallback?: string | null;
+  theme: OfferTheme;
 }) {
   const Icon = offer.category === "drink" ? Wine : Utensils;
   const window = offerWindowLabel(offer.timeFrom, offer.timeTo);
-  const category = offer.category === "drink" ? "DRINK DEAL" : "FOOD DEAL";
-  const badge = offerDiscountBadge(offer);
-  const daysLabel = offerDaysLabel(offer.days);
-  // Offer's own deal image, then the server-resolved venue cover (handles
-  // partner pubs whose photo lives on the pub event), then the page fallback.
-  const dealImage = offer.imageUrl || offer.venueCoverImage || coverFallback || null;
-
-  if (featured) {
-    const gradient = accent === "amber"
-      ? "from-amber-500/95 via-amber-600/90 to-amber-700/85"
-      : "from-primary/95 via-primary/80 to-primary/60";
-    return (
-      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} text-white p-5 flex flex-col gap-2 red-glow border border-white/[0.10]`}>
-        <Icon className="absolute -right-6 -bottom-6 h-32 w-32 text-white/10 rotate-12 pointer-events-none" />
-        {dealImage && (
-          <SquareImage src={dealImage} alt={offer.title} className="relative z-[1] w-full rounded-xl border border-white/20 mb-1" />
-        )}
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/85">{category}</p>
-          <span className="shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 border border-white/30">{badge}</span>
-        </div>
-        <p className="text-lg font-black leading-snug line-clamp-2 text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{offer.title}</p>
-        {offer.description && (
-          <p className="text-xs text-white leading-snug line-clamp-2">{offer.description}</p>
-        )}
-        <p className="text-xs text-white/90 line-clamp-1 flex items-center gap-1.5">
-          <CalIcon className="h-3 w-3" /> {daysLabel}{window ? ` • ${window}` : ""}
-        </p>
-        <button
-          type="button"
-          onClick={onBookClick}
-          className="mt-3 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold uppercase tracking-wider transition-all"
-        >
-          Book Now <ArrowRight className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    );
-  }
-
-  const labelColor = accent === "amber" ? "text-amber-400" : "text-primary";
-  const vendorColor = accent === "amber" ? "text-amber-300" : "text-primary";
-  const ctaClass = accent === "amber"
-    ? "bg-amber-500/15 hover:bg-amber-500 border-amber-500/30 hover:border-amber-500 text-amber-400 hover:text-black"
-    : "bg-primary/15 hover:bg-primary border-primary/30 hover:border-primary text-primary hover:text-primary-foreground";
+  const { eyebrow, value } = offerHero(offer);
 
   return (
-    <div className="rounded-2xl glass-card p-5 flex flex-col gap-2">
-      {dealImage && (
-        <SquareImage src={dealImage} alt={offer.title} className="w-full rounded-xl border border-white/10 mb-1" />
-      )}
-      <div className="flex items-start justify-between gap-3">
-        <p className={`text-[10px] font-bold uppercase tracking-[0.22em] ${labelColor}`}>{category}</p>
-        <span className={`shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${accent === "amber" ? "bg-amber-500/15 border border-amber-500/30 text-amber-400" : "bg-primary/15 border border-primary/30 text-primary"}`}>
-          {badge}
-        </span>
+    <NightlifeOfferCard
+      hideImage
+      theme={theme}
+      onBook={onBookClick}
+      venueName={offer.title}
+      title={offer.description || ""}
+      offerIcon={<Icon className="h-5 w-5" />}
+      offerLabel={value}
+      offerEyebrow={eyebrow}
+    >
+      <div className="flex flex-col gap-1.5">
+        <OfferDayPills days={offer.days} accent={theme.accent} glow={theme.glow} />
+        <div className="flex items-center gap-1.5 text-[11px] text-white/55">
+          <Clock className="h-3 w-3 shrink-0" style={{ color: theme.accent }} />
+          <span className="truncate">{window || "All day"}</span>
+        </div>
       </div>
-      <p className={`text-lg font-black ${vendorColor} leading-snug line-clamp-2`}>{offer.title}</p>
-      {offer.description && (
-        <p className="text-xs text-foreground/80 leading-snug line-clamp-2">{offer.description}</p>
-      )}
-      <p className="text-xs text-muted-foreground line-clamp-1 flex items-center gap-1.5">
-        <CalIcon className="h-3 w-3 flex-shrink-0" /> {daysLabel}{window ? ` • ${window}` : ""}
-      </p>
-      <button
-        type="button"
-        onClick={onBookClick}
-        className={`mt-3 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all ${ctaClass}`}
-      >
-        Book Now <ArrowRight className="h-3.5 w-3.5" />
-      </button>
-    </div>
+    </NightlifeOfferCard>
   );
 }
 

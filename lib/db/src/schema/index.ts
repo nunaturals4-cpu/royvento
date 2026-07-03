@@ -96,6 +96,21 @@ export const vendorsTable = pgTable(
     // Bar / drinks menu images/PDFs (shown as its own sub-section).
     barMenuUrls: text("bar_menu_urls").array().notNull().default([]),
     crowdLevel: varchar("crowd_level", { length: 20 }),
+    // ── Venue "About" details (shown on the pub's event-profile Overview) ──
+    // Cuisines / facilities / languages are free tag arrays; the "things to
+    // know" set maps 1:1 to display rows; faqs is [{question, answer}].
+    cuisines: text("cuisines").array().notNull().default([]),
+    facilities: text("facilities").array().notNull().default([]),
+    languages: text("languages").array().notNull().default([]),
+    durationInfo: varchar("duration_info", { length: 60 }).notNull().default(""),
+    ticketAge: varchar("ticket_age", { length: 40 }).notNull().default(""),
+    entryAge: varchar("entry_age", { length: 40 }).notNull().default(""),
+    venueLayout: varchar("venue_layout", { length: 20 }).notNull().default(""),
+    seatingArrangement: varchar("seating_arrangement", { length: 20 }).notNull().default(""),
+    kidsAllowed: boolean("kids_allowed"),
+    petsAllowed: boolean("pets_allowed"),
+    faqs: jsonb("faqs").notNull().default([]),
+    termsConditions: text("terms_conditions").notNull().default(""),
     onlineBalance: numeric("online_balance", { precision: 14, scale: 2 }).notNull().default("0"),
     commissionOwed: numeric("commission_owed", { precision: 14, scale: 2 }).notNull().default("0"),
     baseFeePercent: numeric("base_fee_percent", { precision: 5, scale: 2 }).notNull().default("3.50"),

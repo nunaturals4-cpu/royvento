@@ -11,7 +11,7 @@ import { sql } from "drizzle-orm";
 const router: IRouter = Router();
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
-const SOON_WINDOW_MIN = 240; // "starting soon" = within the next 4 hours
+const SOON_WINDOW_MIN = 180; // "starting soon" = within the next 3 hours
 const EVENING_START_MIN = 16 * 60; // venues with no explicit time count as "on" from 4 PM
 
 function todayIstDate(): string {
@@ -119,7 +119,7 @@ function scoreItem(
   let s = 0;
   if (it.bucket === "now") s += 100;
   else if (it.bucket === "soon" && it.startMin !== null) {
-    // sooner = higher, scaled across the 4h window
+    // sooner = higher, scaled across the soon window
     s += 60 + Math.round((1 - (it.startMin - it.nowMin) / SOON_WINDOW_MIN) * 30);
   }
   if (cityMatch(it.city, userCity)) s += 30;
