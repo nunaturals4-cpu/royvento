@@ -2959,6 +2959,23 @@ function BlogsAdmin() {
   });
   const [editing, setEditing] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [imgUploading, setImgUploading] = useState(false);
+
+  const onBlogImage = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    const err = validateImageFile(file);
+    if (err) { toast({ title: err, variant: "destructive" }); return; }
+    setImgUploading(true);
+    try {
+      const url = await uploadImage(file);
+      setForm((p) => ({ ...p, imageUrl: url }));
+    } catch {
+      toast({ title: "Image upload failed", variant: "destructive" });
+    } finally {
+      setImgUploading(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -3036,8 +3053,25 @@ function BlogsAdmin() {
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <Label>Image URL</Label>
-            <Input value={form.imageUrl} onChange={(e) => setForm((p) => ({ ...p, imageUrl: e.target.value }))} placeholder="https://..." />
+            <Label>Cover image</Label>
+            {form.imageUrl ? (
+              <div className="relative w-40 h-24 rounded-lg overflow-hidden border border-white/10">
+                <img src={form.imageUrl} alt="" className="w-full h-full object-cover" />
+                <button type="button" onClick={() => setForm((p) => ({ ...p, imageUrl: "" }))}
+                  className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 flex items-center justify-center text-white">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <label className={cn(
+                "flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/20 text-sm text-muted-foreground cursor-pointer hover:border-white/40 transition-colors w-fit",
+                imgUploading && "opacity-50 pointer-events-none",
+              )}>
+                <Upload className="h-4 w-4" />
+                {imgUploading ? "Uploading..." : "Upload image"}
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => onBlogImage(e.target.files)} />
+              </label>
+            )}
           </div>
           <div>
             <Label>Author</Label>
