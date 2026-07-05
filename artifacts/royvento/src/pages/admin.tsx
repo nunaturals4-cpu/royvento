@@ -881,6 +881,8 @@ interface AdminVendor {
   city: string;
   state: string;
   country: string;
+  address?: string;
+  mapLocation?: string;
   bannerImage: string;
   status: string;
   eventCount: number;
@@ -1120,7 +1122,7 @@ function AllVendorsAdmin() {
 
   const startEdit = (v: AdminVendor) => {
     setEditingId(v.id);
-    setEditForm({ businessName: v.businessName, description: v.description, category: v.category, status: v.status, city: v.city, state: v.state, country: v.country });
+    setEditForm({ businessName: v.businessName, description: v.description, category: v.category, status: v.status, city: v.city, state: v.state, country: v.country, address: v.address ?? "", mapLocation: v.mapLocation ?? "" });
     vendorFormErrors.reset();
   };
 
@@ -1128,8 +1130,17 @@ function AllVendorsAdmin() {
     setSaving(true);
     vendorFormErrors.reset();
     try {
-      await apiPatch(`/api/admin/vendors/${id}`, editForm);
-      toast({ title: "Partner updated" });
+      // Split the save: the orval-generated PATCH accepts only the core profile
+      // fields (strict schema), while the hand-written /location endpoint takes
+      // the address + Google Maps Location and derives the coordinates.
+      const { address, mapLocation, city, state, country, ...core } = editForm;
+      await apiPatch(`/api/admin/vendors/${id}`, core);
+      const locRes = await apiPatch<{ coordsResolved?: boolean }>(`/api/admin/vendors/${id}/location`, { country, state, city, address, mapLocation });
+      if (mapLocation && mapLocation.trim() && locRes && locRes.coordsResolved === false) {
+        toast({ title: "Saved, but couldn't read coordinates", description: "Paste a Google Maps link containing coordinates (e.g. …/@12.97,77.59… or '12.97, 77.59') so nearby-offer alerts can use this venue's location.", variant: "destructive" });
+      } else {
+        toast({ title: "Partner updated" });
+      }
       setEditingId(null);
       load(page);
     } catch (e: any) {
@@ -1298,6 +1309,26 @@ function AllVendorsAdmin() {
                     {(vendorFormErrors.fieldError("country") || vendorFormErrors.fieldError("state") || vendorFormErrors.fieldError("city")) && (
                       <p className="text-xs text-red-400">{vendorFormErrors.fieldError("country") || vendorFormErrors.fieldError("state") || vendorFormErrors.fieldError("city")}</p>
                     )}
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-xs text-white/60">Address</Label>
+                    <Textarea
+                      rows={2}
+                      value={editForm.address ?? ""}
+                      placeholder="Street, area, landmark…"
+                      onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))}
+                      className="bg-black/40 border-white/10 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-xs text-white/60">Google Maps Location</Label>
+                    <Input
+                      value={editForm.mapLocation ?? ""}
+                      placeholder="Paste a Google Maps link or 'lat, lng' (e.g. 12.9716, 77.5946)"
+                      onChange={(e) => setEditForm((f) => ({ ...f, mapLocation: e.target.value }))}
+                      className="bg-black/40 border-white/10 h-9 text-sm"
+                    />
+                    <p className="text-[11px] text-white/35">Used for the 25 km radius that decides who gets cover-charge &amp; ticket offer alerts. Paste a link containing coordinates.</p>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs text-white/60">Status</Label>
@@ -8413,6 +8444,7 @@ interface VenuePayload {
   country?: string;
   state?: string;
   city?: string;
+  mapLocation?: string;
   capacity?: number;
   pubMode: string;
   priceWomen?: number;
@@ -8445,6 +8477,7 @@ interface VenuePayload {
 interface VenueFormInitial {
   businessName?: string; category?: string; description?: string; bannerImage?: string;
   location?: string; country?: string; state?: string; city?: string;
+  address?: string; mapLocation?: string;
   capacity?: number; pubMode?: string;
   priceWomen?: number; priceMen?: number; priceCouple?: number;
   dayPricing?: Record<string, { women: number; men: number; couple: number } | null> | null;
@@ -9025,6 +9058,7 @@ function VenueForm({
   const [country, setCountry] = useState(initial?.country ?? "");
   const [stateF, setStateF] = useState(initial?.state ?? "");
   const [city, setCity] = useState(initial?.city ?? "");
+  const [mapLocation, setMapLocation] = useState(initial?.mapLocation ?? "");
   const [capacity, setCapacity] = useState(initial?.capacity ? String(initial.capacity) : "");
   const [pubMode, setPubMode] = useState<"ticket" | "event" | "both">(
     initial?.pubMode === "ticket" || initial?.pubMode === "event" ? initial.pubMode : "both",
@@ -9074,7 +9108,7 @@ function VenueForm({
 
   function resetForm() {
     setTitle(""); setCategory("Pub"); setDescription(""); setImageUrl("");
-    setLocation(""); setCountry(""); setStateF(""); setCity("");
+    setLocation(""); setCountry(""); setStateF(""); setCity(""); setMapLocation("");
     setCapacity(""); setPubMode("both");
     setPriceWomen(""); setPriceMen(""); setPriceCouple("");
     setVaryByDay(false); setDayPricingOverrides({});
@@ -9212,6 +9246,7 @@ function VenueForm({
         country: country || undefined,
         state: stateF || undefined,
         city: city || undefined,
+        mapLocation: mapLocation.trim(),
         capacity: capacity ? Number(capacity) : undefined,
         pubMode,
         priceWomen: priceWomen ? Number(priceWomen) : undefined,
@@ -9335,24 +9370,52 @@ function VenueForm({
               <Input id="cp-location" placeholder="Street address"
                 value={location} onChange={(e) => setLocation(e.target.value)}
                 className="bg-black/40 border-white/10" />
-              {location.trim() && (
-                <div className="mt-2">
-                  <iframe key={location} title="Pub location"
-                    src={`https://maps.google.com/maps?q=${encodeURIComponent([location, city, stateF].filter(Boolean).join(", "))}&output=embed&hl=en`}
-                    className="w-full h-48 md:h-56 rounded-xl border border-white/10"
-                    loading="lazy" referrerPolicy="no-referrer-when-downgrade"
-                  />
-                  <a href={`https://maps.google.com/?q=${encodeURIComponent([location, city, stateF].filter(Boolean).join(", "))}`}
-                    target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 mt-1.5 text-xs text-muted-foreground hover:text-primary transition-colors">
-                    <Navigation className="h-3 w-3" />Open in Google Maps
-                  </a>
-                </div>
-              )}
             </div>
 
             <LocationSelect country={country} state={stateF} city={city}
               onChange={(next) => { setCountry(next.country); setStateF(next.state); setCity(next.city); }} />
+
+            <div className="space-y-1.5">
+              <Label htmlFor="cp-maploc">Google Maps Location</Label>
+              <Input id="cp-maploc"
+                placeholder="Paste a Google Maps link or 'lat, lng' (e.g. 12.9716, 77.5946)"
+                value={mapLocation} onChange={(e) => setMapLocation(e.target.value)}
+                className="bg-black/40 border-white/10" />
+              <p className="text-[11px] text-muted-foreground">
+                Sets the venue's coordinates for the 25 km radius that decides who gets Cover Charge &amp; Included-With-Ticket offer alerts. Paste a link containing coordinates.
+              </p>
+
+              {/* Live Google Map preview — driven by the Google Maps Location
+                  field (coordinates pulled from a pasted link or "lat,lng"),
+                  falling back to the Address/City/State. */}
+              {(() => {
+                const raw = mapLocation.trim();
+                const m =
+                  /@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/.exec(raw) ||
+                  /!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/.exec(raw) ||
+                  /[?&](?:q|query|ll|destination)=(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/.exec(raw) ||
+                  /^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/.exec(raw);
+                const mapQuery = m
+                  ? `${m[1]},${m[2]}`
+                  : raw && !/^https?:\/\//i.test(raw)
+                    ? raw
+                    : [location, city, stateF].filter(Boolean).join(", ").trim();
+                if (!mapQuery) return null;
+                return (
+                  <div className="mt-2">
+                    <iframe key={mapQuery} title="Pub location"
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed&hl=en`}
+                      className="w-full h-48 md:h-56 rounded-xl border border-white/10"
+                      loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+                    <a href={`https://maps.google.com/?q=${encodeURIComponent(mapQuery)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 mt-1.5 text-xs text-muted-foreground hover:text-primary transition-colors">
+                      <Navigation className="h-3 w-3" />Open in Google Maps ↗
+                    </a>
+                  </div>
+                );
+              })()}
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">

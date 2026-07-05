@@ -29,6 +29,7 @@ import { respondInvalid } from "../lib/validationError";
 import { logger } from "../lib/logger";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { createUserNotification } from "../lib/notify";
+import { notifyOrganizerNewEvent } from "../lib/organizerFollowNotify";
 
 const DEFAULT_MANAGER_PERMS: OrganizerManagerPermissions = { scan: true, attendance: true, reports: false };
 
@@ -667,8 +668,18 @@ router.patch("/partner/organizer-events/:id/approve", requireAuth(["vendor", "ad
       message: `${venue.businessName} approved "${ev.title}". It's now live and bookable.`,
       url: `/organizer-events/${ev.slug}`,
       tag: `org-event-venue-approved-${ev.id}`,
+      type: "event_approved",
     }).catch(() => {});
   }
+  // The event just went public → alert everyone who follows this organizer.
+  // Deduped per event, so it fires at most once even if re-approved.
+  void notifyOrganizerNewEvent({
+    organizerId: ev.organizerId,
+    eventId: ev.id,
+    eventTitle: ev.title,
+    eventSlug: ev.slug,
+    city: ev.city,
+  });
   return res.json(row);
 });
 

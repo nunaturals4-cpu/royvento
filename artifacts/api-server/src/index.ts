@@ -5,8 +5,11 @@ import { runMorningReminders, runPreArrivalReminders } from "./jobs/bookingRemin
 import { runExpoPushReceiptPoll } from "./jobs/expoPushReceipts";
 import { runPointsExpiry } from "./jobs/pointsExpiry";
 import { runTonightDigest, runStartingSoonReminders } from "./jobs/tonightNotifications";
+import { runDailyOfferReminders } from "./jobs/dailyOfferReminders";
+import { runFoodDrinkNotifier } from "./jobs/foodDrinkNotifier";
 import { runSoloGroupExpiry } from "./jobs/soloGroupExpiry";
 import { runIndexNowSweep } from "./jobs/indexNow";
+import { runNotificationQueue, runNotificationQueuePrune } from "./jobs/notificationQueue";
 import cron from "node-cron";
 import { db, usersTable, vendorsTable, eventsTable, wishlistsTable, organizersTable } from "@workspace/db";
 import { eq, or, sql, inArray } from "drizzle-orm";
@@ -1318,6 +1321,53 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "follows_user_target_idx" ON "follows" ("user_id", "target_type", "target_id")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "follows_target_idx" ON "follows" ("target_type", "target_id")`);
 
+    // ── Smart follow-notification system ──────────────────────────────────
+    // Deep-link + category columns on the durable in-app notification row, so
+    // tapping a notification navigates to the exact event/offer/venue page.
+    await db.execute(sql`ALTER TABLE "notifications" ADD COLUMN IF NOT EXISTS "url" text NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "notifications" ADD COLUMN IF NOT EXISTS "type" varchar(40) NOT NULL DEFAULT 'general'`);
+    await db.execute(sql`ALTER TABLE "notifications" ADD COLUMN IF NOT EXISTS "tag" varchar(120)`);
+
+    // Delivery queue: dedup (unique user_id+dedup_key), 30-min per-user spacing
+    // (scheduled_at), and claim-based retry/backoff (status/attempts).
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "notification_queue" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "user_id" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "title" varchar(255) NOT NULL,
+        "message" text NOT NULL DEFAULT '',
+        "url" text NOT NULL DEFAULT '',
+        "type" varchar(40) NOT NULL DEFAULT 'general',
+        "tag" varchar(120),
+        "dedup_key" varchar(180) NOT NULL,
+        "priority" integer NOT NULL DEFAULT 0,
+        "scheduled_at" timestamp with time zone NOT NULL DEFAULT now(),
+        "status" varchar(16) NOT NULL DEFAULT 'pending',
+        "attempts" integer NOT NULL DEFAULT 0,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+        "sent_at" timestamp with time zone
+      )`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "notif_queue_user_dedup_idx" ON "notification_queue" ("user_id", "dedup_key")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "notif_queue_dispatch_idx" ON "notification_queue" ("status", "scheduled_at")`);
+
+    // ── Location-based smart notifications ────────────────────────────────
+    // Latest user location (saved/updated on login) for the 25 km radius filter.
+    await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "latitude" numeric(9,6)`);
+    await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "longitude" numeric(9,6)`);
+    await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "location_updated_at" timestamp with time zone`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "users_location_idx" ON "users" ("latitude", "longitude")`);
+    // Venue Google-Maps location + parsed coordinates (admin Edit Listing).
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "map_location" text NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "latitude" numeric(9,6)`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "longitude" numeric(9,6)`);
+    // Chronological "unpublished offer" bookkeeping for food & drink discounts.
+    await db.execute(sql`ALTER TABLE "vendor_offers" ADD COLUMN IF NOT EXISTS "notified_at" timestamp with time zone`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "vendor_offers_notified_idx" ON "vendor_offers" ("notified_at", "created_at")`);
+    // Per-notification geo-fence for cover-charge / ticket offers.
+    await db.execute(sql`ALTER TABLE "notification_queue" ADD COLUMN IF NOT EXISTS "geo_lat" numeric(9,6)`);
+    await db.execute(sql`ALTER TABLE "notification_queue" ADD COLUMN IF NOT EXISTS "geo_lng" numeric(9,6)`);
+    await db.execute(sql`ALTER TABLE "notification_queue" ADD COLUMN IF NOT EXISTS "geo_radius_km" integer`);
+
     logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url + announcements.approval_status + razorpay columns + events.disabled_genders + events.hidden ensured");
   } catch (err) {
     logger.error({ err }, "Schema migration warning");
@@ -1456,6 +1506,42 @@ const server = app.listen(port, (err) => {
       logger.error({ err }, "Tonight starting-soon reminder job failed"),
     );
   }, { timezone: "Asia/Kolkata" });
+
+  // Daily offer reminders — 6 PM IST: re-notify followers of every venue that
+  // still has a live, non-expired offer (one per venue/day, 30-min spaced per
+  // user, fresh wording daily). Stops automatically when the offer expires or is
+  // deleted. See jobs/dailyOfferReminders.ts.
+  cron.schedule("0 18 * * *", () => {
+    logger.info("Running daily offer reminders job (6 PM IST)");
+    runDailyOfferReminders().catch((err) =>
+      logger.error({ err }, "Daily offer reminders job failed"),
+    );
+  }, { timezone: "Asia/Kolkata" });
+
+  // Food & Drink Discount publisher — every 5 min, feed the oldest unpublished
+  // offers into the notification queue in chronological order (requirement 2).
+  // Per-user 30-min spacing is enforced by the queue itself.
+  cron.schedule("*/5 * * * *", () => {
+    runFoodDrinkNotifier().catch((err) =>
+      logger.error({ err }, "Food & drink notifier job failed"),
+    );
+  });
+
+  // Follow-notification queue — every minute, deliver any queued follow
+  // notifications whose scheduled time has arrived (the 30-min-spaced remainder
+  // of a burst + any retries). The enqueue path also flushes inline so the
+  // first notification of a burst is effectively instant.
+  cron.schedule("* * * * *", () => {
+    runNotificationQueue().catch((err) =>
+      logger.error({ err }, "Notification queue dispatch job failed"),
+    );
+  });
+  // Prune delivered/failed queue rows daily (history stays in notifications).
+  cron.schedule("30 3 * * *", () => {
+    runNotificationQueuePrune().catch((err) =>
+      logger.warn({ err }, "Notification queue prune job failed"),
+    );
+  });
 
   // IndexNow — every 15 min, push newly-published venues/events/blogs to
   // Bing/Yandex/Copilot so they get crawled fast. Delta-based (only new content

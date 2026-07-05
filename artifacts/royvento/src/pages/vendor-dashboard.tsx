@@ -1996,6 +1996,16 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
   const { toast } = useToast();
   const isPub = event.type === "pub";
 
+  // ── Venue location (vendor-level) — Country / State / City / Address / Google
+  // Maps Location. Editable here so partners can set the coordinates that gate
+  // cover-charge & ticket offer notifications (25 km radius). Saved to the vendor
+  // via /api/partner/profile as part of the main "Save changes".
+  const [country, setCountry] = useState<string>(vendor?.country ?? "India");
+  const [stateF, setStateF] = useState<string>(vendor?.state ?? "");
+  const [city, setCity] = useState<string>(vendor?.city ?? "");
+  const [venueAddress, setVenueAddress] = useState<string>(vendor?.address ?? "");
+  const [mapLocation, setMapLocation] = useState<string>(vendor?.mapLocation ?? "");
+
   // Sync free entry state from drink plans on mount (drink plans = source of truth)
   useEffect(() => {
     if (!isPub || !vendor?.id) return;
@@ -2189,6 +2199,18 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
       // things-to-know / FAQs) as part of the same Save changes click.
       await venueExtraRef.current?.save();
 
+      // Persist the venue's location (Country / State / City / Address / Google
+      // Maps Location). The server parses coordinates from mapLocation for the
+      // 25 km radius offer notifications.
+      await apiPatch("/api/partner/profile", {
+        country: country || "India",
+        state: stateF,
+        city,
+        address: venueAddress,
+        mapLocation,
+      });
+      onVenueSaved?.();
+
       formErrors.reset();
       toast({ title: "Updated" });
       onSaved();
@@ -2227,6 +2249,61 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
           <Label>Description</Label>
           <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("description"))} />
           {formErrors.fieldError("description") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("description")}</p>}
+        </div>
+
+        {/* ── Location & Google Maps ─────────────────────────────────────── */}
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
+          <p className="text-sm font-medium flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" />Location</p>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Country / State / City</Label>
+            <LocationSelect country={country} state={stateF} city={city}
+              onChange={(next) => { setCountry(next.country); setStateF(next.state); setCity(next.city); }} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Address</Label>
+            <Textarea rows={2} value={venueAddress} onChange={(e) => setVenueAddress(e.target.value)}
+              placeholder="Street, area, landmark…" className="bg-black/40 border-white/10" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Google Maps Location</Label>
+            <Input value={mapLocation} onChange={(e) => setMapLocation(e.target.value)}
+              placeholder="Paste a Google Maps link or 'lat, lng' (e.g. 12.9716, 77.5946)"
+              className="bg-black/40 border-white/10" />
+            <p className="text-[11px] text-muted-foreground">Sets your venue's coordinates so nearby guests (within 25 km) get your Cover Charge &amp; Included-With-Ticket offer alerts. Paste a link containing coordinates.</p>
+          </div>
+
+          {/* Live Google Map preview. Driven by the Google Maps Location field:
+              pull coordinates out of whatever was pasted (plain "lat,lng", an
+              @lat,lng link, or a !3d..!4d.. place URL); if it's a plain address
+              string use it as-is; only fall back to the Address/City/State when
+              the Maps field is empty. The iframe `key` changes with the query so
+              it re-renders whenever the location changes. */}
+          {(() => {
+            const raw = mapLocation.trim();
+            const m =
+              /@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/.exec(raw) ||
+              /!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/.exec(raw) ||
+              /[?&](?:q|query|ll|destination)=(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/.exec(raw) ||
+              /^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/.exec(raw);
+            const mapQuery = m
+              ? `${m[1]},${m[2]}`
+              : raw && !/^https?:\/\//i.test(raw)
+                ? raw
+                : [venueAddress, city, stateF].filter(Boolean).join(", ").trim();
+            if (!mapQuery) return null;
+            return (
+              <div className="mt-1">
+                <iframe key={mapQuery} title="Venue location"
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed&hl=en`}
+                  className="w-full h-48 md:h-56 rounded-xl border border-white/10"
+                  loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+                <a href={`https://maps.google.com/?q=${encodeURIComponent(mapQuery)}`} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 mt-1.5 text-xs text-muted-foreground hover:text-primary transition-colors">
+                  <Navigation className="h-3 w-3" />Open in Google Maps ↗
+                </a>
+              </div>
+            );
+          })()}
         </div>
         <div>
           <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Listing image (cover)</Label>

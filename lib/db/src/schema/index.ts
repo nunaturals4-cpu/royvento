@@ -39,6 +39,12 @@ export const usersTable = pgTable(
     webPushSubscription: text("web_push_subscription"),
     gender: varchar("gender", { length: 10 }),
     genderCompleted: boolean("gender_completed").notNull().default(false),
+    // Latest known location, saved/updated on login (and when the browser
+    // reports a new position). Drives the 25 km radius filter for nearby-venue
+    // offer notifications. Null = unknown (user never shared location).
+    latitude: numeric("latitude", { precision: 9, scale: 6 }),
+    longitude: numeric("longitude", { precision: 9, scale: 6 }),
+    locationUpdatedAt: timestamp("location_updated_at", { withTimezone: true }),
     // Session-revocation counter. Embedded in issued JWTs; bumped on password
     // reset / logout-all so previously-issued tokens stop authenticating.
     tokenVersion: integer("token_version").notNull().default(0),
@@ -49,6 +55,8 @@ export const usersTable = pgTable(
   (t) => ({
     emailIdx: uniqueIndex("users_email_idx").on(t.email),
     referralCodeIdx: uniqueIndex("users_referral_code_idx").on(t.referralCode),
+    // Bounding-box prefilter for the radius query (see lib/geo.ts).
+    locationIdx: index("users_location_idx").on(t.latitude, t.longitude),
   }),
 );
 
@@ -77,6 +85,12 @@ export const vendorsTable = pgTable(
     openDays: text("open_days").array().notNull().default([]),
     dayHours: text("day_hours"),
     address: text("address"),
+    // Google Maps location: the raw pasted link/text the admin enters, plus the
+    // lat/lng parsed out of it (see lib/geo.ts parseCoords). The coordinates
+    // power the 25 km radius filter for cover-charge / ticket offer notifications.
+    mapLocation: text("map_location").notNull().default(""),
+    latitude: numeric("latitude", { precision: 9, scale: 6 }),
+    longitude: numeric("longitude", { precision: 9, scale: 6 }),
     isPremium: boolean("is_premium").notNull().default(false),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
     // Admin "hide" lever, independent of the approval `status`. When true the
@@ -597,6 +611,16 @@ export const notificationsTable = pgTable(
     userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
     title: varchar("title", { length: 255 }).notNull(),
     message: text("message").notNull().default(""),
+    // Deep-link target opened when the in-app notification is tapped (e.g.
+    // "/organizer-events/nye-bash-12"). Empty = not clickable. Persisting it here
+    // is what makes the in-app list navigate on click (web + mobile), not just
+    // the transient web-push/expo payload.
+    url: text("url").notNull().default(""),
+    // Category for iconography / analytics: "general" | "follow_event" |
+    // "follow_offer" | "booking" | … Rendering can key an icon off this.
+    type: varchar("type", { length: 40 }).notNull().default("general"),
+    // Optional coalesce/reference key (mirrors the push `tag`).
+    tag: varchar("tag", { length: 120 }),
     isRead: boolean("is_read").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -608,6 +632,54 @@ export const notificationsTable = pgTable(
 );
 
 export type Notification = typeof notificationsTable.$inferSelect;
+
+// ── Follow-notification delivery queue ───────────────────────────────────────
+// Backs the smart, non-spam follow notification system. Each row is one pending
+// notification for one user. The queue gives us, in one place:
+//   • Deduplication — a unique (user_id, dedup_key) means the same event/offer
+//     is never delivered twice to the same user.
+//   • Rate limiting / anti-fatigue — when several followed venues/organizers
+//     post around the same time, rows are spaced 30 minutes apart per user
+//     (the first fires immediately, the rest are staggered via `scheduled_at`).
+//   • Fault tolerance — a claim-based dispatcher marks rows sending → sent, with
+//     bounded retries + backoff on failure, safe across multiple replicas.
+export const notificationQueueTable = pgTable(
+  "notification_queue",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 255 }).notNull(),
+    message: text("message").notNull().default(""),
+    url: text("url").notNull().default(""),
+    type: varchar("type", { length: 40 }).notNull().default("general"),
+    tag: varchar("tag", { length: 120 }),
+    // Idempotency key per subject, e.g. "organizer-event:42" or
+    // "vendor:7:food_drink:915". Unique per user → hard dedup.
+    dedupKey: varchar("dedup_key", { length: 180 }).notNull(),
+    // Higher = more important; dispatched first within a due batch.
+    priority: integer("priority").notNull().default(0),
+    // Optional geo-fence: only deliver if the recipient's LATEST saved location
+    // is within `geoRadiusKm` of (geoLat, geoLng). Re-checked at dispatch time so
+    // a user who moved out of range between enqueue and send is skipped. NULL =
+    // no geo restriction (deliver to everyone). Used for cover-charge / ticket.
+    geoLat: numeric("geo_lat", { precision: 9, scale: 6 }),
+    geoLng: numeric("geo_lng", { precision: 9, scale: 6 }),
+    geoRadiusKm: integer("geo_radius_km"),
+    // Earliest time this row may be delivered (drives 30-min spacing + backoff).
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull().defaultNow(),
+    // pending | sending | sent | failed
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+  },
+  (t) => ({
+    userDedupUniq: uniqueIndex("notif_queue_user_dedup_idx").on(t.userId, t.dedupKey),
+    dispatchIdx: index("notif_queue_dispatch_idx").on(t.status, t.scheduledAt),
+  }),
+);
+
+export type NotificationQueueRow = typeof notificationQueueTable.$inferSelect;
 
 export const wishlistsTable = pgTable(
   "wishlists",
@@ -1167,12 +1239,19 @@ export const vendorOffersTable = pgTable(
     // Optional per-offer deal image. Null/empty = the customer card falls back
     // to the venue's cover photo (mirrors drink_plans.image_url behaviour).
     imageUrl: text("image_url"),
+    // When the follower "new food & drink discount" notification was published.
+    // NULL = not yet notified. The chronological scheduler (jobs/foodDrink
+    // Notifier.ts) processes unpublished offers oldest-first, one per 30-min
+    // per-user slot, then stamps this so it never re-fires for the same offer.
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     vendorIdx: index("vendor_offers_vendor_idx").on(t.vendorId),
     activeIdx: index("vendor_offers_vendor_active_idx").on(t.vendorId, t.active),
+    // Feeds the "oldest unpublished first" scan.
+    notifiedIdx: index("vendor_offers_notified_idx").on(t.notifiedAt, t.createdAt),
   }),
 );
 

@@ -7,6 +7,7 @@ import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { buildServerUploadUrl } from "../lib/uploadToken";
 import { respondInvalid } from "../lib/validationError";
+import { parseCoords } from "../lib/geo";
 
 const router: IRouter = Router();
 
@@ -114,6 +115,9 @@ const UpdatePartnerProfileBody = z.object({
   city: z.string().optional(),
   country: z.string().optional(),
   address: z.string().max(500).optional(),
+  // Google Maps location link/text; coordinates are parsed from it for the
+  // 25 km radius that gates cover-charge / ticket offer notifications.
+  mapLocation: z.string().max(2000).optional(),
   coverImageUrl: z.string().optional(),
   openDays: z.array(z.enum(VALID_DAYS)).optional(),
   dayHours: z.record(DayTimesSchema).optional(),
@@ -164,6 +168,12 @@ router.patch(
       updates["coverImageUrl"] = parsed.data.coverImageUrl;
     if (parsed.data.address !== undefined)
       updates["address"] = parsed.data.address || null;
+    if (parsed.data.mapLocation !== undefined) {
+      updates["mapLocation"] = parsed.data.mapLocation;
+      const coords = parseCoords(parsed.data.mapLocation);
+      updates["latitude"] = coords ? coords.lat.toFixed(6) : null;
+      updates["longitude"] = coords ? coords.lng.toFixed(6) : null;
+    }
     if (parsed.data.openDays !== undefined)
       updates["openDays"] = parsed.data.openDays;
     if (parsed.data.dayHours !== undefined)

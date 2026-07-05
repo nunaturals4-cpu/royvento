@@ -42,6 +42,8 @@ import { sendEventApprovedEmail } from "../lib/notifications";
 import { generateTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { resolvePlaceFromUrl, resolvePlaceById, downloadAndStorePhoto } from "../lib/googlePlaces";
 import { respondInvalid } from "../lib/validationError";
+import { parseCoords } from "../lib/geo";
+import { z } from "zod";
 import {
   PatchAdminEventBody,
   PatchAdminEventParams,
@@ -858,6 +860,8 @@ router.get("/admin/vendors", requireAuth(["admin"]), async (req, res) => {
       city: v.city,
       state: v.state,
       country: v.country,
+      address: v.address ?? "",
+      mapLocation: v.mapLocation ?? "",
       bannerImage: v.bannerImage,
       status: v.status,
       eventCount: eCountMap.get(v.id) ?? 0,
@@ -915,6 +919,54 @@ router.patch("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
     await db.update(organizerEventsTable).set({ venueName: v.businessName }).where(eq(organizerEventsTable.venueId, v.id));
   }
   res.json({ ok: true, vendor: { id: v.id, businessName: v.businessName, status: v.status } });
+});
+
+// ── Admin: edit a venue's location / address / Google Maps Location ──────────
+// Hand-written (not orval) so we can accept the address + map_location fields
+// and derive coordinates without a codegen cycle. Parsing the pasted Google
+// Maps link into latitude/longitude is what powers the 25 km radius filter for
+// cover-charge / ticket offer notifications.
+const AdminVendorLocationBody = z.object({
+  country: z.string().max(100).optional(),
+  state: z.string().max(100).optional(),
+  city: z.string().max(100).optional(),
+  address: z.string().max(2000).optional(),
+  mapLocation: z.string().max(2000).optional(),
+});
+
+router.patch("/admin/vendors/:id/location", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id) || id < 1) { res.status(400).json({ error: "Invalid vendor id" }); return; }
+  const parsed = AdminVendorLocationBody.safeParse(req.body);
+  if (!parsed.success) { respondInvalid(res, parsed.error); return; }
+  const d = parsed.data;
+
+  const updates: Record<string, unknown> = {};
+  if (d.country !== undefined) updates["country"] = d.country;
+  if (d.state !== undefined) updates["state"] = d.state;
+  if (d.city !== undefined) updates["city"] = d.city;
+  if (d.address !== undefined) updates["address"] = d.address;
+  if (d.mapLocation !== undefined) {
+    updates["mapLocation"] = d.mapLocation;
+    // Re-derive coordinates from the pasted link. Null them out if the field is
+    // cleared or unparseable, so a stale coordinate never lingers.
+    const coords = parseCoords(d.mapLocation);
+    updates["latitude"] = coords ? coords.lat.toFixed(6) : null;
+    updates["longitude"] = coords ? coords.lng.toFixed(6) : null;
+  }
+
+  if (Object.keys(updates).length === 0) { res.status(400).json({ error: "No fields to update" }); return; }
+
+  const [v] = await db.update(vendorsTable).set(updates).where(eq(vendorsTable.id, id)).returning();
+  if (!v) { res.status(404).json({ error: "Not found" }); return; }
+  const coords = parseCoords(v.mapLocation);
+  res.json({
+    ok: true,
+    address: v.address ?? "",
+    mapLocation: v.mapLocation,
+    coords: coords ?? null,
+    coordsResolved: !!coords,
+  });
 });
 
 // ── Admin: set live crowd level for a vendor ────────────────────────────────
@@ -1183,7 +1235,7 @@ const UNASSIGNED_VENUE_USER_ID = 0;
 router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
   const adminId = (req as AuthedRequest).user.id;
   const {
-    businessName, category, description, location, city, state, country,
+    businessName, category, description, location, city, state, country, address, mapLocation,
     capacity, imageUrl, pubMode, priceWomen, priceMen, priceCouple,
     galleryImages, galleryVideo, pubEventTypes, dayPricing,
     freeEntryEnabled, freeEntryGenders, freeEntryDays, freeEntryBeforeTime,
@@ -1198,6 +1250,8 @@ router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
     city?: string;
     state?: string;
     country?: string;
+    address?: string;
+    mapLocation?: string;
     capacity?: number;
     imageUrl?: string;
     pubMode?: string;
@@ -1275,6 +1329,10 @@ router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
           state: state ?? "",
           city: city ?? "",
           country: country ?? "India",
+          address: address ?? "",
+          mapLocation: mapLocation ?? "",
+          latitude: mapLocation ? (parseCoords(mapLocation)?.lat.toFixed(6) ?? null) : null,
+          longitude: mapLocation ? (parseCoords(mapLocation)?.lng.toFixed(6) ?? null) : null,
           bannerImage: imageUrl ?? "",
           status: "approved",
           assignmentStatus: "unassigned",
@@ -1667,6 +1725,8 @@ router.get("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
     city: vendor.city,
     state: vendor.state,
     country: vendor.country,
+    address: vendor.address ?? "",
+    mapLocation: vendor.mapLocation ?? "",
     bannerImage: vendor.bannerImage,
     assignmentStatus: vendor.assignmentStatus,
     status: vendor.status,
@@ -1707,7 +1767,7 @@ router.patch("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
   const id = Number(req.params["id"]);
   if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid venue id" }); return; }
   const {
-    businessName, category, description, location, city, state, country,
+    businessName, category, description, location, city, state, country, address, mapLocation,
     capacity, imageUrl, pubMode, priceWomen, priceMen, priceCouple,
     galleryImages, galleryVideo, pubEventTypes, dayPricing,
     freeEntryEnabled, freeEntryGenders, freeEntryDays, freeEntryBeforeTime,
@@ -1718,6 +1778,10 @@ router.patch("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
 
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, id)).limit(1);
   if (!vendor) { res.status(404).json({ error: "Venue not found" }); return; }
+
+  // Google Maps Location → parse coordinates for the 25 km radius notifications.
+  const mapLocationVal = typeof mapLocation === "string" ? mapLocation : undefined;
+  const parsedCoords = mapLocationVal !== undefined ? parseCoords(mapLocationVal) : undefined;
 
   const title = typeof businessName === "string" ? businessName.trim() : vendor.businessName;
   if (!title) { res.status(400).json({ error: "Venue name is required" }); return; }
@@ -1747,6 +1811,14 @@ router.patch("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
         city: typeof city === "string" ? city : vendor.city,
         state: typeof state === "string" ? state : vendor.state,
         country: typeof country === "string" ? country : vendor.country,
+        address: typeof address === "string" ? address : vendor.address,
+        ...(mapLocationVal !== undefined
+          ? {
+              mapLocation: mapLocationVal,
+              latitude: parsedCoords ? parsedCoords.lat.toFixed(6) : null,
+              longitude: parsedCoords ? parsedCoords.lng.toFixed(6) : null,
+            }
+          : {}),
         bannerImage: typeof imageUrl === "string" ? imageUrl : vendor.bannerImage,
         danceFloor: typeof danceFloor === "string" ? (danceFloor || null) : vendor.danceFloor,
         danceFloorPhotos: Array.isArray(danceFloorPhotos) ? (danceFloorPhotos as string[]) : vendor.danceFloorPhotos,
@@ -1824,7 +1896,7 @@ router.post("/admin/venues/:id/drink-plans", requireAuth(["admin"]), async (req,
   if (!parsed.success) { respondInvalid(res, parsed.error); return; }
   const [plan] = await db.insert(drinkPlansTable).values({ vendorId: id, ...parsed.data }).returning();
   // Notify followers when an admin adds a deal on the venue's behalf.
-  void notifyVenueFollowers(id, drinkPlanKind(plan.type));
+  void notifyVenueFollowers(id, drinkPlanKind(plan.type), plan?.id);
   res.json(plan);
 });
 
@@ -1840,8 +1912,9 @@ router.patch("/admin/venues/:id/drink-plans/:planId", requireAuth(["admin"]), as
     .where(and(eq(drinkPlansTable.id, planId), eq(drinkPlansTable.vendorId, id)))
     .returning();
   if (!updated) { res.status(404).json({ error: "Plan not found" }); return; }
-  // Notify followers when an admin updates a deal on the venue's behalf.
-  void notifyVenueFollowers(id, drinkPlanKind(updated.type));
+  // Notify followers when an admin updates a deal. Dedup by plan id means the
+  // same plan won't re-notify on repeated edits.
+  void notifyVenueFollowers(id, drinkPlanKind(updated.type), planId);
   res.json(updated);
 });
 

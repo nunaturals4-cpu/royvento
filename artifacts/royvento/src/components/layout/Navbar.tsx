@@ -12,10 +12,10 @@ import { useGetMe, useLogout } from "@workspace/api-client-react";
 import { Logo } from "@/components/Logo";
 import {
   Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Globe, Palette, Check, Gift, Receipt,
-  Moon, CalendarDays, Wine, Music, Gamepad2, UserPlus, PartyPopper, Info, Newspaper, Mail,
+  Moon, CalendarDays, Wine, Gamepad2, UserPlus, PartyPopper, Info, Newspaper, Mail,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { apiGet, apiPatch } from "@/lib/api";
+import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CityPickerModal } from "@/components/CityPickerModal";
 import { useTranslation } from "react-i18next";
@@ -29,6 +29,9 @@ interface Notification {
   id: number;
   title: string;
   message: string;
+  /** Deep-link target opened when the notification is tapped. */
+  url?: string;
+  type?: string;
   isRead: boolean;
   createdAt: string;
 }
@@ -165,7 +168,7 @@ export function Navbar() {
   const notifRef = useRef<HTMLDivElement | null>(null);
   const qc = useQueryClient();
 
-  const { selectedCity, selectedLocality } = useSelectedCity();
+  const { selectedCity, selectedLocality, coords } = useSelectedCity();
   // Show the precise locality (e.g. "Tarulia") when we have it, falling back to
   // the city (e.g. "Bidhannagar"). Matches Zomato/Swiggy's "area-first" label.
   const locationLabel = selectedLocality || selectedCity;
@@ -183,8 +186,12 @@ export function Navbar() {
     queryKey: ["notifications"],
     queryFn: () => apiGet<Notification[]>("/api/notifications"),
     enabled: !!user,
-    staleTime: 10 * 60 * 60 * 1000,
-    refetchInterval: false,
+    // Poll in the background so the bell reflects new follow notifications
+    // within ~1 min even when web push isn't configured/granted (mirrors the
+    // mobile app). Push, when available, still updates it instantly via the
+    // service-worker message listener below.
+    staleTime: 60_000,
+    refetchInterval: 60_000,
   });
 
   // Global, admin-controlled visibility: which primary-nav items are hidden.
@@ -248,6 +255,19 @@ export function Navbar() {
   // and the badge updates whenever the user navigates or marks a notification
   // read. If a stale badge is ever an issue, the user can refresh manually.
 
+  // Persist the logged-in user's latest location for nearby-offer alerts. Fires
+  // when they log in (user + coords both present) and whenever the detected
+  // position changes; the server ignores sub-~50 m jitter. Requirement (1):
+  // "save the user's current location on login; update it if it changes."
+  const lastPostedLoc = useRef<string>("");
+  useEffect(() => {
+    if (!user || !coords) return;
+    const key = `${coords.lat.toFixed(4)},${coords.lng.toFixed(4)}`;
+    if (lastPostedLoc.current === key) return;
+    lastPostedLoc.current = key;
+    apiPost("/api/users/me/location", { lat: coords.lat, lng: coords.lng }).catch(() => {});
+  }, [user, coords]);
+
   const handleLogout = () => {
     logout.mutate(undefined, {
       onSuccess: () => {
@@ -264,6 +284,14 @@ export function Navbar() {
   };
 
   const unreadCount = notifs.filter((n) => !n.isRead).length;
+
+  // Tapping a notification marks it read and, if it carries a deep link, opens
+  // the exact event/offer/venue page so the user can book or claim right away.
+  const openNotification = (n: Notification) => {
+    if (!n.isRead) markReadMutation.mutate(n.id);
+    setNotifOpen(false);
+    if (n.url && n.url !== "/") setLocation(n.url);
+  };
 
   // Primary navigation (left of the second tier) — shared by the desktop bar and
   // the mobile drawer so the two never drift out of sync. Built from the shared
@@ -284,13 +312,8 @@ export function Navbar() {
         { href: "/pub-offers", label: t("nav.happy_hour", "Happy Hour"), sub: t("nav.happy_hour_sub", "Drink deals & offers"), Icon: Wine, navKey: "pub-offers" },
       ],
     },
-    {
-      kind: "menu",
-      label: t("nav.venues", "Venues"),
-      items: [
-        { href: "/pubs", label: t("nav.pubs", "Pubs & Clubs"), sub: t("nav.pubs_sub", "Bars, clubs & lounges"), Icon: Music, navKey: "pubs" },
-      ],
-    },
+    // Direct link (no dropdown) — a single destination doesn't warrant a menu.
+    { kind: "link", label: t("nav.pub_club", "Pub & Club"), href: "/pubs", navKey: "pubs" },
     {
       kind: "menu",
       label: t("nav.experiences", "Experiences"),
@@ -433,7 +456,7 @@ export function Navbar() {
                             <div
                               key={n.id}
                               className={`px-4 py-3 cursor-pointer hover:bg-accent/30 transition-colors ${!n.isRead ? "bg-primary/5" : ""}`}
-                              onClick={() => { if (!n.isRead) markReadMutation.mutate(n.id); }}
+                              onClick={() => openNotification(n)}
                             >
                               <div className="flex items-start gap-2">
                                 {!n.isRead && (

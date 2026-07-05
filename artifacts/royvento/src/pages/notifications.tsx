@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Bell, CheckCheck, Loader2 } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { apiGet, apiPatch } from "@/lib/api";
@@ -9,6 +10,9 @@ interface Notification {
   id: number;
   title: string;
   message: string;
+  /** Deep-link target opened when the notification is tapped. */
+  url?: string;
+  type?: string;
   isRead: boolean;
   createdAt: string;
 }
@@ -30,6 +34,7 @@ function formatTime(iso: string) {
 export function Notifications() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const { data, isLoading } = useQuery<Notification[]>({
     queryKey: ["notifications"],
@@ -62,6 +67,13 @@ export function Notifications() {
 
   const notifications = data ?? [];
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  // Mark read and, when the notification carries a deep link, open the exact
+  // event/offer/venue page so the user can act on it immediately.
+  const openNotification = (n: Notification) => {
+    if (!n.isRead) markRead.mutate(n.id);
+    if (n.url && n.url !== "/") setLocation(n.url);
+  };
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl">
@@ -112,9 +124,7 @@ export function Notifications() {
               className={`px-6 py-4 flex items-start gap-3 cursor-pointer hover:bg-accent/20 transition-colors ${
                 !n.isRead ? "bg-primary/5" : ""
               }`}
-              onClick={() => {
-                if (!n.isRead) markRead.mutate(n.id);
-              }}
+              onClick={() => openNotification(n)}
             >
               <span
                 className={`mt-2 h-2 w-2 rounded-full shrink-0 ${

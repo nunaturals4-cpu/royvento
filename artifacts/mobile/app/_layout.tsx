@@ -46,6 +46,56 @@ Notifications.setNotificationHandler({
 });
 
 /**
+ * Map a notification's payload to a mobile route so tapping it opens the exact
+ * page (fixing "notifications show but don't navigate"). Server notifications
+ * carry a web-style `url` (e.g. "/organizer-events/nye-12"); the mobile app's
+ * Expo Router routes mirror those paths, so most pass straight through. The one
+ * exception is a venue: web uses "/pubs/{city}/{slug}-{id}" while mobile uses
+ * "/partner/{id}", so we extract the trailing id. Returns null when there is
+ * nothing safe to navigate to.
+ */
+function resolveNotificationRoute(data: Record<string, unknown> | undefined): string | null {
+  if (!data) return null;
+  // Legacy screen hint still supported.
+  if (data.screen === "bookings") return "/(tabs)/bookings";
+
+  const url = typeof data.url === "string" ? data.url.trim() : "";
+  if (!url || !url.startsWith("/")) return null;
+
+  // Venue page: /pubs/<city>/<slug>-<id>[?tab=…]  →  /partner/<id>
+  const pubMatch = /^\/pubs\/[^/]+\/.+-(\d+)(?:[/?#].*)?$/.exec(url);
+  if (pubMatch) return `/partner/${pubMatch[1]}`;
+
+  // Pub event page: /events/<city>/<slug>-<id>[?to=…]  →  /event/<id>
+  const eventMatch = /^\/events\/[^/]+\/.+-(\d+)(?:[/?#].*)?$/.exec(url);
+  if (eventMatch) return `/event/${eventMatch[1]}`;
+
+  // Dashboard bookings → the bookings tab.
+  if (url.startsWith("/dashboard/bookings")) return "/(tabs)/bookings";
+
+  // Paths whose mobile route matches the web path 1:1.
+  const PASSTHROUGH = [
+    "/organizer-events/",
+    "/organizers/",
+    "/game-organizers/",
+    "/event/",
+    "/events",
+    "/partner/",
+    "/pub-offers",
+    "/tonight-plans",
+    "/games-and-sports",
+    "/solo-connect",
+    "/blogs",
+    "/blog/",
+    "/notifications",
+    "/subscription",
+  ];
+  if (PASSTHROUGH.some((p) => url === p || url.startsWith(p))) return url;
+
+  return null;
+}
+
+/**
  * Request notification permission and obtain the Expo push token.
  * Safe to call before any user is logged in (first launch).
  * Returns null on web, when permission is denied, or on any error.
@@ -164,11 +214,21 @@ function NotificationHandler({ pushToken }: NotificationHandlerProps) {
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         const data = response.notification.request.content.data as Record<string, unknown>;
-        if (data?.screen === "bookings") {
-          router.push("/(tabs)/bookings" as never);
-        }
+        const target = resolveNotificationRoute(data);
+        if (target) router.push(target as never);
       },
     );
+
+    // If the app was cold-started by tapping a notification, honour its deep
+    // link too (the listener above only fires for taps while already running).
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (!response) return;
+        const data = response.notification.request.content.data as Record<string, unknown>;
+        const target = resolveNotificationRoute(data);
+        if (target) router.push(target as never);
+      })
+      .catch(() => {});
 
     return () => {
       responseListener.current?.remove();

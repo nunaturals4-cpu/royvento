@@ -22,6 +22,9 @@ router.get("/notifications", requireAuth(), async (req, res) => {
       userId: n.userId,
       title: n.title,
       message: n.message,
+      // Deep-link target so the in-app list can navigate on tap.
+      url: n.url ?? "",
+      type: n.type ?? "general",
       isRead: n.isRead,
       createdAt: n.createdAt.toISOString(),
     })),
@@ -82,6 +85,8 @@ router.patch("/notifications/:id/read", requireAuth(), async (req, res) => {
     userId: updated.userId,
     title: updated.title,
     message: updated.message,
+    url: updated.url ?? "",
+    type: updated.type ?? "general",
     isRead: updated.isRead,
     createdAt: updated.createdAt.toISOString(),
   });

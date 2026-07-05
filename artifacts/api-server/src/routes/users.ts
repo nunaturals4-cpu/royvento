@@ -47,6 +47,59 @@ router.patch("/users/me", requireAuth(), async (req, res) => {
   res.json(userToPublic(updated));
 });
 
+// ── Save / update the current user's location ────────────────────────────────
+// Called by the web/mobile client right after login (and whenever the browser
+// reports a fresh position). We keep the LATEST location only, stamping
+// location_updated_at, so nearby-offer notifications always use the most recent
+// position. Idempotent last-write-wins; a tiny jitter below ~50 m is ignored so
+// we don't thrash the row on every GPS tick.
+const SaveLocationBody = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+});
+
+router.post("/users/me/location", requireAuth(), async (req, res) => {
+  const me = await loadUserFromRequest(req);
+  if (!me) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const parsed = SaveLocationBody.safeParse(req.body);
+  if (!parsed.success) {
+    respondInvalid(res, parsed.error);
+    return;
+  }
+  const { lat, lng } = parsed.data;
+
+  // Skip a no-op write when the position barely moved (~4 decimals ≈ 11 m).
+  const [cur] = await db
+    .select({ lat: usersTable.latitude, lng: usersTable.longitude })
+    .from(usersTable)
+    .where(eq(usersTable.id, me.id))
+    .limit(1);
+  const prevLat = cur?.lat != null ? Number(cur.lat) : null;
+  const prevLng = cur?.lng != null ? Number(cur.lng) : null;
+  const unchanged =
+    prevLat != null &&
+    prevLng != null &&
+    Math.abs(prevLat - lat) < 0.0005 &&
+    Math.abs(prevLng - lng) < 0.0005;
+  if (unchanged) {
+    res.json({ ok: true, updated: false });
+    return;
+  }
+
+  await db
+    .update(usersTable)
+    .set({
+      latitude: lat.toFixed(6),
+      longitude: lng.toFixed(6),
+      locationUpdatedAt: new Date(),
+    })
+    .where(eq(usersTable.id, me.id));
+  res.json({ ok: true, updated: true });
+});
+
 router.get("/users", requireAuth(["admin"]), async (_req, res) => {
   const rows = await db
     .select()

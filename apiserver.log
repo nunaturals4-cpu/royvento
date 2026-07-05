@@ -1,0 +1,87 @@
+
+> @workspace/api-server@0.0.0 dev:local D:\royvento\artifacts\api-server
+> pnpm run build && node --enable-source-maps --env-file=.env.local ./dist/index.mjs
+
+
+> @workspace/api-server@0.0.0 build D:\royvento\artifacts\api-server
+> node ./build.mjs
+
+
+  dist\index.mjs                   6.4mb
+  dist\pino-worker.mjs           153.4kb
+  dist\pino-file.mjs             142.0kb
+  dist\pino-pretty.mjs           114.6kb
+  dist\thread-stream-worker.mjs    7.3kb
+  ...and 5 more output files...
+
+Done in 492ms
+[00:15:10.409] [32mINFO[39m (10512): [36mServing frontend dist[39m
+    [35mfrontendDist[39m: "D:\royvento\artifacts\royvento\dist\public"
+[00:15:10.415] [32mINFO[39m (10512): [36mServer listening[39m
+    [35mport[39m: 5000
+[00:15:10.572] [32mINFO[39m (10512): [36mAdmin account ensured (password rotated from ADMIN_PASSWORD)[39m
+[00:15:10.585] [32mINFO[39m (10512): [36mCleanup: deleted old notifications[39m
+    [35mcount[39m: 0
+[00:15:10.594] [32mINFO[39m (10512): [36mCleanup: deleted old emails[39m
+    [35mmessages[39m: 0
+    [35mthreadsPruned[39m: 0
+[00:15:10.697] [32mINFO[39m (10512): [36mSchema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url + announcements.approval_status + razorpay columns + events.disabled_genders + events.hidden ensured[39m
+[00:15:10.698] [31mERROR[39m (10512): [36mStartup audit: users.password_hash failed bcrypt prefix check. See replit.md gotcha.[39m
+    [35mbadPasswordHashCount[39m: 3
+[00:15:10.699] [32mINFO[39m (10512): [36mStartup audit: all vendors have ticketPrefix/ticketSalt[39m
+[00:15:10.703] [33mWARN[39m (10512): [36mStartup audit: 1 vendor owner(s) are also accepted managers of another pub — they will see those pubs in their scanner panels until they tap Leave.[39m
+    [35moverlap[39m: [
+      {
+        "manager_id": 3,
+        "email": "sandipd310@gmail.com",
+        "own_vendor_id": 4,
+        "managed_vendor_ids": [
+          2
+        ]
+      }
+    ]
+[00:15:10.704] [32mINFO[39m (10512): [36mStartup cleanup: no legacy 'Royvento Studio' vendor to remove[39m
+[00:15:10.706] [32mINFO[39m (10512): [36m[email] schema ensured[39m
+[00:17:03.096] [32mINFO[39m (10512): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 1,
+      "method": "GET",
+      "url": "/api/auth/me"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 36
+[00:17:03.155] [32mINFO[39m (10512): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 2,
+      "method": "GET",
+      "url": "/api/site-settings"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 79
+[00:17:03.639] [32mINFO[39m (10512): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 3,
+      "method": "GET",
+      "url": "/api/notifications"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 14
+[00:18:03.981] [32mINFO[39m (10512): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 4,
+      "method": "GET",
+      "url": "/api/notifications"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 7
+D:\royvento\artifacts\api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 dev:local: `pnpm run build && node --enable-source-maps --env-file=.env.local ./dist/index.mjs`
+Exit status 4294967295

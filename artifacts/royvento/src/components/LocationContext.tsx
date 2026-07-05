@@ -11,6 +11,9 @@ interface LocationContextValue {
   /** The user's detected administrative state/region (e.g. "West Bengal").
    *  Empty when unknown (manual city pick or no GPS). */
   selectedState: string;
+  /** Raw GPS coordinates of the latest detected position, or null if unknown.
+   *  Used to persist the user's location for nearby-offer notifications. */
+  coords: { lat: number; lng: number } | null;
   /** `manual` = true when the user explicitly picked a city from the list, so
    *  GPS auto-detect won't override it on the next load. */
   setSelectedCity: (city: string, locality?: string, manual?: boolean) => void;
@@ -25,6 +28,7 @@ const LocationContext = createContext<LocationContextValue>({
   selectedCity: "",
   selectedLocality: "",
   selectedState: "",
+  coords: null,
   setSelectedCity: () => {},
   detectLocation: async () => false,
   detecting: false,
@@ -144,6 +148,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const [detecting, setDetecting] = useState(false);
   const [locationError, setLocationError] = useState("");
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   const setSelectedCity = useCallback((city: string, locality = "", manual = false) => {
     setSelectedCityState(city);
@@ -169,6 +174,8 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     setLocationError("");
     try {
       const pos = await getBestPosition();
+      // Expose the raw fix so it can be persisted for nearby-offer alerts.
+      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       const { city, locality, state } = await reverseGeocodeDetailed(
         pos.coords.latitude,
         pos.coords.longitude,
@@ -217,7 +224,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <LocationContext.Provider
-      value={{ selectedCity, selectedLocality, selectedState, setSelectedCity, detectLocation, detecting, locationError }}
+      value={{ selectedCity, selectedLocality, selectedState, coords, setSelectedCity, detectLocation, detecting, locationError }}
     >
       {children}
     </LocationContext.Provider>

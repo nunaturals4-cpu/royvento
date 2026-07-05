@@ -60,6 +60,7 @@ interface VendorRow {
   state?: string | null;
   city?: string | null;
   address?: string | null;
+  mapLocation?: string | null;
   bannerImage: string;
   coverImageUrl: string;
   portfolioImages: string[];
@@ -146,6 +147,7 @@ async function serializeVendor(v: VendorRow) {
     portfolioImages: v.portfolioImages,
     openDays: v.openDays ?? [],
     address: v.address ?? null,
+    mapLocation: v.mapLocation ?? "",
     dayHours: parseDayHours(v.dayHours),
     status: v.status,
     isPremium: v.isPremium ?? false,
@@ -774,8 +776,9 @@ router.post("/vendors/me/drink-plans", requireAuth(["vendor"]), async (req, res)
     vendorId: vendor[0].id,
     ...parsed.data,
   }).returning();
-  // Instantly notify followers of the new deal (fire-and-forget).
-  void notifyVenueFollowers(vendor[0].id, drinkPlanKind(parsed.data.type));
+  // Instantly notify followers of the new deal (fire-and-forget). Passing the
+  // plan id anchors dedup to this specific deal.
+  void notifyVenueFollowers(vendor[0].id, drinkPlanKind(parsed.data.type), plan?.id);
   res.json(plan);
 });
 
@@ -814,8 +817,9 @@ router.patch("/vendors/me/drink-plans/:planId", requireAuth(["vendor"]), async (
     .where(and(eq(drinkPlansTable.id, planId), eq(drinkPlansTable.vendorId, vendor[0].id)))
     .returning();
   if (!updated) { res.status(404).json({ error: "Plan not found" }); return; }
-  // Instantly notify followers of the updated deal (fire-and-forget).
-  void notifyVenueFollowers(vendor[0].id, drinkPlanKind(effectiveType));
+  // Notify followers (fire-and-forget). Dedup by plan id means re-saving the
+  // same plan won't re-notify — only a genuinely new deal reaches followers.
+  void notifyVenueFollowers(vendor[0].id, drinkPlanKind(effectiveType), planId);
   res.json(updated);
 });
 

@@ -45,6 +45,12 @@ export function FollowButton({ targetType, targetId, name, className = "", hideC
   const following = data?.following ?? false;
   const followerCount = data?.followerCount ?? 0;
 
+  // Follow is a logged-in-only action (it drives personalised push alerts), so
+  // don't show the button to logged-out visitors at all — they'd only be
+  // bounced to /login on tap. They still see the profile; the CTA appears once
+  // they sign in.
+  if (!me?.user) return null;
+
   const toggle = async () => {
     if (!me?.user) { setLocation("/login"); return; }
     if (busy || !enabled) return;

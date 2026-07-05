@@ -5,7 +5,6 @@ import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
 import { isOfferActiveAt } from "../lib/offerActive";
-import { notifyVenueFollowers } from "../lib/venueFollowNotify";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -186,8 +185,10 @@ router.post("/partner/offers", requireAuth(["vendor", "admin"]), async (req, res
         imageUrl: d.imageUrl ?? null,
       })
       .returning();
-    // Instantly notify followers of the new food & drink discount.
-    void notifyVenueFollowers(vendorId, "food_drink");
+    // Do NOT notify instantly. Food & Drink Discount notifications are published
+    // in chronological order (oldest unpublished first), one per 30-min slot per
+    // user, by the foodDrinkNotifier cron — it picks this up via notified_at IS
+    // NULL. (Requirement 2.)
     return res.status(201).json(created);
   } catch (err) {
     return dbErrorResponse(res, "create offer", err);
@@ -235,8 +236,8 @@ router.patch("/partner/offers/:id", requireAuth(["vendor", "admin"]), async (req
       })
       .where(and(eq(vendorOffersTable.id, id), eq(vendorOffersTable.vendorId, vendorId)))
       .returning();
-    // Instantly notify followers of the updated food & drink discount.
-    void notifyVenueFollowers(vendorId, "food_drink");
+    // Editing an existing offer is not "newly added content", so we don't
+    // re-notify followers here — the create path already announced it.
     return res.json(updated);
   } catch (err) {
     return dbErrorResponse(res, "update offer", err);
