@@ -48,26 +48,26 @@ function BlogCard({ blog, featured }: { blog: Blog; featured?: boolean }) {
             )}
           </div>
         )}
-        <div className={`flex flex-col gap-3 p-5 ${featured ? "md:p-8 justify-center" : ""} flex-1`}>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <div className={`flex flex-col ${featured ? "gap-3 p-5 md:p-8 justify-center" : "gap-2 p-4"} flex-1`}>
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <span className="font-medium text-primary/80">{blog.authorName}</span>
             <span>·</span>
             <span>{new Date(blog.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
           </div>
           <h2
             className={`font-serif tracking-tight leading-tight group-hover:text-primary transition-colors line-clamp-2 ${
-              featured ? "text-2xl md:text-3xl" : "text-xl"
+              featured ? "text-2xl md:text-3xl" : "text-base"
             }`}
           >
             {blog.title}
           </h2>
           {blog.excerpt && (
-            <p className={`text-muted-foreground leading-relaxed ${featured ? "line-clamp-3 text-base" : "line-clamp-2 text-sm"}`}>
+            <p className={`text-muted-foreground leading-relaxed ${featured ? "line-clamp-3 text-base" : "line-clamp-2 text-[13px]"}`}>
               {blog.excerpt}
             </p>
           )}
-          <div className="flex items-center gap-1 text-sm font-medium text-primary mt-auto pt-2 group-hover:gap-2 transition-all">
-            Read article <ArrowRight className="h-4 w-4" />
+          <div className={`flex items-center gap-1 font-medium text-primary mt-auto group-hover:gap-2 transition-all ${featured ? "text-sm pt-2" : "text-xs pt-1"}`}>
+            Read article <ArrowRight className={featured ? "h-4 w-4" : "h-3.5 w-3.5"} />
           </div>
         </div>
       </article>
@@ -216,7 +216,7 @@ export function Blogs() {
 
           {/* Grid of remaining articles */}
           {restBlogs.length > 0 && (
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {restBlogs.map((blog) => (
                 <BlogCard key={blog.id} blog={blog} />
               ))}
