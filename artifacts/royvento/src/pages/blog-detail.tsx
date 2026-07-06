@@ -110,8 +110,11 @@ export function BlogDetail() {
       </Link>
 
       {blog.imageUrl && (
-        <div className="rounded-2xl overflow-hidden aspect-[16/7] mb-10">
-          <img src={blog.imageUrl} alt={blog.title} className="w-full h-full object-cover" />
+        // 16:9 matches the cover uploads, so the full image shows without the
+        // top/bottom crop the old 16:7 container caused. bg + object-contain
+        // keeps any non-16:9 image fully visible (letterboxed) rather than cut.
+        <div className="rounded-2xl overflow-hidden aspect-[16/9] mb-10 bg-black/40">
+          <img src={blog.imageUrl} alt={blog.title} className="w-full h-full object-contain" />
         </div>
       )}
 
