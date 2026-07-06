@@ -940,6 +940,11 @@ async function applyPendingSchemaChanges() {
     // see them in its dashboard. NULL for standalone organizer / pub bookings.
     await execSafe(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "host_vendor_id" integer`);
     await execSafe(sql`CREATE INDEX IF NOT EXISTS "bookings_host_vendor_idx" ON "bookings" ("host_vendor_id")`);
+    // organizer_events.venue_id must exist BEFORE the two backfills below reference
+    // it (the full column set is (re)ensured later near the organizer-event block).
+    // Ordering matters: on a DB without this column the backfills would otherwise
+    // error and, pre-resilience, aborted the entire schema sync.
+    await execSafe(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "venue_id" integer`);
     // Backfill host_vendor_id from the event's host venue for organizer bookings
     // made before this column existed, so the host venue's report shows them.
     await execSafe(sql`
