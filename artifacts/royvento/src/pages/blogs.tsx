@@ -29,7 +29,7 @@ function BlogCard({ blog, featured }: { blog: Blog; featured?: boolean }) {
         {blog.imageUrl && (
           <div
             className={`relative overflow-hidden shrink-0 ${
-              featured ? "md:w-[55%] aspect-[16/9] md:aspect-auto" : "aspect-[16/9]"
+              featured ? "md:w-1/2 aspect-[16/9]" : "aspect-[16/9]"
             }`}
           >
             <img
@@ -48,7 +48,7 @@ function BlogCard({ blog, featured }: { blog: Blog; featured?: boolean }) {
             )}
           </div>
         )}
-        <div className={`flex flex-col ${featured ? "gap-3 p-5 md:p-8 justify-center" : "gap-2 p-4"} flex-1`}>
+        <div className={`flex flex-col ${featured ? "gap-3 p-5 md:p-6 justify-center" : "gap-2 p-4"} flex-1`}>
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <span className="font-medium text-primary/80">{blog.authorName}</span>
             <span>·</span>
@@ -56,7 +56,7 @@ function BlogCard({ blog, featured }: { blog: Blog; featured?: boolean }) {
           </div>
           <h2
             className={`font-serif tracking-tight leading-tight group-hover:text-primary transition-colors line-clamp-2 ${
-              featured ? "text-2xl md:text-3xl" : "text-base"
+              featured ? "text-xl md:text-2xl" : "text-base"
             }`}
           >
             {blog.title}
