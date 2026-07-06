@@ -21,50 +21,47 @@ interface Blog {
 const fmtDate = (d: string) =>
   new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
-// Featured hero: a compact, magazine-style banner — cover image with a bottom
-// gradient and the headline / meta laid over it. Controlled height so it never
-// balloons regardless of the source image's shape.
+// Featured card: a clean horizontal split. The image column is locked to the
+// covers' native 16:9 ratio, so the FULL image is shown (object-cover doesn't
+// crop when the container aspect matches the image), while the half-width keeps
+// the card compact (~300px tall) instead of a full-bleed 16:9 banner.
 function FeaturedBlogCard({ blog }: { blog: Blog }) {
   return (
     <Link href={`/blogs/${blog.slug}`}>
-      <article className="group relative cursor-pointer overflow-hidden rounded-2xl border border-border/60 hover:border-primary/30 transition-colors duration-300 h-[240px] sm:h-[280px] md:h-[300px]">
-        {blog.imageUrl ? (
-          <img
-            src={blog.imageUrl}
-            alt={blog.title}
-            loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-zinc-900 to-black" />
-        )}
-        {/* Readability scrims — heavier at the bottom-left where the text sits. */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/5" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/10 to-transparent" />
-
-        <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6 md:p-8">
-          <div className="max-w-2xl space-y-2.5">
+      <article className="group cursor-pointer overflow-hidden rounded-2xl border border-border/60 bg-card/30 hover:border-primary/30 transition-colors duration-300 flex flex-col md:flex-row">
+        {blog.imageUrl && (
+          <div className="relative shrink-0 overflow-hidden aspect-[16/9] md:w-[48%]">
+            <img
+              src={blog.imageUrl}
+              alt={blog.title}
+              loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+            />
             {blog.tags.length > 0 && (
-              <Badge className="bg-primary/90 text-primary-foreground border-0 text-[10px] uppercase tracking-wide">
-                {blog.tags[0]}
-              </Badge>
+              <div className="absolute top-3 left-3">
+                <Badge className="bg-primary/90 text-primary-foreground border-0 text-[10px] uppercase tracking-wide">
+                  {blog.tags[0]}
+                </Badge>
+              </div>
             )}
-            <h2 className="font-serif text-xl sm:text-2xl md:text-3xl tracking-tight leading-tight text-white line-clamp-2">
-              {blog.title}
-            </h2>
-            {blog.excerpt && (
-              <p className="hidden sm:block text-sm text-white/60 leading-relaxed line-clamp-2 max-w-xl">
-                {blog.excerpt}
-              </p>
-            )}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/50 pt-0.5">
-              <span className="font-medium text-primary/80">{blog.authorName}</span>
-              <span>·</span>
-              <span>{fmtDate(blog.createdAt)}</span>
-              <span className="flex items-center gap-1 font-medium text-primary ml-auto sm:ml-1 group-hover:gap-2 transition-all">
-                Read article <ArrowRight className="h-3.5 w-3.5" />
-              </span>
-            </div>
+          </div>
+        )}
+        <div className="flex flex-1 flex-col justify-center gap-2.5 p-5 md:p-7">
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="font-medium text-primary/80">{blog.authorName}</span>
+            <span>·</span>
+            <span>{fmtDate(blog.createdAt)}</span>
+          </div>
+          <h2 className="font-serif text-lg sm:text-xl md:text-2xl tracking-tight leading-tight group-hover:text-primary transition-colors line-clamp-2">
+            {blog.title}
+          </h2>
+          {blog.excerpt && (
+            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 md:line-clamp-3">
+              {blog.excerpt}
+            </p>
+          )}
+          <div className="flex items-center gap-1 text-sm font-medium text-primary pt-0.5 group-hover:gap-2 transition-all">
+            Read article <ArrowRight className="h-4 w-4" />
           </div>
         </div>
       </article>
