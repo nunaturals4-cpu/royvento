@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, couponsTable, usersTable, vendorsTable, vendorCouponsTable } from "@workspace/db";
+import { db, couponsTable, usersTable, vendorsTable, vendorCouponsTable, followsTable } from "@workspace/db";
 import { eq, desc, and, isNull, or, gt } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
@@ -24,6 +24,34 @@ function genCode(prefix = "RV"): string {
 /** Generate a random 5-character alphanumeric code (uppercase). */
 function genVendorCode(): string {
   return randomCode(5);
+}
+
+// Is `userId` following the given vendor? Used to gate follower/non-follower
+// coupons. Never throws — a missing follows table degrades to "not following".
+async function isFollowingVendor(userId: number, vendorId: number): Promise<boolean> {
+  try {
+    const rows = await db
+      .select({ id: followsTable.id })
+      .from(followsTable)
+      .where(
+        and(
+          eq(followsTable.userId, userId),
+          eq(followsTable.targetType, "vendor"),
+          eq(followsTable.targetId, vendorId),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// Given a coupon audience and the viewer's follow status, may they use it?
+function audienceAllows(audience: string | null | undefined, following: boolean): boolean {
+  if (audience === "followers") return following;
+  if (audience === "non_followers") return !following;
+  return true; // "all" / legacy
 }
 
 // ─── User coupon routes ───────────────────────────────────────────────────────
@@ -96,6 +124,7 @@ router.post("/coupons/validate", requireAuth(), async (req, res) => {
       discountType: vendorCouponsTable.discountType,
       discountValue: vendorCouponsTable.discountValue,
       applicableTo: vendorCouponsTable.applicableTo,
+      audience: vendorCouponsTable.audience,
       vendorId: vendorCouponsTable.vendorId,
       maxUses: vendorCouponsTable.maxUses,
       usedCount: vendorCouponsTable.usedCount,
@@ -122,6 +151,18 @@ router.post("/coupons/validate", requireAuth(), async (req, res) => {
   if (vc.expiresAt && new Date(vc.expiresAt) < new Date()) {
     return res.status(400).json({ error: "This coupon has expired." });
   }
+  // Follower-audience guard — prevent a non-follower from using a followers-only
+  // code they obtained out of band (and vice-versa).
+  if (vc.audience === "followers" || vc.audience === "non_followers") {
+    const following = await isFollowingVendor(user.id, vc.vendorId);
+    if (!audienceAllows(vc.audience, following)) {
+      return res.status(400).json({
+        error: vc.audience === "followers"
+          ? `Follow ${vc.vendorName ?? "this venue"} to unlock this coupon.`
+          : "This coupon is only available to users who don't follow this venue.",
+      });
+    }
+  }
   // Vendor-lock guard
   if (parsed.data.vendorId && vc.vendorId !== parsed.data.vendorId) {
     return res.status(400).json({
@@ -146,7 +187,8 @@ const VendorCouponBody = z.object({
   code: z.string().min(3).max(10).transform((v) => v.trim().toUpperCase()).optional(),
   discountType: z.enum(["percent", "fixed"]).default("percent"),
   discountValue: z.number().positive().max(100000),
-  applicableTo: z.enum(["ticket", "event", "both"]).default("both"),
+  applicableTo: z.enum(["ticket", "event", "event_booking", "cover_charge", "both"]).default("both"),
+  audience: z.enum(["all", "followers", "non_followers"]).default("all"),
   active: z.boolean().default(true),
   maxUses: z.number().int().positive().nullable().optional(),
   expiresAt: z.string().datetime({ offset: true }).nullable().optional(),
@@ -183,6 +225,11 @@ router.post("/partner/coupons", requireAuth(["vendor", "admin"]), async (req, re
     code = genVendorCode();
   }
 
+  // Follower / non-follower coupons are non-expiring by design.
+  const expiresAt = parsed.data.audience === "all"
+    ? (parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null)
+    : null;
+
   const [created] = await db
     .insert(vendorCouponsTable)
     .values({
@@ -191,9 +238,10 @@ router.post("/partner/coupons", requireAuth(["vendor", "admin"]), async (req, re
       discountType: parsed.data.discountType,
       discountValue: String(parsed.data.discountValue),
       applicableTo: parsed.data.applicableTo,
+      audience: parsed.data.audience,
       active: parsed.data.active,
       maxUses: parsed.data.maxUses ?? null,
-      expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
+      expiresAt,
     })
     .returning();
   return res.status(201).json(created);
@@ -215,15 +263,23 @@ router.patch("/partner/coupons/:id", requireAuth(["vendor", "admin"]), async (re
   const parsed = UpdateBody.safeParse(req.body);
   if (!parsed.success) return respondInvalid(res, parsed.error);
 
+  // Follower / non-follower coupons are non-expiring: force expiry null whenever
+  // the effective audience is targeted.
+  const effectiveAudience = parsed.data.audience ?? existing[0].audience;
+  const expiryUpdate = effectiveAudience !== "all"
+    ? { expiresAt: null }
+    : (parsed.data.expiresAt !== undefined ? { expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null } : {});
+
   const [updated] = await db
     .update(vendorCouponsTable)
     .set({
       ...(parsed.data.discountType !== undefined && { discountType: parsed.data.discountType }),
       ...(parsed.data.discountValue !== undefined && { discountValue: String(parsed.data.discountValue) }),
       ...(parsed.data.applicableTo !== undefined && { applicableTo: parsed.data.applicableTo }),
+      ...(parsed.data.audience !== undefined && { audience: parsed.data.audience }),
       ...(parsed.data.active !== undefined && { active: parsed.data.active }),
       ...(parsed.data.maxUses !== undefined && { maxUses: parsed.data.maxUses }),
-      ...(parsed.data.expiresAt !== undefined && { expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null }),
+      ...expiryUpdate,
     })
     .where(and(eq(vendorCouponsTable.id, id), eq(vendorCouponsTable.vendorId, vRows[0].id)))
     .returning();
@@ -247,11 +303,17 @@ router.delete("/partner/coupons/:id", requireAuth(["vendor", "admin"]), async (r
   return res.json({ ok: true });
 });
 
-// Public: list active vendor coupons for a vendor (for display on booking page)
+// Public: list active vendor coupons for a vendor (for display on booking page).
+// Auth is optional — the viewer's follow status decides which follower-gated
+// coupons are shown. Logged-out visitors count as non-followers.
 router.get("/vendor-coupons/vendor/:vendorId", async (req, res) => {
   const vendorId = Number(req.params["vendorId"]);
   if (!Number.isFinite(vendorId)) return res.status(400).json({ error: "Invalid vendorId" });
   const now = new Date();
+
+  const me = await loadUserFromRequest(req).catch(() => null);
+  const following = me ? await isFollowingVendor(me.id, vendorId) : false;
+
   const rows = await db
     .select({
       id: vendorCouponsTable.id,
@@ -259,6 +321,7 @@ router.get("/vendor-coupons/vendor/:vendorId", async (req, res) => {
       discountType: vendorCouponsTable.discountType,
       discountValue: vendorCouponsTable.discountValue,
       applicableTo: vendorCouponsTable.applicableTo,
+      audience: vendorCouponsTable.audience,
       maxUses: vendorCouponsTable.maxUses,
       usedCount: vendorCouponsTable.usedCount,
       expiresAt: vendorCouponsTable.expiresAt,
@@ -271,10 +334,12 @@ router.get("/vendor-coupons/vendor/:vendorId", async (req, res) => {
       ),
     )
     .orderBy(desc(vendorCouponsTable.createdAt));
-  // Filter out expired and maxed-out coupons in application layer
+  // Filter out expired / maxed-out coupons and any the viewer isn't eligible for
+  // based on their follow status.
   const available = rows.filter((c) => {
     if (c.expiresAt && new Date(c.expiresAt) < now) return false;
     if (c.maxUses !== null && c.usedCount >= c.maxUses) return false;
+    if (!audienceAllows(c.audience, following)) return false;
     return true;
   });
   return res.json(available);
@@ -369,7 +434,8 @@ const AdminVendorCouponBody = z.object({
   code: z.string().min(3).max(10).transform((v) => v.trim().toUpperCase()).optional(),
   discountType: z.enum(["percent", "fixed"]).default("percent"),
   discountValue: z.number().positive().max(100000),
-  applicableTo: z.enum(["ticket", "event", "both"]).default("both"),
+  applicableTo: z.enum(["ticket", "event", "event_booking", "cover_charge", "both"]).default("both"),
+  audience: z.enum(["all", "followers", "non_followers"]).default("all"),
   active: z.boolean().default(true),
   maxUses: z.number().int().positive().nullable().optional(),
   expiresAt: z.string().datetime({ offset: true }).nullable().optional(),
@@ -389,6 +455,10 @@ router.post("/admin/vendor-coupons", requireAuth(["admin"]), async (req, res) =>
     code = genVendorCode();
   }
 
+  const expiresAt = parsed.data.audience === "all"
+    ? (parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null)
+    : null;
+
   const [created] = await db
     .insert(vendorCouponsTable)
     .values({
@@ -397,9 +467,10 @@ router.post("/admin/vendor-coupons", requireAuth(["admin"]), async (req, res) =>
       discountType: parsed.data.discountType,
       discountValue: String(parsed.data.discountValue),
       applicableTo: parsed.data.applicableTo,
+      audience: parsed.data.audience,
       active: parsed.data.active,
       maxUses: parsed.data.maxUses ?? null,
-      expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
+      expiresAt,
     })
     .returning();
   return res.status(201).json(created);
@@ -414,6 +485,7 @@ router.get("/admin/vendor-coupons", requireAuth(["admin"]), async (_req, res) =>
       discountType: vendorCouponsTable.discountType,
       discountValue: vendorCouponsTable.discountValue,
       applicableTo: vendorCouponsTable.applicableTo,
+      audience: vendorCouponsTable.audience,
       active: vendorCouponsTable.active,
       maxUses: vendorCouponsTable.maxUses,
       usedCount: vendorCouponsTable.usedCount,
@@ -434,8 +506,13 @@ router.patch("/admin/vendor-coupons/:id", requireAuth(["admin"]), async (req, re
   const parsed = VendorCouponBody.partial().safeParse(req.body);
   if (!parsed.success) return respondInvalid(res, parsed.error);
 
-  const existing = await db.select({ id: vendorCouponsTable.id }).from(vendorCouponsTable).where(eq(vendorCouponsTable.id, id)).limit(1);
+  const existing = await db.select({ id: vendorCouponsTable.id, audience: vendorCouponsTable.audience }).from(vendorCouponsTable).where(eq(vendorCouponsTable.id, id)).limit(1);
   if (!existing[0]) return res.status(404).json({ error: "Coupon not found." });
+
+  const effectiveAudience = parsed.data.audience ?? existing[0].audience;
+  const expiryUpdate = effectiveAudience !== "all"
+    ? { expiresAt: null }
+    : (parsed.data.expiresAt !== undefined ? { expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null } : {});
 
   const [updated] = await db
     .update(vendorCouponsTable)
@@ -443,9 +520,10 @@ router.patch("/admin/vendor-coupons/:id", requireAuth(["admin"]), async (req, re
       ...(parsed.data.discountType !== undefined && { discountType: parsed.data.discountType }),
       ...(parsed.data.discountValue !== undefined && { discountValue: String(parsed.data.discountValue) }),
       ...(parsed.data.applicableTo !== undefined && { applicableTo: parsed.data.applicableTo }),
+      ...(parsed.data.audience !== undefined && { audience: parsed.data.audience }),
       ...(parsed.data.active !== undefined && { active: parsed.data.active }),
       ...(parsed.data.maxUses !== undefined && { maxUses: parsed.data.maxUses }),
-      ...(parsed.data.expiresAt !== undefined && { expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null }),
+      ...expiryUpdate,
     })
     .where(eq(vendorCouponsTable.id, id))
     .returning();

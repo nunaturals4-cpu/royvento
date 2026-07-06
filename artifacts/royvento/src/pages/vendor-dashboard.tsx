@@ -5943,12 +5943,16 @@ function CoverSavingsSummary({ items, packageRupees }: { items: DrinkPlanLineIte
 
 // ─── Coupons Panel ────────────────────────────────────────────────────────────
 
+type CouponAudience = "all" | "followers" | "non_followers";
+type CouponApplicableTo = "ticket" | "event" | "event_booking" | "cover_charge" | "both";
+
 interface VendorCoupon {
   id: number;
   code: string;
   discountType: "percent" | "fixed";
   discountValue: string;
-  applicableTo: "ticket" | "event" | "both";
+  applicableTo: CouponApplicableTo;
+  audience: CouponAudience;
   active: boolean;
   maxUses: number | null;
   usedCount: number;
@@ -5956,7 +5960,10 @@ interface VendorCoupon {
   createdAt: string;
 }
 
-const BLANK_COUPON: { code: string; discountType: "percent" | "fixed"; discountValue: string; applicableTo: "ticket" | "event" | "both"; active: boolean; maxUses: string; expiresAt: string } = { code: "", discountType: "percent", discountValue: "10", applicableTo: "both", active: true, maxUses: "", expiresAt: "" };
+const BLANK_COUPON: { code: string; discountType: "percent" | "fixed"; discountValue: string; applicableTo: CouponApplicableTo; audience: CouponAudience; active: boolean; maxUses: string; expiresAt: string } = { code: "", discountType: "percent", discountValue: "10", applicableTo: "both", audience: "all", active: true, maxUses: "", expiresAt: "" };
+
+const AUDIENCE_LABELS: Record<CouponAudience, string> = { all: "Everyone", followers: "Followers only", non_followers: "Non-followers only" };
+const APPLICABLE_LABELS: Record<CouponApplicableTo, string> = { both: "All bookings", ticket: "Tickets only", event: "Table only", event_booking: "Event booking only", cover_charge: "Cover charges only" };
 
 function CouponsPanel() {
   const { toast } = useToast();
@@ -5980,7 +5987,7 @@ function CouponsPanel() {
 
   const openCreate = () => { setForm(BLANK_COUPON); setEditing(null); setShowForm(true); };
   const openEdit = (c: VendorCoupon) => {
-    setForm({ code: c.code, discountType: c.discountType, discountValue: String(c.discountValue), applicableTo: c.applicableTo, active: c.active, maxUses: c.maxUses != null ? String(c.maxUses) : "", expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : "" });
+    setForm({ code: c.code, discountType: c.discountType, discountValue: String(c.discountValue), applicableTo: c.applicableTo, audience: c.audience ?? "all", active: c.active, maxUses: c.maxUses != null ? String(c.maxUses) : "", expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : "" });
     setEditing(c);
     setShowForm(true);
   };
@@ -5992,9 +5999,11 @@ function CouponsPanel() {
         discountType: form.discountType,
         discountValue: Number(form.discountValue),
         applicableTo: form.applicableTo,
+        audience: form.audience,
         active: form.active,
         maxUses: form.maxUses ? Number(form.maxUses) : null,
-        expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
+        // Follower / non-follower coupons are non-expiring by design.
+        expiresAt: form.audience === "all" && form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
       };
       if (!editing) payload.code = form.code.trim().toUpperCase() || undefined;
 
@@ -6090,16 +6099,38 @@ function CouponsPanel() {
             </div>
             <div>
               <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Applicable To</Label>
-              <Select value={form.applicableTo} onValueChange={(v) => setForm({ ...form, applicableTo: v as "ticket" | "event" | "both" })}>
+              <Select value={form.applicableTo} onValueChange={(v) => setForm({ ...form, applicableTo: v as CouponApplicableTo })}>
                 <SelectTrigger className="bg-black/40 border-white/10 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="both">Both (Tickets & Events)</SelectItem>
+                  <SelectItem value="both">All Booking Types</SelectItem>
                   <SelectItem value="ticket">Ticket Bookings Only</SelectItem>
-                  <SelectItem value="event">Event/Table Bookings Only</SelectItem>
+                  <SelectItem value="event">Table Bookings Only</SelectItem>
+                  <SelectItem value="event_booking">Event Booking Only</SelectItem>
+                  <SelectItem value="cover_charge">Cover Charges Only</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Audience</Label>
+              <Select value={form.audience} onValueChange={(v) => setForm({ ...form, audience: v as CouponAudience })}>
+                <SelectTrigger className="bg-black/40 border-white/10 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Everyone</SelectItem>
+                  <SelectItem value="followers">Followers</SelectItem>
+                  <SelectItem value="non_followers">Non-Followers</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.audience !== "all" && (
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  {form.audience === "followers"
+                    ? "Auto-unlocked for users after they follow your venue. Non-expiring."
+                    : "Shown only to users who don't follow your venue. Non-expiring."}
+                </p>
+              )}
             </div>
             <div>
               <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Max Uses (blank = unlimited)</Label>
@@ -6112,15 +6143,17 @@ function CouponsPanel() {
                 className="bg-black/40 border-white/10 rounded-xl"
               />
             </div>
-            <div>
-              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Expires On (blank = never)</Label>
-              <Input
-                type="date"
-                value={form.expiresAt}
-                onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
-                className="bg-black/40 border-white/10 rounded-xl"
-              />
-            </div>
+            {form.audience === "all" && (
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Expires On (blank = never)</Label>
+                <Input
+                  type="date"
+                  value={form.expiresAt}
+                  onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
+                  className="bg-black/40 border-white/10 rounded-xl"
+                />
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 cursor-pointer text-sm">
@@ -6152,6 +6185,7 @@ function CouponsPanel() {
                   <th className="px-4 py-3 text-left">Code</th>
                   <th className="px-4 py-3 text-left">Discount</th>
                   <th className="px-4 py-3 text-left">Applies To</th>
+                  <th className="px-4 py-3 text-left">Audience</th>
                   <th className="px-4 py-3 text-left">Uses</th>
                   <th className="px-4 py-3 text-left">Expires</th>
                   <th className="px-4 py-3 text-left">Status</th>
@@ -6170,7 +6204,12 @@ function CouponsPanel() {
                         : <span className="flex items-center gap-1"><IndianRupee className="h-3.5 w-3.5 text-emerald-400" />{Number(c.discountValue)} off</span>
                       }
                     </td>
-                    <td className="px-4 py-3 capitalize text-muted-foreground text-xs">{c.applicableTo === "both" ? "All bookings" : `${c.applicableTo}s`}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">{APPLICABLE_LABELS[c.applicableTo] ?? c.applicableTo}</td>
+                    <td className="px-4 py-3 text-xs">
+                      {(c.audience ?? "all") === "all"
+                        ? <span className="text-muted-foreground">Everyone</span>
+                        : <span className={`px-2 py-0.5 rounded-md font-medium ${c.audience === "followers" ? "bg-primary/15 text-primary" : "bg-sky-500/15 text-sky-300"}`}>{AUDIENCE_LABELS[c.audience]}</span>}
+                    </td>
                     <td className="px-4 py-3 text-muted-foreground tabular-nums text-xs">
                       {c.usedCount}{c.maxUses != null ? `/${c.maxUses}` : ""}
                     </td>

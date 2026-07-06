@@ -754,6 +754,9 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "vendor_coupons_code_idx" ON "vendor_coupons" ("code")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "vendor_coupons_vendor_idx" ON "vendor_coupons" ("vendor_id")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "vendor_coupons_active_idx" ON "vendor_coupons" ("active")`);
+    // Follower-based coupon targeting (migration 0045). Idempotent.
+    await db.execute(sql`ALTER TABLE "vendor_coupons" ADD COLUMN IF NOT EXISTS "audience" varchar(20) NOT NULL DEFAULT 'all'`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "vendor_coupons_audience_idx" ON "vendor_coupons" ("audience")`);
     // ── events free-entry-for-table columns (migrations 0034 / 0035) ───────
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "free_entry_for_table" boolean NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "free_entry_for_table_days" jsonb`);

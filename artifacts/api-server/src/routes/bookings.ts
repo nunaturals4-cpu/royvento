@@ -22,6 +22,7 @@ import {
   organizerEventsTable,
   eventTicketsTable,
   drinkPlansTable,
+  followsTable,
 } from "@workspace/db";
 import {
   computeCommissionFromPlanned,
@@ -575,12 +576,48 @@ router.post("/bookings", requireAuth(), async (req, res) => {
         .limit(1);
       const vc = vcRows[0];
       if (vc) {
-        // Applicability check
-        const isTicketMode = parsed.data.pubMode === "ticket";
-        const bookingKind = isTicketMode ? "ticket" : "event";
+        // Applicability check. Each pub booking mode maps to its own coupon
+        // target: ticket, cover_charge, event_booking (event tickets), and event
+        // (table reservations).
+        const bookingKind = parsed.data.pubMode === "ticket"
+          ? "ticket"
+          : parsed.data.pubMode === "cover_charge"
+            ? "cover_charge"
+            : parsed.data.pubMode === "event_booking"
+              ? "event_booking"
+              : "event";
         if (vc.applicableTo !== "both" && vc.applicableTo !== bookingKind) {
-          res.status(400).json({ error: `This coupon is only valid for ${vc.applicableTo} bookings.` });
+          const label = vc.applicableTo === "cover_charge"
+            ? "cover charge"
+            : vc.applicableTo === "event_booking"
+              ? "event"
+              : vc.applicableTo === "event"
+                ? "table"
+                : vc.applicableTo;
+          res.status(400).json({ error: `This coupon is only valid for ${label} bookings.` });
           return;
+        }
+        // Follower-audience guard — server-side authority so a follower-only code
+        // can't be redeemed by a non-follower who obtained it out of band.
+        if (vc.audience === "followers" || vc.audience === "non_followers") {
+          const followRows = await db
+            .select({ id: followsTable.id })
+            .from(followsTable)
+            .where(and(
+              eq(followsTable.userId, user.id),
+              eq(followsTable.targetType, "vendor"),
+              eq(followsTable.targetId, evt.vendorId),
+            ))
+            .limit(1);
+          const following = followRows.length > 0;
+          if ((vc.audience === "followers" && !following) || (vc.audience === "non_followers" && following)) {
+            res.status(400).json({
+              error: vc.audience === "followers"
+                ? "Follow this venue to unlock this coupon."
+                : "This coupon is only available to users who don't follow this venue.",
+            });
+            return;
+          }
         }
         if (vc.maxUses !== null && vc.usedCount >= vc.maxUses) {
           res.status(400).json({ error: "This coupon has reached its usage limit." });

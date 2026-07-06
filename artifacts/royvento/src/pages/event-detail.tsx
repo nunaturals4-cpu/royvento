@@ -240,8 +240,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     discountValue?: number;
     code: string;
     isVendorCoupon?: boolean;
+    applicableTo?: string; // "ticket" | "event" | "cover_charge" | "both"
   } | null>(null);
-  const [vendorCoupons, setVendorCoupons] = useState<{ id: number; code: string; discountType: string; discountValue: string; applicableTo: string }[]>([]);
+  const [vendorCoupons, setVendorCoupons] = useState<{ id: number; code: string; discountType: string; discountValue: string; applicableTo: string; audience?: string }[]>([]);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewImages, setReviewImages] = useState<string[]>([]);
@@ -418,11 +419,26 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     return () => window.removeEventListener("keydown", onKey);
   }, [lightbox]);
 
+  // Follow status for this venue. Shares the react-query cache key with
+  // <FollowButton>, so following/unfollowing the venue updates this value and
+  // re-runs the coupon fetch below — follower-only coupons appear the moment the
+  // user follows (and non-follower coupons disappear).
+  // Match the exact id the venue <FollowButton> follows (vendor.id) so both share
+  // the same react-query cache entry — otherwise following wouldn't re-trigger the
+  // coupon refetch below. Falls back to the flat vendorId for safety.
+  const couponVendorId = (((event as any)?.vendor?.id) ?? (event as any)?.vendorId) as number | undefined;
+  const { data: vendorFollow } = useQuery<{ following: boolean; followerCount: number }>({
+    queryKey: ["follow", "vendor", couponVendorId],
+    queryFn: () => apiGet(`/api/follows/vendor/${couponVendorId}`),
+    enabled: !!couponVendorId,
+  });
+  const vendorFollowing = vendorFollow?.following ?? false;
+
   useEffect(() => {
-    const vendorId = (event as any)?.vendorId;
-    if (!vendorId) return;
-    apiGet<any[]>(`/api/vendor-coupons/vendor/${vendorId}`).then(setVendorCoupons).catch(() => {});
-  }, [(event as any)?.vendorId]);
+    if (!couponVendorId) return;
+    // Server filters the returned coupons by the viewer's follow status.
+    apiGet<any[]>(`/api/vendor-coupons/vendor/${couponVendorId}`).then(setVendorCoupons).catch(() => {});
+  }, [couponVendorId, vendorFollowing, me?.user?.id]);
 
   useEffect(() => {
     if (me?.user?.name && !personName) setPersonName(me.user.name);
@@ -536,24 +552,32 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     if (next !== "ticket") setPubMode(next);
   }, [isLoading, event, deepLinkBook, drinkPlansFetched, announcementsFetched, hostedEventsFetched, drinkPlans, announcements, hostedEvents, date]);
 
-  // Clear any applied coupon if the selected booking date becomes a
-  // free-entry day (subtotal becomes ₹0 and the server refuses to consume
-  // a coupon). Mirrors the isFreeEntryDay computation below but is hoisted
-  // above the early returns to keep hook order stable.
+  // Clear any applied coupon only when the selected date makes the booking
+  // *fully* free (every entry tier free, or all prices ₹0) — because then the
+  // subtotal is ₹0 and the server refuses to consume a coupon. Mirrors the
+  // isFreeEntryDay computation below; hoisted above the early returns to keep
+  // hook order stable.
+  //
+  // IMPORTANT: this must NOT fire on a *partial* free-entry day (only some
+  // genders free) or for a paid table / cover-charge booking at a venue that
+  // simply has no ticket tiers. Using bare `ferActive` here wrongly wiped the
+  // applied coupon and blanked the code input on every keystroke.
   useEffect(() => {
     const ev = event as any;
     if (!ev || ev?.type !== "pub") return;
     const DAY_ABBRS_h = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const dayName = date ? DAY_ABBRS_h[new Date(`${date}T12:00:00`).getDay()] : "";
-    const fer = ev?.freeEntryRules as { enabled?: boolean; days?: string[] } | undefined;
+    const fer = ev?.freeEntryRules as { enabled?: boolean; days?: string[]; genders?: string[] } | undefined;
     const ferActive = !!(fer?.enabled === true && (fer.days ?? []).includes(dayName));
+    const ferGendersH = ferActive ? (fer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+    const allGendersFree = ferActive && ["women", "men", "couple"].every((g) => ferGendersH.includes(g));
     const dayPricing = ev?.dayPricing as Record<string, { women: number; men: number; couple: number } | null> | null;
     const ovr = dayName && dayPricing?.[dayName] ? dayPricing[dayName] : null;
     const w = ovr ? Number(ovr.women) : Number(ev?.priceWomen || 0);
     const m = ovr ? Number(ovr.men) : Number(ev?.priceMen || 0);
     const c = ovr ? Number(ovr.couple) : Number(ev?.priceCouple || 0);
-    const freeDay = ferActive || (w === 0 && m === 0 && c === 0);
-    if (freeDay && (couponState || couponInput)) {
+    const fullyFree = allGendersFree || (w === 0 && m === 0 && c === 0);
+    if (fullyFree && (couponState || couponInput)) {
       setCouponState(null);
       setCouponInput("");
     }
@@ -781,8 +805,28 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     (ferDayActive && pubMode === "ticket" && _ticketsCount > 0 && subtotal === 0)
   );
 
+  // Which booking kind is currently selected — used to gate a coupon by its
+  // applicableTo target. Table + event-ticket bookings both count as "event";
+  // cover charges and tickets are their own kinds. Mirrors the server check.
+  const currentBookingKind = !isPub
+    ? "event"
+    : pubMode === "ticket"
+      ? "ticket"
+      : pubMode === "cover_charge"
+        ? "cover_charge"
+        : pubMode === "event_booking"
+          ? "event_booking"
+          : "event";
+  // A coupon applies to this booking only when its target matches (or is "both",
+  // or it's a user-granted coupon with no target). Keeps the on-screen total and
+  // the server in agreement so a code never shows "applied" on a bill it can't
+  // actually discount.
+  const couponMatchesMode = !couponState?.applicableTo
+    || couponState.applicableTo === "both"
+    || couponState.applicableTo === currentBookingKind;
+
   const couponDiscount = (() => {
-    if (!couponState?.valid) return 0;
+    if (!couponState?.valid || !couponMatchesMode) return 0;
     if (couponState.isVendorCoupon) {
       return couponState.discountType === "fixed"
         ? Math.min(Math.round(couponState.discountValue ?? 0), subtotal)
@@ -820,25 +864,31 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     return ev.startingPrice ?? ev.price ?? 0;
   })();
 
-  const validateCoupon = async () => {
+  // Validate + apply a coupon. Called both by the "Apply" button (uses the typed
+  // input) and by clicking an available-offer chip (passes the code directly so
+  // it applies in one tap). Only one coupon can be active at a time — applying a
+  // new one replaces whatever was previously selected.
+  const validateCoupon = async (codeArg?: string) => {
     if (!me?.user) {
       toast({ title: t("events.login_coupons"), variant: "destructive" });
       return;
     }
-    if (!couponInput.trim()) return;
+    const code = (codeArg ?? couponInput).trim().toUpperCase();
+    if (!code) return;
+    setCouponInput(code);
     try {
       const vendorId = (event as any)?.vendorId;
       const r = await apiPost<any>(
         "/api/coupons/validate",
-        { code: couponInput.trim().toUpperCase(), vendorId },
+        { code, vendorId },
       );
       if (r.valid) {
         if (r.isVendorCoupon) {
           const discDisplay = r.discountType === "fixed" ? `₹${r.discountValue} off` : `${r.discountValue}% off`;
-          setCouponState({ valid: true, discountType: r.discountType, discountValue: r.discountValue, code: couponInput.trim().toUpperCase(), isVendorCoupon: true });
+          setCouponState({ valid: true, discountType: r.discountType, discountValue: r.discountValue, code, isVendorCoupon: true, applicableTo: r.applicableTo });
           toast({ title: t("events.coupon_applied_title"), description: discDisplay });
         } else {
-          setCouponState({ valid: true, discountPercent: r.discountPercent, code: couponInput.trim().toUpperCase() });
+          setCouponState({ valid: true, discountPercent: r.discountPercent, code });
           toast({ title: t("events.coupon_applied_title"), description: t("events.coupon_applied_pct", { pct: r.discountPercent }) });
         }
       }
@@ -940,7 +990,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
           name: personName,
           phone,
           quantity: Math.max(1, guests),
-          couponCode: !bookingIsFullyFree && couponState?.valid ? couponState.code : "",
+          couponCode: !bookingIsFullyFree && couponState?.valid && couponMatchesMode ? couponState.code : "",
         });
         toast({ title: t("events.booking_confirmed"), description: t("events.booking_confirmed_desc") });
         setLocation("/dashboard/bookings");
@@ -961,7 +1011,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
         notes,
         eventType,
         budgetRange: budget === "any" ? "" : budget,
-        couponCode: !bookingIsFullyFree && couponState?.valid ? couponState.code : "",
+        couponCode: !bookingIsFullyFree && couponState?.valid && couponMatchesMode ? couponState.code : "",
         personName,
         phone,
         pointsToUse: pointsApplied,
@@ -2872,11 +2922,15 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                         <>
                           <div className="flex gap-2">
                             <Input value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())} placeholder="RV-XXXXXX" className="bg-black/40 border-white/10 h-11 rounded-xl" />
-                            <Button type="button" variant="outline" onClick={validateCoupon} className="border-white/15 rounded-xl px-5 shrink-0 h-11">{t("events.apply_coupon")}</Button>
+                            <Button type="button" variant="outline" onClick={() => validateCoupon()} className="border-white/15 rounded-xl px-5 shrink-0 h-11">{t("events.apply_coupon")}</Button>
                           </div>
-                          {couponState?.valid && <p className="text-xs text-emerald-400 mt-1.5">✓ {couponState.isVendorCoupon ? (couponState.discountType === "fixed" ? `₹${couponState.discountValue} off` : `${couponState.discountValue}% off`) : t("events.coupon_pct_off", { pct: couponState.discountPercent })}</p>}
-                          {myCoupons.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{myCoupons.slice(0, 3).map((c) => <button key={c.id} type="button" onClick={() => setCouponInput(c.code)} className="text-[10px] px-2.5 py-1 rounded-lg bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 transition-colors">{c.code} — {c.discountPercent}%</button>)}</div>}
-                          {vendorCoupons.length > 0 && <div className="mt-2"><p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Available offers</p><div className="flex flex-wrap gap-1.5">{vendorCoupons.map((vc) => <button key={vc.id} type="button" onClick={() => setCouponInput(vc.code)} className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 transition-colors font-mono">{vc.code} — {vc.discountType === "fixed" ? `₹${Number(vc.discountValue)}` : `${Number(vc.discountValue)}%`} off</button>)}</div></div>}
+                          {couponState?.valid && (couponMatchesMode ? (
+                            <p className="text-xs text-emerald-400 mt-1.5">✓ {couponState.isVendorCoupon ? (couponState.discountType === "fixed" ? `₹${couponState.discountValue} off` : `${couponState.discountValue}% off`) : t("events.coupon_pct_off", { pct: couponState.discountPercent })}{couponDiscount > 0 ? ` — you save ${formatINRExact(couponDiscount)}` : ""}</p>
+                          ) : (
+                            <p className="text-xs text-amber-400 mt-1.5">This coupon is valid for {couponState.applicableTo === "ticket" ? "ticket" : couponState.applicableTo === "cover_charge" ? "cover charge" : couponState.applicableTo === "event_booking" ? "event" : "table"} bookings only — switch booking type to use it.</p>
+                          ))}
+                          {myCoupons.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{myCoupons.slice(0, 3).map((c) => <button key={c.id} type="button" onClick={() => validateCoupon(c.code)} className={`text-[10px] px-2.5 py-1 rounded-lg border transition-colors ${couponState?.code === c.code ? "bg-primary/30 border-primary text-primary" : "bg-primary/15 border-primary/30 text-primary hover:bg-primary/25"}`}>{c.code} — {c.discountPercent}%</button>)}</div>}
+                          {vendorCoupons.length > 0 && <div className="mt-2"><p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Available offers{vendorFollowing ? " · unlocked by following" : ""}</p><div className="flex flex-wrap gap-1.5">{vendorCoupons.map((vc) => { const applied = couponState?.code === vc.code; return <button key={vc.id} type="button" onClick={() => validateCoupon(vc.code)} title={vc.audience === "followers" ? "Follower-exclusive offer" : undefined} className={`text-[10px] px-2.5 py-1 rounded-lg border transition-colors font-mono ${applied ? "bg-emerald-500/30 border-emerald-400 text-emerald-200" : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25"}`}>{applied ? "✓ " : ""}{vc.audience === "followers" ? "★ " : ""}{vc.code} — {vc.discountType === "fixed" ? `₹${Number(vc.discountValue)}` : `${Number(vc.discountValue)}%`} off</button>; })}</div></div>}
                         </>
                       )}
                     </div>
@@ -2912,6 +2966,47 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     </RadioGroup>
                     {paymentMethod === "cod" && <p className="text-xs text-muted-foreground px-1">{t("events.cod_hint")}</p>}
                     {paymentMethod === "online" && <p className="text-xs text-muted-foreground px-1">{t("events.online_hint")}</p>}
+                  </div>
+                )}
+
+                {/* Live price breakdown — updates immediately as a coupon/points
+                    are applied so the effect is visible right here, not only on
+                    the review step. */}
+                {!bookingIsFullyFree && (
+                  <div className="rounded-2xl glass-card p-5 space-y-2 text-sm border border-primary/15">
+                    <p className="text-xs font-semibold text-foreground uppercase tracking-wider mb-1">{t("events.total_label")}</p>
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>{t("events.subtotal_label")}</span>
+                      <span className="tabular-nums">{formatINRExact(subtotal)}</span>
+                    </div>
+                    {couponDiscount > 0 && couponDiscount === discount && (
+                      <div className="flex items-center justify-between text-emerald-400">
+                        <span>{t("events.coupon_label")} ({couponState?.code})</span>
+                        <span className="tabular-nums">– {formatINRExact(couponDiscount)}</span>
+                      </div>
+                    )}
+                    {newUserDiscount > 0 && newUserDiscount === discount && couponDiscount < newUserDiscount && (
+                      <div className="flex items-center justify-between text-emerald-400">
+                        <span>{t("events.new_member_pct_off", { pct: newUserPercent })}</span>
+                        <span className="tabular-nums">– {formatINRExact(newUserDiscount)}</span>
+                      </div>
+                    )}
+                    {pointsApplied > 0 && (
+                      <div className="flex items-center justify-between text-primary">
+                        <span>{t("events.points_label")}</span>
+                        <span className="tabular-nums">– {formatINRExact(pointsApplied * POINTS_RUPEE_RATE)}</span>
+                      </div>
+                    )}
+                    {baseFee > 0 && (
+                      <div className="flex items-center justify-between text-amber-400/80 text-xs">
+                        <span>Base Fee (Incl. GST)</span>
+                        <span className="tabular-nums">+ {formatINRExact(baseFee)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between font-semibold text-lg pt-2 border-t border-white/10">
+                      <span>{t("events.total_label")}</span>
+                      <span className="text-gradient-red tabular-nums">{formatINRExact(totalPayable)}</span>
+                    </div>
                   </div>
                 )}
                 </>)}

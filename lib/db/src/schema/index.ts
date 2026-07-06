@@ -1187,6 +1187,9 @@ export const vendorCouponsTable = pgTable(
     discountType: varchar("discount_type", { length: 10 }).notNull().default("percent"), // "percent" | "fixed"
     discountValue: numeric("discount_value", { precision: 10, scale: 2 }).notNull().default("10"),
     applicableTo: varchar("applicable_to", { length: 20 }).notNull().default("both"), // "ticket" | "event" | "both"
+    // Follower-based targeting. "all" = everyone (legacy default); "followers" =
+    // only users who follow the venue; "non_followers" = only users who don't.
+    audience: varchar("audience", { length: 20 }).notNull().default("all"),
     active: boolean("active").notNull().default(true),
     maxUses: integer("max_uses"),          // null = unlimited
     usedCount: integer("used_count").notNull().default(0),
