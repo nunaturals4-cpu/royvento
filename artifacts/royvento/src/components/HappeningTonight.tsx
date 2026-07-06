@@ -239,7 +239,12 @@ export function HappeningTonight() {
 
         {/* Cards */}
         {filtered.length > 0 ? (
-          <CarouselRow className="mt-4">
+          // items-start: don't stretch cards to the tallest sibling. A single
+          // photo card (e.g. a DJ event) is taller than the text-only gold VIP
+          // cards; without this, flex-stretch would inflate every gold card with
+          // empty space (the prod-vs-local mismatch, since local's tonight data
+          // is all VIP cards). Each card now keeps its natural, compact height.
+          <CarouselRow className="mt-4" itemClassName="self-start">
             {filtered.map((it) => <TonightCard key={it.key} item={it} />)}
           </CarouselRow>
         ) : (
