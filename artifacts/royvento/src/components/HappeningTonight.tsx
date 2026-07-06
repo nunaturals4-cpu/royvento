@@ -107,11 +107,15 @@ function TonightCard({ item }: { item: TonightItem }) {
   }
 
   return (
-    <div className="h-full w-[195px] sm:w-[210px]">
+    // Same width as the offer/happy-hour VIP cards above so every card in the
+    // Happening Tonight row lines up evenly. A 4:3 cover (instead of the default
+    // 1:1) keeps the photo card from becoming an oversized square at this width.
+    <div className="h-full w-[300px] sm:w-[330px]">
       <NightlifeOfferCard
         href={item.href}
         bookHref={bookHref}
         imageUrl={item.imageUrl}
+        imageAspectClass="aspect-[4/3]"
         title={item.title}
         venueName={item.subtitle}
         offerLabel={offerLabel}
