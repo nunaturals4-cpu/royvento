@@ -18,20 +18,67 @@ interface Blog {
   createdAt: string;
 }
 
-function BlogCard({ blog, featured }: { blog: Blog; featured?: boolean }) {
+const fmtDate = (d: string) =>
+  new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+// Featured hero: a compact, magazine-style banner — cover image with a bottom
+// gradient and the headline / meta laid over it. Controlled height so it never
+// balloons regardless of the source image's shape.
+function FeaturedBlogCard({ blog }: { blog: Blog }) {
   return (
     <Link href={`/blogs/${blog.slug}`}>
-      <article
-        className={`group cursor-pointer overflow-hidden rounded-2xl border border-border/60 bg-card/30 hover:border-primary/30 transition-all duration-300 h-full flex flex-col ${
-          featured ? "md:flex-row" : ""
-        }`}
-      >
+      <article className="group relative cursor-pointer overflow-hidden rounded-2xl border border-border/60 hover:border-primary/30 transition-colors duration-300 h-[240px] sm:h-[280px] md:h-[300px]">
+        {blog.imageUrl ? (
+          <img
+            src={blog.imageUrl}
+            alt={blog.title}
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-zinc-900 to-black" />
+        )}
+        {/* Readability scrims — heavier at the bottom-left where the text sits. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/5" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/10 to-transparent" />
+
+        <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6 md:p-8">
+          <div className="max-w-2xl space-y-2.5">
+            {blog.tags.length > 0 && (
+              <Badge className="bg-primary/90 text-primary-foreground border-0 text-[10px] uppercase tracking-wide">
+                {blog.tags[0]}
+              </Badge>
+            )}
+            <h2 className="font-serif text-xl sm:text-2xl md:text-3xl tracking-tight leading-tight text-white line-clamp-2">
+              {blog.title}
+            </h2>
+            {blog.excerpt && (
+              <p className="hidden sm:block text-sm text-white/60 leading-relaxed line-clamp-2 max-w-xl">
+                {blog.excerpt}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/50 pt-0.5">
+              <span className="font-medium text-primary/80">{blog.authorName}</span>
+              <span>·</span>
+              <span>{fmtDate(blog.createdAt)}</span>
+              <span className="flex items-center gap-1 font-medium text-primary ml-auto sm:ml-1 group-hover:gap-2 transition-all">
+                Read article <ArrowRight className="h-3.5 w-3.5" />
+              </span>
+            </div>
+          </div>
+        </div>
+      </article>
+    </Link>
+  );
+}
+
+// Standard list card: compact vertical layout used in the grid.
+function BlogCard({ blog }: { blog: Blog }) {
+  return (
+    <Link href={`/blogs/${blog.slug}`}>
+      <article className="group cursor-pointer overflow-hidden rounded-2xl border border-border/60 bg-card/30 hover:border-primary/30 transition-all duration-300 h-full flex flex-col">
         {blog.imageUrl && (
-          <div
-            className={`relative overflow-hidden shrink-0 ${
-              featured ? "md:w-1/2 aspect-[16/9]" : "aspect-[16/9]"
-            }`}
-          >
+          <div className="relative overflow-hidden shrink-0 aspect-[16/9]">
             <img
               src={blog.imageUrl}
               alt={blog.title}
@@ -48,26 +95,22 @@ function BlogCard({ blog, featured }: { blog: Blog; featured?: boolean }) {
             )}
           </div>
         )}
-        <div className={`flex flex-col ${featured ? "gap-3 p-5 md:p-6 justify-center" : "gap-2 p-4"} flex-1`}>
+        <div className="flex flex-col gap-2 p-4 flex-1">
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <span className="font-medium text-primary/80">{blog.authorName}</span>
             <span>·</span>
-            <span>{new Date(blog.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+            <span>{fmtDate(blog.createdAt)}</span>
           </div>
-          <h2
-            className={`font-serif tracking-tight leading-tight group-hover:text-primary transition-colors line-clamp-2 ${
-              featured ? "text-xl md:text-2xl" : "text-base"
-            }`}
-          >
+          <h2 className="font-serif text-base tracking-tight leading-tight group-hover:text-primary transition-colors line-clamp-2">
             {blog.title}
           </h2>
           {blog.excerpt && (
-            <p className={`text-muted-foreground leading-relaxed ${featured ? "line-clamp-3 text-base" : "line-clamp-2 text-[13px]"}`}>
+            <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-2">
               {blog.excerpt}
             </p>
           )}
-          <div className={`flex items-center gap-1 font-medium text-primary mt-auto group-hover:gap-2 transition-all ${featured ? "text-sm pt-2" : "text-xs pt-1"}`}>
-            Read article <ArrowRight className={featured ? "h-4 w-4" : "h-3.5 w-3.5"} />
+          <div className="flex items-center gap-1 text-xs font-medium text-primary mt-auto pt-1 group-hover:gap-2 transition-all">
+            Read article <ArrowRight className="h-3.5 w-3.5" />
           </div>
         </div>
       </article>
@@ -209,9 +252,9 @@ export function Blogs() {
         </div>
       ) : (
         <div className="space-y-8">
-          {/* Featured article — full width, larger */}
+          {/* Featured article — compact magazine-style hero banner */}
           {featuredBlog && (
-            <BlogCard blog={featuredBlog} featured />
+            <FeaturedBlogCard blog={featuredBlog} />
           )}
 
           {/* Grid of remaining articles */}
