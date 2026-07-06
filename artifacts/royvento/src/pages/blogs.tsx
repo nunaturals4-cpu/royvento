@@ -46,22 +46,22 @@ function FeaturedBlogCard({ blog }: { blog: Blog }) {
             )}
           </div>
         )}
-        <div className="flex flex-1 flex-col justify-center gap-2.5 p-5 md:p-7">
+        <div className="flex flex-1 flex-col justify-center gap-2 p-4 md:p-5">
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <span className="font-medium text-primary/80">{blog.authorName}</span>
             <span>·</span>
             <span>{fmtDate(blog.createdAt)}</span>
           </div>
-          <h2 className="font-serif text-lg sm:text-xl md:text-2xl tracking-tight leading-tight group-hover:text-primary transition-colors line-clamp-2">
+          <h2 className="font-serif text-base sm:text-lg md:text-xl tracking-tight leading-tight group-hover:text-primary transition-colors line-clamp-2">
             {blog.title}
           </h2>
           {blog.excerpt && (
-            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 md:line-clamp-3">
+            <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-2">
               {blog.excerpt}
             </p>
           )}
-          <div className="flex items-center gap-1 text-sm font-medium text-primary pt-0.5 group-hover:gap-2 transition-all">
-            Read article <ArrowRight className="h-4 w-4" />
+          <div className="flex items-center gap-1 text-xs font-medium text-primary pt-0.5 group-hover:gap-2 transition-all">
+            Read article <ArrowRight className="h-3.5 w-3.5" />
           </div>
         </div>
       </article>
@@ -249,9 +249,11 @@ export function Blogs() {
         </div>
       ) : (
         <div className="space-y-8">
-          {/* Featured article — compact magazine-style hero banner */}
+          {/* Featured article — constrained width keeps the 16:9 split compact */}
           {featuredBlog && (
-            <FeaturedBlogCard blog={featuredBlog} />
+            <div className="max-w-4xl">
+              <FeaturedBlogCard blog={featuredBlog} />
+            </div>
           )}
 
           {/* Grid of remaining articles */}
