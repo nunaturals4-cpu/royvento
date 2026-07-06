@@ -108,14 +108,16 @@ function TonightCard({ item }: { item: TonightItem }) {
 
   return (
     // Same width as the offer/happy-hour VIP cards above so every card in the
-    // Happening Tonight row lines up evenly. A 4:3 cover (instead of the default
-    // 1:1) keeps the photo card from becoming an oversized square at this width.
+    // Happening Tonight row lines up evenly. Use a FIXED short cover height (not a
+    // 1:1/4:3 aspect) so a photo card stays as compact as the horizontal VIP
+    // cards — otherwise the carousel stretches every card to the tallest one and
+    // the gold cards balloon with empty space (prod vs local mismatch).
     <div className="h-full w-[300px] sm:w-[330px]">
       <NightlifeOfferCard
         href={item.href}
         bookHref={bookHref}
         imageUrl={item.imageUrl}
-        imageAspectClass="aspect-[4/3]"
+        imageAspectClass="h-32"
         title={item.title}
         venueName={item.subtitle}
         offerLabel={offerLabel}
