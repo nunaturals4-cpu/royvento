@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { FollowButton } from "@/components/FollowButton";
+import { useSelectedCity, buildBookingLocation } from "@/components/LocationContext";
 import {
   BadgeCheck, Share2, CalendarDays, MapPin, Star, Users, Ticket,
   Instagram, Facebook, Youtube, Globe, Clock, ChevronDown, ChevronRight,
@@ -525,6 +526,7 @@ function BookingDialog({
   slug, eventTitle, ticket, onClose, onBooked,
 }: { slug: string; eventTitle: string; ticket: TicketTier | null; onClose: () => void; onBooked: () => void }) {
   const { toast } = useToast();
+  const bookingLoc = useSelectedCity();
   const [qty, setQty] = useState(1);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -593,6 +595,7 @@ function BookingDialog({
       }>(`/api/organizer-events/${slug}/book`, {
         ticketId: ticket.id, name: name.trim(), phone: phone.trim(), quantity: qty,
         couponCode: coupon.trim(), pointsToUse: pointsApplied,
+        ...buildBookingLocation(bookingLoc),
       });
 
       // Paid ticket — open Razorpay checkout

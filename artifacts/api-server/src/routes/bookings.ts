@@ -55,6 +55,7 @@ import {
 import { initiatePayment, isPhonePeConfigured, getAppUrl } from "../lib/phonepe";
 import { createOrder as createRazorpayOrder, isRazorpayConfigured, getKeyId as getRazorpayKeyId } from "../lib/razorpay";
 import { computeEffectiveRevenues, bookingDiscountRatio } from "../lib/effectiveRevenue";
+import { bookingLocationFromBody } from "../lib/geo";
 import { respondInvalid } from "../lib/validationError";
 import { scanOrganizerTicket } from "./organizers";
 
@@ -172,6 +173,9 @@ interface BookingRow {
   actualMen?: number | null;
   actualCouple?: number | null;
   actualGuests?: number | null;
+  bookingLocation?: string | null;
+  bookingLatitude?: string | null;
+  bookingLongitude?: string | null;
   createdAt: Date;
 }
 
@@ -292,6 +296,9 @@ async function serializeBookings(rows: BookingRow[]) {
       actualEntry,
       actualAmountDue,
       freeEntryRules: e?.freeEntryRules ?? null,
+      bookingLocation: b.bookingLocation ?? "",
+      bookingLatitude: b.bookingLatitude ?? null,
+      bookingLongitude: b.bookingLongitude ?? null,
       createdAt: b.createdAt.toISOString(),
       kind: b.kind ?? "pub",
       eventTitle: isOrg ? (oe?.title ?? "") : isEventBooking ? (ann?.title || b.selectedPubEvent || "") : (e?.title ?? ""),
@@ -716,6 +723,8 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     arrivalTime: parsed.data.arrivalTime || null,
     approvedBy: useRazorpay ? "payment" : "auto",
     paymentMethod: bookingPaymentMethod,
+    // Customer's current location at booking time (for admin/partner reports).
+    ...bookingLocationFromBody(req.body),
   };
 
   const [bMaybe] = await db.insert(bookingsTable).values(bookingValues).returning();

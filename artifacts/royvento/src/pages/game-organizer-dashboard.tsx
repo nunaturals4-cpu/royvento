@@ -1059,7 +1059,7 @@ interface Analytics {
 interface BookingRow {
   id: number; createdAt: string; bookingDate: string; time: string | null; durationHours: string | null;
   persons: number; amount: string; checkedIn: boolean; attendee: string; phone: string; email: string;
-  itemName: string; gameName: string | null; packageName: string | null;
+  itemName: string; gameName: string | null; packageName: string | null; bookingLocation?: string;
 }
 
 // Endpoint config so the game dashboard panels (Analytics/Leads/Coupons) serve
@@ -1154,6 +1154,7 @@ export function InsightsPanel({ api = GAME_SELF_API }: { api?: GameOrgDashboardA
                 <th className="text-left font-medium p-3">Item</th>
                 <th className="text-left font-medium p-3">Attendee</th>
                 <th className="text-left font-medium p-3 hidden sm:table-cell">Contact</th>
+                <th className="text-left font-medium p-3">Location</th>
                 <th className="text-right font-medium p-3">When</th>
                 <th className="text-right font-medium p-3">Amount</th>
                 <th className="text-center font-medium p-3">In</th>
@@ -1165,6 +1166,7 @@ export function InsightsPanel({ api = GAME_SELF_API }: { api?: GameOrgDashboardA
                     <td className="p-3">{r.itemName || r.gameName || r.packageName || "—"}{r.durationHours ? ` · ${Number(r.durationHours)}h` : ""}</td>
                     <td className="p-3">{r.attendee}</td>
                     <td className="p-3 text-white/50 text-xs hidden sm:table-cell">{[r.email, r.phone].filter(Boolean).join(" · ") || "—"}</td>
+                    <td className="p-3 text-white/50 text-xs">{r.bookingLocation || "—"}</td>
                     <td className="p-3 text-right text-white/60">{r.bookingDate}{r.time ? ` ${r.time}` : ""}</td>
                     <td className="p-3 text-right">{formatINR(Number(r.amount))}</td>
                     <td className="p-3 text-center">{r.checkedIn ? <CheckCircle2 className="h-4 w-4 text-emerald-400 inline" /> : <span className="text-white/20">—</span>}</td>

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { FollowButton } from "@/components/FollowButton";
+import { useSelectedCity, buildBookingLocation } from "@/components/LocationContext";
 import {
   BadgeCheck, Share2, MapPin, Star, Users, Gamepad2, Package,
   Instagram, Facebook, Youtube, Globe, Plus, Minus, CheckCircle2, ShieldCheck,
@@ -287,6 +288,7 @@ function BookingDialog({
   slug, venueName, venueAddress, bookable, onClose,
 }: { slug: string; venueName: string; venueAddress: string; bookable: Bookable | null; onClose: () => void }) {
   const { toast } = useToast();
+  const bookingLoc = useSelectedCity();
   const [persons, setPersons] = useState(1);
   const [hours, setHours] = useState(1);
   const [quantity, setQuantity] = useState(1);
@@ -357,6 +359,7 @@ function BookingDialog({
         persons, hours: isHourly ? hours : 0, quantity,
         date: date || undefined, time: time || undefined,
         name: name.trim(), phone: phone.trim(), couponCode: coupon.trim(), pointsToUse: pointsApplied,
+        ...buildBookingLocation(bookingLoc),
       });
       setConfirmation({ ticketCode: res.ticketCode, total: res.total, bookingId: res.bookingId });
     } catch (e: any) {

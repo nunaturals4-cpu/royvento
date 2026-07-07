@@ -3027,6 +3027,7 @@ export function BookingReport({ bookTablePage, setBookTablePage, adminVendorId }
                       <th className="text-left py-2 pr-3">Date</th>
                       <th className="text-left py-2 pr-3">Guest</th>
                       <th className="text-left py-2 pr-3">Mobile</th>
+                      <th className="text-left py-2 pr-3">Location</th>
                       <th className="text-left py-2 pr-3">Event</th>
                       <th className="text-left py-2 pr-3">Mode</th>
                       <th className="text-left py-2 pr-3">Arrival</th>
@@ -3044,6 +3045,7 @@ export function BookingReport({ bookTablePage, setBookTablePage, adminVendorId }
                           <span className="font-medium">{b.personName || "—"}</span>
                         </td>
                         <td className="py-2.5 pr-3 text-muted-foreground text-xs tabular-nums">{(b as any).phone || "—"}</td>
+                        <td className="py-2.5 pr-3 text-muted-foreground text-xs max-w-[140px] truncate" title={(b as any).bookingLocation || ""}>{(b as any).bookingLocation || "—"}</td>
                         <td className="py-2.5 pr-3 text-muted-foreground max-w-[120px] truncate">{b.eventTitle || "—"}</td>
                         <td className="py-2.5 pr-3 capitalize text-muted-foreground">{b.pubMode === "event" ? "Table" : b.pubMode === "ticket" ? "Ticket" : "—"}</td>
                         <td className="py-2.5 pr-3">

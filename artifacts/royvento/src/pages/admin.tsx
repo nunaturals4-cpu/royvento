@@ -3654,6 +3654,7 @@ function BookingReport() {
                   <th className="px-4 py-3 text-left">Partner · Event</th>
                   <th className="px-4 py-3 text-left">Customer</th>
                   <th className="px-4 py-3 text-left">Mobile</th>
+                  <th className="px-4 py-3 text-left">Location</th>
                   <th className="px-4 py-3 text-left">Date</th>
                   <th className="px-4 py-3 text-left">Mode</th>
                   <th className="px-4 py-3 text-right">Tickets</th>
@@ -3687,6 +3688,9 @@ function BookingReport() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground text-xs">
                       {(b as any).phone || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs max-w-[160px] truncate" title={(b as any).bookingLocation || ""}>
+                      {(b as any).bookingLocation || "—"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                       {b.bookingDate

@@ -26,6 +26,7 @@ import { eq, and, desc, sql, inArray, or, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
+import { bookingLocationFromBody } from "../lib/geo";
 import { logger } from "../lib/logger";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { createUserNotification } from "../lib/notify";
@@ -1127,6 +1128,8 @@ router.post("/organizer-events/:slug/book", requireAuth(), async (req, res) => {
       phone,
       approvedBy: total > 0 && isRazorpayConfigured() ? "payment" : "auto",
       paymentMethod: total > 0 && isRazorpayConfigured() ? "online" : "cod",
+      // Customer's current location at booking time (for admin/organizer reports).
+      ...bookingLocationFromBody(req.body),
     } as unknown as typeof bookingsTable.$inferInsert;
     const [booking] = await db.insert(bookingsTable).values(bookingValues).returning();
 
@@ -1678,6 +1681,7 @@ router.get("/organizer/bookings", requireAuth(["organizer"]), async (req, res) =
     SELECT b.id, b.created_at AS "createdAt", b.booking_date AS "bookingDate",
       b.guests AS "quantity", (b.final_price + COALESCE(b.base_fee, 0)) AS "amount", b.checked_in AS "checkedIn",
       b.person_name AS "attendee", b.phone, u.email AS "email",
+      b.booking_location AS "bookingLocation",
       e.title AS "eventTitle", t.name AS "ticketType"
     FROM bookings b
     LEFT JOIN users u ON u.id = b.user_id
@@ -1959,7 +1963,9 @@ router.get("/admin/organizer/:orgId/bookings", requireAuth(["admin"]), async (re
   const rows = await db.execute(sql`
     SELECT b.id, b.created_at AS "createdAt", b.booking_date AS "bookingDate",
       b.guests AS "quantity", (b.final_price + COALESCE(b.base_fee, 0)) AS "amount", b.checked_in AS "checkedIn",
-      b.person_name AS "attendee", b.phone, u.email AS "email", e.title AS "eventTitle", t.name AS "ticketType"
+      b.person_name AS "attendee", b.phone, u.email AS "email",
+      b.booking_location AS "bookingLocation",
+      e.title AS "eventTitle", t.name AS "ticketType"
     FROM bookings b
     LEFT JOIN users u ON u.id = b.user_id
     LEFT JOIN organizer_events e ON e.id = b.organizer_event_id

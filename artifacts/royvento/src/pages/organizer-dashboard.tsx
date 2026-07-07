@@ -1525,6 +1525,7 @@ interface Analytics {
 interface BookingRow {
   id: number; createdAt: string; bookingDate: string; quantity: number; amount: string;
   checkedIn: boolean; attendee: string; phone: string; email: string; eventTitle: string; ticketType: string;
+  bookingLocation?: string;
 }
 
 export function InsightsPanel({ events, api = SELF_API }: { events: OrganizerEvent[]; api?: OrganizerDashboardApi }) {
@@ -1539,8 +1540,8 @@ export function InsightsPanel({ events, api = SELF_API }: { events: OrganizerEve
   }, [eventFilter, api]);
 
   const exportCsv = () => {
-    const header = ["Booking", "Event", "Ticket", "Attendee", "Phone", "Email", "Qty", "Amount", "Date", "CheckedIn"];
-    const lines = rows.map((r) => [r.id, r.eventTitle, r.ticketType, r.attendee, r.phone, r.email, r.quantity, r.amount, r.bookingDate, r.checkedIn ? "yes" : "no"]
+    const header = ["Booking", "Event", "Ticket", "Attendee", "Phone", "Email", "Qty", "Amount", "Date", "Location", "CheckedIn"];
+    const lines = rows.map((r) => [r.id, r.eventTitle, r.ticketType, r.attendee, r.phone, r.email, r.quantity, r.amount, r.bookingDate, r.bookingLocation ?? "", r.checkedIn ? "yes" : "no"]
       .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","));
     const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -1599,6 +1600,7 @@ export function InsightsPanel({ events, api = SELF_API }: { events: OrganizerEve
                 <th className="text-left font-medium p-3">Event</th>
                 <th className="text-left font-medium p-3">Ticket</th>
                 <th className="text-left font-medium p-3">Contact</th>
+                <th className="text-left font-medium p-3">Location</th>
                 <th className="text-right font-medium p-3">Qty</th>
                 <th className="text-right font-medium p-3">Amount</th>
                 <th className="text-center font-medium p-3">In</th>
@@ -1610,6 +1612,7 @@ export function InsightsPanel({ events, api = SELF_API }: { events: OrganizerEve
                     <td className="p-3 text-white/60">{r.eventTitle}</td>
                     <td className="p-3 text-white/60">{r.ticketType}</td>
                     <td className="p-3 text-white/50 text-xs">{[r.phone, r.email].filter(Boolean).join(" · ") || "—"}</td>
+                    <td className="p-3 text-white/50 text-xs">{r.bookingLocation || "—"}</td>
                     <td className="p-3 text-right">{r.quantity}</td>
                     <td className="p-3 text-right">{formatINR(Number(r.amount))}</td>
                     <td className="p-3 text-center">{r.checkedIn ? <CheckCircle2 className="h-4 w-4 text-emerald-400 inline" /> : <span className="text-white/20">—</span>}</td>

@@ -337,6 +337,15 @@ export const bookingsTable = pgTable(
     actualMen: integer("actual_men"),
     actualCouple: integer("actual_couple"),
     actualGuests: integer("actual_guests"),
+    // Customer's location at the time of booking, captured from the browser's
+    // detected/selected location (see LocationContext). `bookingLocation` is a
+    // human-readable label (e.g. "Tarulia, Bidhannagar, West Bengal") shown in
+    // the admin/partner/organizer booking reports; lat/lng are the raw fix (may
+    // be null when only a manually-picked city label is available). Applies to
+    // all three verticals — pub (kind='pub'), organizer, and game bookings.
+    bookingLocation: varchar("booking_location", { length: 255 }).notNull().default(""),
+    bookingLatitude: numeric("booking_latitude", { precision: 9, scale: 6 }),
+    bookingLongitude: numeric("booking_longitude", { precision: 9, scale: 6 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

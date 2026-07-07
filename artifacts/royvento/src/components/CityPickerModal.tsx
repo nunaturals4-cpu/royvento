@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { COUNTRIES } from "@/lib/locations";
 import { useSelectedCity } from "@/components/LocationContext";
+import { LocationPinModal } from "@/components/LocationPinModal";
 
 interface Props {
   open: boolean;
@@ -55,6 +56,7 @@ const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 export function CityPickerModal({ open, onOpenChange }: Props) {
   const { selectedCity, selectedLocality, setSelectedCity, detectLocation, detecting, locationError } = useSelectedCity();
   const [query, setQuery] = useState("");
+  const [pinOpen, setPinOpen] = useState(false);
   const letterRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const filteredCities = useMemo(() => {
@@ -135,17 +137,32 @@ export function CityPickerModal({ open, onOpenChange }: Props) {
             />
           </div>
 
-          <button
-            onClick={handleUseLocation}
-            disabled={detecting}
-            className="mt-3 flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors font-medium disabled:opacity-50"
-          >
-            <Navigation className={`h-4 w-4 shrink-0 ${detecting ? "animate-pulse" : ""}`} />
-            {detecting ? "Detecting precise location…" : "Use Current Location"}
-          </button>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <button
+              onClick={handleUseLocation}
+              disabled={detecting}
+              className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors font-medium disabled:opacity-50"
+            >
+              <Navigation className={`h-4 w-4 shrink-0 ${detecting ? "animate-pulse" : ""}`} />
+              {detecting ? "Detecting precise location…" : "Use Current Location"}
+            </button>
+            {/* The reliable exact-location path on ANY device: pin it on a map. */}
+            <button
+              onClick={() => setPinOpen(true)}
+              className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+            >
+              <MapPin className="h-4 w-4 shrink-0" />
+              Pin exact location on map
+            </button>
+          </div>
           {locationError && (
             <p className="mt-2 text-xs text-amber-400">{locationError}</p>
           )}
+          <LocationPinModal
+            open={pinOpen}
+            onOpenChange={setPinOpen}
+            onConfirmed={() => { onOpenChange(false); setQuery(""); }}
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto min-h-0">

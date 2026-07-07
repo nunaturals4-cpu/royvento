@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, Link, useLocation, useSearch } from "wouter";
 import { SEO, buildBreadcrumbList } from "@/components/SEO";
+import { useSelectedCity, buildBookingLocation } from "@/components/LocationContext";
 import { RichText } from "@/components/RichText";
 import { CarouselRow } from "@/components/CarouselRow";
 import { eventDetailSlug, pubDetailSlug } from "@/lib/seo-slug";
@@ -176,6 +177,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const id = eventIdProp ?? Number(params["id"]);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const bookingLoc = useSelectedCity();
   const { data: event, isLoading } = useGetEvent(id);
   const REVIEWS_PAGE_SIZE = 5;
   const [reviewsPage, setReviewsPage] = useState(1);
@@ -991,6 +993,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
           phone,
           quantity: Math.max(1, guests),
           couponCode: !bookingIsFullyFree && couponState?.valid && couponMatchesMode ? couponState.code : "",
+          ...buildBookingLocation(bookingLoc),
         });
         toast({ title: t("events.booking_confirmed"), description: t("events.booking_confirmed_desc") });
         setLocation("/dashboard/bookings");
@@ -1016,6 +1019,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
         phone,
         pointsToUse: pointsApplied,
         paymentMethod,
+        ...buildBookingLocation(bookingLoc),
         ...(isPub
           ? {
               pubMode,

@@ -1283,6 +1283,11 @@ async function applyPendingSchemaChanges() {
     await execSafe(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "duration_hours" numeric(5,1)`);
     await execSafe(sql`CREATE INDEX IF NOT EXISTS "bookings_game_organizer_idx" ON "bookings" ("game_organizer_id")`);
 
+    // Customer's location captured at booking time (pub / organizer / game).
+    await execSafe(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "booking_location" varchar(255) NOT NULL DEFAULT ''`);
+    await execSafe(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "booking_latitude" numeric(9,6)`);
+    await execSafe(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "booking_longitude" numeric(9,6)`);
+
     // ── Happening Tonight — real-time discovery fields on the three partner
     // listing tables. start/end time = the listing's tonight session window
     // ("HH:MM", IST). happening_tonight/starting_soon default true so existing

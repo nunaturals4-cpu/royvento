@@ -23,6 +23,7 @@ import { eq, and, desc, sql, inArray, or, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
+import { bookingLocationFromBody } from "../lib/geo";
 import { logger } from "../lib/logger";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { createUserNotification } from "../lib/notify";
@@ -557,6 +558,7 @@ router.get("/admin/game-organizer/:orgId/bookings", requireAuth(["admin"]), asyn
     SELECT b.id, b.created_at AS "createdAt", b.booking_date AS "bookingDate", b.arrival_time AS "time",
       b.duration_hours AS "durationHours", b.guests AS "persons", b.final_price AS "amount", b.checked_in AS "checkedIn",
       b.person_name AS "attendee", b.phone, u.email AS "email", b.selected_pub_event AS "itemName",
+      b.booking_location AS "bookingLocation",
       g.name AS "gameName", p.name AS "packageName"
     FROM bookings b
     LEFT JOIN users u ON u.id = b.user_id
@@ -901,6 +903,8 @@ router.post("/game-organizers/:slug/book", requireAuth(), async (req, res) => {
       phone,
       approvedBy: "auto",
       paymentMethod: "cod",
+      // Customer's current location at booking time (for admin/game-organizer reports).
+      ...bookingLocationFromBody(req.body),
     } as unknown as typeof bookingsTable.$inferInsert;
     const [booking] = await db.insert(bookingsTable).values(bookingValues).returning();
     if (!booking) return res.status(500).json({ error: "Could not complete booking" });
@@ -1392,6 +1396,7 @@ router.get("/game-organizer/bookings", requireAuth(["game_organizer"]), async (r
       b.arrival_time AS "time", b.duration_hours AS "durationHours",
       b.guests AS "persons", b.final_price AS "amount", b.checked_in AS "checkedIn",
       b.person_name AS "attendee", b.phone, u.email AS "email",
+      b.booking_location AS "bookingLocation",
       b.selected_pub_event AS "itemName",
       g.name AS "gameName", p.name AS "packageName"
     FROM bookings b

@@ -2183,6 +2183,9 @@ async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
       status: b.status,
       notes: b.notes,
       ticketCode,
+      bookingLocation: b.bookingLocation ?? "",
+      bookingLatitude: b.bookingLatitude ?? null,
+      bookingLongitude: b.bookingLongitude ?? null,
       checkedIn: b.checkedIn,
       checkedInAt: b.checkedInAt?.toISOString() ?? null,
       createdAt: b.createdAt.toISOString(),
@@ -2898,7 +2901,7 @@ router.get("/admin/bookings/report/download", requireAuth(["admin"]), async (req
     "Booking ID", "Date", "Created At", "Vendor", "Guest Name", "Phone", "Email",
     "Pub Mode", "Women", "Men", "Couples", "Guests",
     "Ticket Price (₹)", "Discount (₹)", "Final Ticket (₹)", "Base Fee (₹)", "Total Payable (₹)",
-    "Payment Method", "Status", "Checked In", "Check-In Time", "Ticket Code",
+    "Payment Method", "Status", "Booking Location", "Checked In", "Check-In Time", "Ticket Code",
   ];
 
   const dataRows = enriched.map((b) => [
@@ -2921,6 +2924,7 @@ router.get("/admin/bookings/report/download", requireAuth(["admin"]), async (req
     b.totalPayable,
     b.paymentMethod,
     b.status,
+    b.bookingLocation,
     b.checkedIn ? "Yes" : "No",
     b.checkedInAt ? new Date(b.checkedInAt).toLocaleString("en-IN") : "",
     b.ticketCode,
@@ -2931,7 +2935,7 @@ router.get("/admin/bookings/report/download", requireAuth(["admin"]), async (req
     { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 28 },
     { wch: 10 }, { wch: 7 }, { wch: 7 }, { wch: 8 }, { wch: 8 },
     { wch: 16 }, { wch: 13 }, { wch: 16 }, { wch: 13 }, { wch: 16 },
-    { wch: 16 }, { wch: 12 }, { wch: 11 }, { wch: 18 }, { wch: 18 },
+    { wch: 16 }, { wch: 12 }, { wch: 24 }, { wch: 11 }, { wch: 18 }, { wch: 18 },
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Bookings");

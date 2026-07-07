@@ -4,6 +4,7 @@ const STORAGE_KEY = "royvento_city";
 const LOCALITY_KEY = "royvento_locality";
 const STATE_KEY = "royvento_state";
 const MANUAL_KEY = "royvento_loc_manual";
+const COORDS_KEY = "royvento_coords";
 
 interface LocationContextValue {
   selectedCity: string;
@@ -17,6 +18,10 @@ interface LocationContextValue {
   /** `manual` = true when the user explicitly picked a city from the list, so
    *  GPS auto-detect won't override it on the next load. */
   setSelectedCity: (city: string, locality?: string, manual?: boolean) => void;
+  /** Save an EXACT location the user confirmed on the map pin (coords + the
+   *  reverse-geocoded label). Treated as a manual pick so GPS never overrides
+   *  it. This is the reliable "exact location" path on any device. */
+  setPreciseLocation: (loc: { lat: number; lng: number; city: string; locality: string; state: string }) => void;
   /** Triggers a high-accuracy GPS lookup + reverse-geocode. Resolves true on
    *  success. Safe to call from a user gesture (this is when we prompt). */
   detectLocation: () => Promise<boolean>;
@@ -30,6 +35,7 @@ const LocationContext = createContext<LocationContextValue>({
   selectedState: "",
   coords: null,
   setSelectedCity: () => {},
+  setPreciseLocation: () => {},
   detectLocation: async () => false,
   detecting: false,
   locationError: "",
@@ -37,6 +43,28 @@ const LocationContext = createContext<LocationContextValue>({
 
 export function useSelectedCity() {
   return useContext(LocationContext);
+}
+
+/** Build the `{ bookingLocation, bookingLatitude, bookingLongitude }` payload
+ *  from the current location context, to attach to a booking request so the
+ *  admin/partner/organizer reports can show where the booking came from. The
+ *  label dedupes and joins locality → city → state (e.g. "Tarulia, Kolkata,
+ *  West Bengal"); coords are included only when a GPS fix is available. */
+export function buildBookingLocation(loc: {
+  selectedCity: string;
+  selectedLocality: string;
+  selectedState: string;
+  coords: { lat: number; lng: number } | null;
+}): { bookingLocation: string; bookingLatitude: number | null; bookingLongitude: number | null } {
+  const parts = [loc.selectedLocality, loc.selectedCity, loc.selectedState]
+    .map((s) => (s || "").trim())
+    .filter(Boolean);
+  const label = parts.filter((v, i) => parts.indexOf(v) === i).join(", ");
+  return {
+    bookingLocation: label,
+    bookingLatitude: loc.coords ? loc.coords.lat : null,
+    bookingLongitude: loc.coords ? loc.coords.lng : null,
+  };
 }
 
 interface GeoResult { city: string; locality: string; state: string; }
@@ -52,14 +80,17 @@ const dedupe = (city: string, locality: string): GeoResult => {
  *  sublocality/neighbourhood data than OSM (the difference between "Tarulia"
  *  and the wider "AP Block" / "Bidhannagar"). Returns null on any failure so
  *  the caller can fall back to OSM. */
-async function reverseGeocodeGoogle(lat: number, lon: number): Promise<GeoResult | null> {
+async function reverseGeocodeGoogle(lat: number, lon: number, fresh = false): Promise<GeoResult | null> {
   try {
-    const r = await fetch(`/api/places/reverse?lat=${lat}&lng=${lon}`, {
+    const r = await fetch(`/api/places/reverse?lat=${lat}&lng=${lon}${fresh ? "&fresh=1" : ""}`, {
       headers: { Accept: "application/json" },
     });
     if (!r.ok) return null;
-    const d = (await r.json()) as { city?: string | null; locality?: string | null; state?: string | null };
-    const res = dedupe(d.city ?? "", d.locality ?? "");
+    const d = (await r.json()) as { city?: string | null; locality?: string | null; route?: string | null; state?: string | null };
+    // Prefer the named neighbourhood; if Google only has a street for the exact
+    // point, use that (still far more precise than a broad block/city name).
+    const locality = (d.locality ?? "").trim() || (d.route ?? "").trim();
+    const res = dedupe(d.city ?? "", locality);
     return res.city || res.locality ? { ...res, state: (d.state ?? "").trim() } : null;
   } catch {
     return null;
@@ -76,9 +107,11 @@ async function reverseGeocodeOSM(lat: number, lon: number): Promise<GeoResult> {
     const data = await r.json();
     const a = data.address ?? {};
     const cityRaw = a.city || a.town || a.municipality || a.state_district || a.county || a.state || "";
+    // Finest → broadest. Prefer a named micro-locality; fall back to the street
+    // so at least the exact road shows (OSM rarely has Google-grade area names).
     const localityRaw =
       a.neighbourhood || a.suburb || a.quarter || a.hamlet || a.village ||
-      a.city_district || a.residential || a.road || "";
+      a.city_district || a.residential || a.road || a.pedestrian || "";
     const clean = (s: string) => (s ? String(s).split(",")[0].trim() : "");
     return { ...dedupe(clean(cityRaw), clean(localityRaw)), state: clean(a.state || "") };
   } catch {
@@ -87,9 +120,10 @@ async function reverseGeocodeOSM(lat: number, lon: number): Promise<GeoResult> {
 }
 
 /** Reverse-geocode lat/lon → { city, locality }. Google first (precise), then
- *  OSM as a fallback. */
-async function reverseGeocodeDetailed(lat: number, lon: number): Promise<GeoResult> {
-  return (await reverseGeocodeGoogle(lat, lon)) ?? (await reverseGeocodeOSM(lat, lon));
+ *  OSM as a fallback. Pass `fresh` for explicit user actions (detect / map pin)
+ *  so the server skips its cache and returns the current name. */
+async function reverseGeocodeDetailed(lat: number, lon: number, fresh = false): Promise<GeoResult> {
+  return (await reverseGeocodeGoogle(lat, lon, fresh)) ?? (await reverseGeocodeOSM(lat, lon));
 }
 
 /** Resolve the most accurate GPS fix the device can give, quickly. Uses
@@ -100,7 +134,7 @@ async function reverseGeocodeDetailed(lat: number, lon: number): Promise<GeoResu
  *    • resolve immediately once accuracy ≤ 65 m (building-level → exact enough),
  *    • otherwise resolve after 8 s with the best fix gathered.
  *  maximumAge:0 forces a fresh fix (never a stale cached one). */
-function getBestPosition(): Promise<GeolocationPosition> {
+export function getBestPosition(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) { reject(new Error("unsupported")); return; }
     let best: GeolocationPosition | null = null;
@@ -148,7 +182,25 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const [detecting, setDetecting] = useState(false);
   const [locationError, setLocationError] = useState("");
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(() => {
+    try {
+      const raw = localStorage.getItem(COORDS_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (typeof p?.lat === "number" && typeof p?.lng === "number") return { lat: p.lat, lng: p.lng };
+      }
+    } catch {}
+    return null;
+  });
+
+  // Persist coords so a confirmed/detected position survives reloads (and is
+  // available to attach to bookings — see buildBookingLocation).
+  useEffect(() => {
+    try {
+      if (coords) localStorage.setItem(COORDS_KEY, JSON.stringify(coords));
+      else localStorage.removeItem(COORDS_KEY);
+    } catch {}
+  }, [coords]);
 
   const setSelectedCity = useCallback((city: string, locality = "", manual = false) => {
     setSelectedCityState(city);
@@ -165,6 +217,19 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, []);
 
+  const setPreciseLocation = useCallback(
+    (loc: { lat: number; lng: number; city: string; locality: string; state: string }) => {
+      setCoords({ lat: loc.lat, lng: loc.lng });
+      setSelectedState(loc.state || "");
+      const city = loc.city || loc.locality;
+      const locality = loc.locality && loc.locality.toLowerCase() !== city.toLowerCase() ? loc.locality : "";
+      // manual = true: a pin the user confirmed is authoritative; GPS auto-detect
+      // must never silently override it.
+      setSelectedCity(city, locality, true);
+    },
+    [setSelectedCity, setSelectedState],
+  );
+
   const detectLocation = useCallback(async (): Promise<boolean> => {
     if (!navigator.geolocation) {
       setLocationError("Location is not supported on this device.");
@@ -179,6 +244,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       const { city, locality, state } = await reverseGeocodeDetailed(
         pos.coords.latitude,
         pos.coords.longitude,
+        true, // explicit user action → bypass server cache, get the current name
       );
       if (state) setSelectedState(state);
       // GPS detection is the source of truth → manual flag cleared (manual=false).
@@ -224,7 +290,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <LocationContext.Provider
-      value={{ selectedCity, selectedLocality, selectedState, coords, setSelectedCity, detectLocation, detecting, locationError }}
+      value={{ selectedCity, selectedLocality, selectedState, coords, setSelectedCity, setPreciseLocation, detectLocation, detecting, locationError }}
     >
       {children}
     </LocationContext.Provider>

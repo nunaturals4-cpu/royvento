@@ -63,9 +63,12 @@ router.get("/places/autocomplete", async (req, res) => {
   }
 });
 
-type ReverseResult = { city: string | null; locality: string | null; area: string | null; state: string | null; formatted: string | null };
+type ReverseResult = { city: string | null; locality: string | null; area: string | null; route: string | null; state: string | null; formatted: string | null };
 const reverseCache = new TtlCache<ReverseResult>();
-const REVERSE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+// Short TTL: a "current location" lookup must reflect where the user is NOW, not
+// a name cached from a previous visit. 10 min is enough to dedupe rapid repeat
+// calls (e.g. dragging the map pin) without ever serving a stale label.
+const REVERSE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 // Reverse-geocode lat/lng → precise Indian locality using Google's Geocoding
 // API (much finer sublocality/neighbourhood data than OpenStreetMap, which is
@@ -80,8 +83,13 @@ router.get("/places/reverse", async (req, res) => {
   }
   // Round to ~11m grid for cache hits without losing locality precision.
   const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
-  const cached = reverseCache.get(cacheKey);
-  if (cached) { res.json(cached); return; }
+  // `?fresh=1` (sent by explicit user detection / pin confirm) forces a live
+  // lookup so the user always gets the current name, never a cached one.
+  const fresh = req.query.fresh === "1" || req.query.fresh === "true";
+  if (!fresh) {
+    const cached = reverseCache.get(cacheKey);
+    if (cached) { res.json(cached); return; }
+  }
 
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) {
@@ -106,24 +114,40 @@ router.get("/places/reverse", async (req, res) => {
       res.status(502).json({ error: "Reverse geocoding returned no result", googleStatus: data.status });
       return;
     }
-    // Merge components across the top results (the most specific result first)
-    // so we can pull the finest available locality even if the nearest result
-    // is a building without a city tag.
-    const all = data.results.flatMap((r) => r.address_components ?? []);
+    // Google returns results ordered most-specific → broadest. Resolve each
+    // field from the MOST specific result that carries it (walking the finest
+    // component types first), so a broad political "block" from a coarse result
+    // never wins over the true street-level neighbourhood. This is the fix for
+    // "AN Block" showing instead of "Tarulia": we prefer the finest name Google
+    // has for the exact point, and only broaden when it's genuinely absent.
+    const results = data.results;
     const pick = (...types: string[]): string | null => {
-      for (const t of types) {
-        const hit = all.find((c) => c.types.includes(t));
-        if (hit) return hit.long_name;
+      for (const r of results) {
+        const comps = r.address_components ?? [];
+        for (const t of types) {
+          const hit = comps.find((c) => c.types.includes(t));
+          if (hit) return hit.long_name;
+        }
       }
       return null;
     };
+    const route = pick("route");
+    const neighbourhood = pick(
+      "neighborhood",
+      "sublocality_level_3",
+      "sublocality_level_2",
+      "sublocality_level_1",
+      "sublocality",
+    );
     const result: ReverseResult = {
-      city: pick("locality", "postal_town", "administrative_area_level_2", "administrative_area_level_1"),
-      // Finest → broadest neighbourhood-level naming (matches what Zomato shows).
-      locality: pick("neighborhood", "sublocality_level_2", "sublocality_level_1", "sublocality", "route"),
+      city: pick("locality", "postal_town", "administrative_area_level_3", "administrative_area_level_2", "administrative_area_level_1"),
+      // Finest neighbourhood name (what Zomato/Blinkit show), falling back to the
+      // street when Google has no named locality for the point.
+      locality: neighbourhood ?? route,
       area: pick("sublocality_level_1", "sublocality", "administrative_area_level_2"),
+      route,
       state: pick("administrative_area_level_1"),
-      formatted: data.results[0]?.formatted_address ?? null,
+      formatted: results[0]?.formatted_address ?? null,
     };
     reverseCache.set(cacheKey, result, REVERSE_TTL_MS);
     res.json(result);

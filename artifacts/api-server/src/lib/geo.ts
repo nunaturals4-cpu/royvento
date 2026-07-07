@@ -119,3 +119,29 @@ export function num(v: unknown): number | null {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;
 }
+
+/**
+ * Extract the customer's booking-time location from a raw request body. The
+ * three booking flows (pub, organizer, game) send `bookingLocation` (a human
+ * readable "area, city, state" label) and, when the browser granted GPS,
+ * `bookingLatitude` / `bookingLongitude`. Returns values shaped for a direct
+ * insert into the bookings table (label clamped to 255 chars; coords null when
+ * out of range or absent). Untrusted input, so everything is validated.
+ */
+export function bookingLocationFromBody(body: unknown): {
+  bookingLocation: string;
+  bookingLatitude: string | null;
+  bookingLongitude: string | null;
+} {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const label = typeof b["bookingLocation"] === "string" ? b["bookingLocation"].trim().slice(0, 255) : "";
+  const lat = num(b["bookingLatitude"]);
+  const lng = num(b["bookingLongitude"]);
+  const validCoords = lat !== null && lng !== null && validLat(lat) && validLng(lng);
+  return {
+    bookingLocation: label,
+    // Store as strings so drizzle's numeric column round-trips cleanly.
+    bookingLatitude: validCoords ? String(lat) : null,
+    bookingLongitude: validCoords ? String(lng) : null,
+  };
+}
