@@ -1227,10 +1227,10 @@ export const vendorOffersTable = pgTable(
     vendorId: integer("vendor_id")
       .notNull()
       .references(() => vendorsTable.id, { onDelete: "cascade" }),
-    category: varchar("category", { length: 10 }).notNull(), // "food" | "drink"
+    category: varchar("category", { length: 10 }).notNull(), // "food" | "drink" | "exclusive"
     title: varchar("title", { length: 120 }).notNull(),
     description: text("description").notNull().default(""),
-    // "percent" | "fixed" | "bogo" | "free_item"
+    // "percent" | "fixed" | "bogo" | "free_item" | "nothing" (custom, no discount)
     discountType: varchar("discount_type", { length: 16 }).notNull(),
     // 0 for bogo / free_item
     discountValue: numeric("discount_value", { precision: 10, scale: 2 }).notNull().default("0"),

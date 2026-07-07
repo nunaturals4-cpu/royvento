@@ -30,6 +30,8 @@ interface TonightItem {
   startTime: string;
   endTime: string;
   bucket: "now" | "soon" | null;
+  /** For "offer" items: the vendor_offers category (food/drink/exclusive). */
+  category?: string;
   dealLabel: string;
   rating: number;
   todayBookings: number;
@@ -52,6 +54,7 @@ const FILTERS: { key: string; label: string; icon: React.ReactNode }[] = [
   { key: "event",  label: "🎤 Events",               icon: <Mic2 className="h-3.5 w-3.5" /> },
   { key: "happy",  label: "🍻 Happy Hours",          icon: <GlassWater className="h-3.5 w-3.5" /> },
   { key: "offers", label: "🍽️ Food & Drink Offers",  icon: <Utensils className="h-3.5 w-3.5" /> },
+  { key: "exclusive", label: "✨ Exclusive Offer",   icon: <Sparkles className="h-3.5 w-3.5" /> },
 ];
 
 function TonightCard({ item }: { item: TonightItem }) {
@@ -65,7 +68,13 @@ function TonightCard({ item }: { item: TonightItem }) {
     <span className="flex items-center gap-1.5 rounded-full bg-amber-400/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-black">
       <Zap className="h-3 w-3" /> {item.startTime || "Soon"}
     </span>
-  ) : null;
+  ) : (
+    // Neutral fallback so every card reserves the same badge-row height — keeps
+    // all cards in the carousel a uniform size even when an item isn't live/soon.
+    <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/70">
+      <Sparkles className="h-3 w-3" /> Tonight
+    </span>
+  );
   // Show the deal in the gold pill, but don't repeat it when it equals the title.
   const offerLabel = item.dealLabel && item.dealLabel.trim() && item.dealLabel !== item.title ? item.dealLabel : undefined;
 
@@ -78,7 +87,10 @@ function TonightCard({ item }: { item: TonightItem }) {
   // Offer & happy-hour items use the premium VIP offer card (the single standard
   // offer-card design); every other kind keeps its photo card.
   if (item.kind === "happyhour" || item.kind === "offer") {
-    const theme = item.kind === "happyhour" ? OFFER_THEMES.free : OFFER_THEMES.food;
+    const isExclusive = item.category === "exclusive";
+    const theme = item.kind === "happyhour"
+      ? OFFER_THEMES.free
+      : isExclusive ? OFFER_THEMES.exclusive : OFFER_THEMES.food;
     const timeLabel = item.startTime
       ? `${item.startTime}${item.endTime ? ` – ${item.endTime}` : ""}`
       : "Tonight";
@@ -91,9 +103,9 @@ function TonightCard({ item }: { item: TonightItem }) {
           bookHref={bookHref}
           title={item.subtitle}
           venueName={item.title}
-          offerLabel={item.dealLabel?.trim() || (item.kind === "happyhour" ? "Happy Hour" : "Special Offer")}
-          offerEyebrow={item.kind === "happyhour" ? "Enjoy" : "Deal"}
-          offerIcon={<GlassWater className="h-5 w-5" />}
+          offerLabel={item.dealLabel?.trim() || (item.kind === "happyhour" ? "Happy Hour" : isExclusive ? "Exclusive Offer" : "Special Offer")}
+          offerEyebrow={item.kind === "happyhour" ? "Enjoy" : isExclusive ? "Exclusive" : "Deal"}
+          offerIcon={isExclusive ? <Sparkles className="h-5 w-5" /> : <GlassWater className="h-5 w-5" />}
           location={loc || "Tonight"}
           statusBadge={statusBadge}
         >

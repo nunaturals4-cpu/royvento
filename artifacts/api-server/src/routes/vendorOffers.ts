@@ -33,10 +33,13 @@ const HHMM = z
   .regex(/^([01]?\d|2[0-3]):[0-5]\d$|^$/, "Use HH:MM 24-hour or empty");
 
 const OfferBody = z.object({
-  category: z.enum(["food", "drink"]),
+  // "exclusive" is a custom promotional offer that isn't tied to food or drink.
+  category: z.enum(["food", "drink", "exclusive"]),
   title: z.string().min(1).max(120),
   description: z.string().max(2000).default(""),
-  discountType: z.enum(["percent", "fixed", "bogo", "free_item"]),
+  // "nothing" = a custom offer with no numeric discount (title/description only),
+  // used for offers that aren't limited to a food/drink discount.
+  discountType: z.enum(["percent", "fixed", "bogo", "free_item", "nothing"]),
   discountValue: z.number().min(0).max(100000).default(0),
   freeItemName: z.string().max(120).default(""),
   gender: z.enum(["all", "female"]).default("all"),

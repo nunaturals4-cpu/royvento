@@ -94,6 +94,8 @@ export interface TonightItem {
   startTime: string;
   endTime: string;
   bucket: Bucket;
+  /** For "offer" items: the vendor_offers category (food/drink/exclusive). */
+  category?: string;
   dealLabel: string;
   rating: number;
   todayBookings: number;
@@ -361,6 +363,8 @@ router.get("/happening-tonight", async (req, res) => {
       const oStart = parseHHMM(r["timeFrom"] as string);
       const oEnd = parseHHMM(r["timeTo"] as string);
       const pubEventId = r["pubEventId"] != null ? Number(r["pubEventId"]) : null;
+      const offerCategory = String(r["category"] ?? "");
+      const isExclusive = offerCategory === "exclusive";
       push({
         key: `offer-${r["id"]}`,
         id: Number(r["id"]),
@@ -373,6 +377,7 @@ router.get("/happening-tonight", async (req, res) => {
         href: pubEventId ? `/events/${pubEventId}?to=offers` : "/pub-offers",
         startTime: String(r["timeFrom"] ?? ""),
         endTime: String(r["timeTo"] ?? ""),
+        category: offerCategory,
         dealLabel: String(r["title"] ?? ""),
         rating: Number(r["rating"] ?? 0),
         todayBookings: 0,
@@ -382,8 +387,9 @@ router.get("/happening-tonight", async (req, res) => {
         // timed offers use the standard now/soon window logic and otherwise show
         // as an upcoming deal for today rather than a false "Live Now".
         forceBucket: oStart === null ? "now" : undefined,
-        // "Food & Drink Offers" filter — vendor_offers only (food + drink discounts).
-        extraFilters: ["offers", "deals"],
+        // Exclusive offers get their own "Exclusive Offer" filter; food & drink
+        // discounts stay under the "Food & Drink Offers" filter.
+        extraFilters: isExclusive ? ["exclusive", "deals"] : ["offers", "deals"],
       });
     }
 

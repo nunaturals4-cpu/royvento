@@ -51,6 +51,11 @@ export const OFFER_THEMES = {
     from: "#8A4F26", to: "#331D0C", plateIcon: "#FFE2C2", accent: "#C67B3E",
     glow: "rgba(182,106,54,0.30)", border: "rgba(182,106,54,0.50)",
   },
+  // ✨ Exclusive Offers — Emerald (distinct from the food/drink gold & copper)
+  exclusive: {
+    from: "#1F5A4C", to: "#0A1F1A", plateIcon: "#C9F5E4", accent: "#4FD1A5",
+    glow: "rgba(79,209,165,0.30)", border: "rgba(79,209,165,0.50)",
+  },
 } satisfies Record<string, OfferTheme>;
 
 export type OfferThemeKey = keyof typeof OFFER_THEMES;

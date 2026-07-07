@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect } from "react";
 import { SEO } from "@/components/SEO";
 import {
   ArrowRight, Bell, ChevronLeft,
-  Clock, GlassWater, Utensils,
+  Clock, GlassWater, Utensils, Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { pubDetailSlug } from "@/lib/seo-slug";
@@ -22,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 interface AllDrinkDeal {
   id: number;
   vendorId: number;
-  category: "food" | "drink";
+  category: "food" | "drink" | "exclusive";
   vendorName: string;
   vendorLocation: string;
   vendorCity: string;
@@ -30,7 +30,7 @@ interface AllDrinkDeal {
   imageUrl?: string | null;
   title: string;
   description: string;
-  discountType: "percent" | "fixed" | "bogo" | "free_item";
+  discountType: "percent" | "fixed" | "bogo" | "free_item" | "nothing";
   discountValue: string;
   freeItemName: string;
   days: string[];
@@ -58,12 +58,14 @@ function discountHero(deal: AllDrinkDeal): { eyebrow: string; value: string } {
   if (deal.discountType === "percent") return { eyebrow: "Flat",  value: `${amount}% OFF` };
   if (deal.discountType === "fixed")   return { eyebrow: "Flat",  value: `₹${amount} OFF` };
   if (deal.discountType === "bogo")    return { eyebrow: "Offer", value: "Buy 1 Get 1" };
-  return { eyebrow: "Free", value: deal.freeItemName || "Item" };
+  if (deal.discountType === "free_item") return { eyebrow: "Free", value: deal.freeItemName || "Item" };
+  // "nothing" — a custom offer with no numeric discount; the title carries it.
+  return { eyebrow: "Offer", value: deal.category === "exclusive" ? "Exclusive" : "Special" };
 }
 
 function DiscountCard({ deal, theme }: { deal: AllDrinkDeal; theme: OfferTheme }) {
   const { eyebrow, value } = discountHero(deal);
-  const Icon = deal.category === "food" ? Utensils : GlassWater;
+  const Icon = deal.category === "exclusive" ? Sparkles : deal.category === "food" ? Utensils : GlassWater;
   const timeLabel = deal.timeFrom && deal.timeTo
     ? `${deal.timeFrom} – ${deal.timeTo}`
     : deal.timeFrom || "";
@@ -169,9 +171,10 @@ export function PubOffers() {
       })
     : allDrinkDeals;
 
-  // Keep Food and Drink discounts in their own colour-coded sections.
+  // Keep Food, Drink and Exclusive offers in their own colour-coded sections.
   const foodDeals = filteredDeals.filter((d) => d.category === "food");
   const drinkDeals = filteredDeals.filter((d) => d.category === "drink");
+  const exclusiveDeals = filteredDeals.filter((d) => d.category === "exclusive");
 
   // â"€â"€ Task 3: Notify Me â€" goes to /subscription; if already subscribed show sweet toast â"€â"€
   const handleNotifyMe = useCallback(async () => {
@@ -282,7 +285,7 @@ export function PubOffers() {
         )}
 
         {/* â"€â"€ DRINK DEALS â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
-        {hasDeals && (
+        {(hasDeals || exclusiveDeals.length > 0) && (
           <section className="mb-12">
             {/* Section header */}
             <div className="flex items-center justify-between mb-5">
@@ -322,7 +325,7 @@ export function PubOffers() {
               </div>
             </div>
 
-            {freeVendors.length === 0 && ticketVendors.length === 0 && coverChargeVendors.length === 0 ? (
+            {freeVendors.length === 0 && ticketVendors.length === 0 && coverChargeVendors.length === 0 && exclusiveDeals.length === 0 ? (
               <div className="rounded-2xl border border-white/[0.06] bg-[#111] p-10 text-center">
                 <GlassWater className="h-8 w-8 text-primary/30 mx-auto mb-3" />
                 <p className="text-white/60">
@@ -334,7 +337,20 @@ export function PubOffers() {
             ) : (
               <div className="space-y-10">
                 <FreeDrinkSection vendors={freeVendors} />
-                {freeVendors.length > 0 && ticketVendors.length > 0 && (
+                {/* Exclusive Offers — dedicated section immediately after Free Drinks. */}
+                {exclusiveDeals.length > 0 && (
+                  <>
+                    {freeVendors.length > 0 && <div className="premium-divider" />}
+                    <DiscountPanel
+                      deals={exclusiveDeals}
+                      title="Exclusive Offers"
+                      subtitle="Curated perks beyond food &amp; drink"
+                      Icon={Sparkles}
+                      theme={OFFER_THEMES.exclusive}
+                    />
+                  </>
+                )}
+                {(freeVendors.length > 0 || exclusiveDeals.length > 0) && ticketVendors.length > 0 && (
                   <div className="premium-divider" />
                 )}
                 <TicketSection vendors={ticketVendors} />

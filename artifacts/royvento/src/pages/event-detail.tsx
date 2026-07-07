@@ -3490,6 +3490,7 @@ function FoodDrinkOffersSection({ vendorId, onBookClick, coverFallback }: { vend
 
   const food = offers.filter((o) => o.category === "food");
   const drink = offers.filter((o) => o.category === "drink");
+  const exclusive = offers.filter((o) => o.category === "exclusive");
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -3533,6 +3534,9 @@ function FoodDrinkOffersSection({ vendorId, onBookClick, coverFallback }: { vend
           )}
           {drink.length > 0 && (
             <OfferGroup icon={Wine} label="Drinks" count={drink.length} offers={drink} onBookClick={onBookClick} theme={OFFER_THEMES.drink} />
+          )}
+          {exclusive.length > 0 && (
+            <OfferGroup icon={Sparkle} label="Exclusive Offers" count={exclusive.length} offers={exclusive} onBookClick={onBookClick} theme={OFFER_THEMES.exclusive} />
           )}
         </div>
       )}
@@ -3586,7 +3590,7 @@ function PremiumOfferCard({
   onBookClick: () => void;
   theme: OfferTheme;
 }) {
-  const Icon = offer.category === "drink" ? Wine : Utensils;
+  const Icon = offer.category === "exclusive" ? Sparkle : offer.category === "drink" ? Wine : Utensils;
   const window = offerWindowLabel(offer.timeFrom, offer.timeTo);
   const { eyebrow, value } = offerHero(offer);
 
