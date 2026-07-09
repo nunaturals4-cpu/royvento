@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MobileFooter } from "@/components/MobileFooter";
+import { FollowButton } from "@/components/FollowButton";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 
@@ -151,6 +152,10 @@ export default function OrganizerProfileScreen() {
           <StatBox label="Tickets" value={String(stats.ticketsSold)} />
           <StatBox label="Rating" value={stats.avgRating > 0 ? stats.avgRating.toFixed(1) : "—"} />
           <StatBox label="Reviews" value={String(stats.reviewCount)} />
+        </View>
+
+        <View style={{ paddingHorizontal: 20, marginTop: 16, alignItems: "flex-start" }}>
+          <FollowButton targetType="organizer" targetId={organizer.id} name={organizer.name} />
         </View>
 
         {!!organizer.description && (

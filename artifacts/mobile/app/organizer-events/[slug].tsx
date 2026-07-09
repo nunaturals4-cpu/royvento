@@ -19,6 +19,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MobileFooter } from "@/components/MobileFooter";
+import { openRazorpayCheckout } from "@/lib/razorpayCheckout";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -200,12 +201,33 @@ function BookingModal({ slug, ticket, onClose }: { slug: string; ticket: TicketT
     if (!name.trim()) { Alert.alert("Please enter your name"); return; }
     setSubmitting(true);
     try {
-      const res = await customFetch<{ ticketCode: string; total: number; bookingId: number }>(`/api/organizer-events/${slug}/book`, {
+      const res = await customFetch<{ ticketCode?: string; total: number; bookingId: number; paymentPending?: boolean; razorpayOrderId?: string; amountPaise?: number; eventTitle?: string }>(`/api/organizer-events/${slug}/book`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ticketId: ticket.id, name: name.trim(), phone: phone.trim(), quantity: qty, couponCode: coupon.trim(), pointsToUse: 0 }),
       });
-      setConfirmation({ ticketCode: res.ticketCode, total: res.total });
+      // Paid ticket → run Razorpay checkout; the webhook confirms the booking.
+      if (res.paymentPending && res.razorpayOrderId) {
+        const pay = await openRazorpayCheckout({
+          orderId: res.razorpayOrderId,
+          amountPaise: res.amountPaise ?? Math.round((res.total || 0) * 100),
+          name: res.eventTitle ?? "Royvento",
+          description: "Event ticket",
+          prefillName: name.trim(),
+          prefillContact: phone.trim(),
+          rid: res.bookingId,
+        });
+        if (pay === "success") {
+          close();
+          router.replace(`/payment-result?payment=success&bookingId=${res.bookingId}` as never);
+        } else if (pay === "cancelled") {
+          Alert.alert("Payment cancelled", "You can try again anytime.");
+        } else {
+          Alert.alert("Payment failed", "Please try again.");
+        }
+        return;
+      }
+      setConfirmation({ ticketCode: res.ticketCode ?? "", total: res.total });
     } catch (e: any) {
       Alert.alert("Booking failed", e?.message ?? "Please try again.");
     } finally {

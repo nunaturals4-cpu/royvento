@@ -6,12 +6,14 @@ import { boundingBox, num, type Coords } from "./geo";
 import { logger } from "./logger";
 
 // The kind of venue update that triggers a follower notification. Drink-plan
-// types map onto the first three; vendor offers map onto "food_drink".
+// types map onto the first three; vendor offers map onto "food_drink" (food /
+// drink discount categories) or "exclusive" (the exclusive-offer category).
 export type VenueUpdateKind =
   | "free_drinks"
   | "ticket"
   | "cover_charge"
-  | "food_drink";
+  | "food_drink"
+  | "exclusive";
 
 // Map a drink-plan `type` (welcome | unlimited | ticket | cover_charge) to the
 // notification kind. Free welcome/unlimited drinks both read as "free drinks".
@@ -27,6 +29,7 @@ const PRIORITY: Record<VenueUpdateKind, number> = {
   cover_charge: 3,
   ticket: 2,
   free_drinks: 2,
+  exclusive: 2,
   food_drink: 1,
 };
 
@@ -62,8 +65,8 @@ function canonicalCitySlug(input: string | null | undefined): string {
 // Deep link for an offer notification. A pub's primary "see & book" surface is
 // its public EVENT page (/events/…), not the /pubs profile page — so we resolve
 // the venue's pub event and link there, opening the relevant section:
-//   • food & drink discounts → ?to=offers      (the Offers tab)
-//   • drink / ticket / cover  → ?to=happyhours  (the Happy Hours tab)
+//   • food & drink discounts / exclusive deals → ?to=offers  (the Offers tab)
+//   • drink / ticket / cover                    → ?to=happyhours (Happy Hours)
 // The event page auto-lands on that section (falling back to Book a Table), so
 // the user sees the exact offer they were told about and can book/claim it.
 // Falls back to the /pubs profile page only if the venue has no public pub event.
@@ -71,7 +74,9 @@ async function offerDeepLink(
   v: { id: number; businessName: string; city: string | null },
   kind: VenueUpdateKind,
 ): Promise<string> {
-  const to = kind === "food_drink" ? "offers" : "happyhours";
+  // Vendor-offer categories (food & drink discount + exclusive deal) both live
+  // on the Offers tab; drink-plan kinds land on Happy Hours.
+  const to = kind === "food_drink" || kind === "exclusive" ? "offers" : "happyhours";
 
   const [pubEvent] = await db
     .select({ id: eventsTable.id, title: eventsTable.title, city: eventsTable.city })

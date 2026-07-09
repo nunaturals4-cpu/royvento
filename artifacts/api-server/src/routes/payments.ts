@@ -17,12 +17,6 @@ import { createUserNotification } from "../lib/notify";
 import { computeCommissionFromPlanned } from "../lib/commission";
 import { eq, and, inArray, ne, sql } from "drizzle-orm";
 import {
-  checkPaymentStatus,
-  verifyWebhookSignature as verifyPhonePeWebhookSignature,
-  decodeWebhookResponse,
-  getAppUrl,
-} from "../lib/phonepe";
-import {
   verifyWebhookSignature as verifyRazorpayWebhookSignature,
   verifyPaymentSignature,
   isRazorpayConfigured,
@@ -76,422 +70,6 @@ async function restoreBookingInstruments(booking: {
   }
 }
 
-/**
- * Atomically gate activation: update payments row from initiated→success.
- * If concurrent callback+webhook both reach here, only one will match the
- * WHERE clause — the other exits early, preventing duplicate side effects.
- */
-async function activateBookingAfterPayment(bookingId: number, phonepeTransactionId: string) {
-  const [booking] = await db
-    .select()
-    .from(bookingsTable)
-    .where(eq(bookingsTable.id, bookingId))
-    .limit(1);
-
-  if (!booking) return;
-
-  // Look up commission rates BEFORE the transaction (read-only) to keep the
-  // tx short. The rates table is effectively immutable per vendor in this flow.
-  const [vcRow, evtRow] = await Promise.all([
-    db.select().from(vendorCommissionsTable).where(eq(vendorCommissionsTable.vendorId, booking.vendorId)).limit(1),
-    db.select({ freeEntryRules: eventsTable.freeEntryRules }).from(eventsTable).where(eq(eventsTable.id, booking.eventId)).limit(1),
-  ]);
-  const comm = computeCommissionFromPlanned(
-    {
-      pubMode: booking.pubMode,
-      finalPrice: booking.finalPrice,
-      guests: booking.guests,
-      ticketWomen: booking.ticketWomen,
-      ticketMen: booking.ticketMen,
-      ticketCouple: booking.ticketCouple,
-      bookingDate: booking.bookingDate,
-    },
-    vcRow[0] ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
-    (evtRow[0]?.freeEntryRules ?? null) as { enabled?: boolean; days?: string[]; genders?: string[] } | null,
-  );
-  const netCredit = Math.max(0, Number(booking.finalPrice ?? 0) - comm.amount);
-
-  // Atomic activation: payment status gate, booking confirmation, and vendor
-  // net credit happen in a single transaction. The initiated→success gate
-  // lives INSIDE the tx so a concurrent caller either sees us mid-flight (and
-  // rolls back) or finds status=success and no-ops. If anything inside fails,
-  // payment status stays `initiated` and the next callback/webhook can safely
-  // retry.
-  //
-  // Admin commission is intentionally NOT recorded here anymore — by product
-  // decision, commission is realised in `commission_ledger` only when the
-  // pub/partner scans the user's QR at check-in (see scan-ticket route).
-  // Booking-time still computes commission so the vendor wallet credit
-  // (`onlineBalance += finalPrice − commission`) stays correct.
-  let activated = false;
-  await db.transaction(async (tx) => {
-    const gated = await tx
-      .update(paymentsTable)
-      .set({ status: "success", phonepeTransactionId, updatedAt: new Date() })
-      .where(and(eq(paymentsTable.bookingId, bookingId), eq(paymentsTable.status, "initiated")))
-      .returning({ id: paymentsTable.id });
-
-    if (gated.length === 0) return; // already activated by a concurrent caller — nothing to do
-
-    await tx
-      .update(bookingsTable)
-      .set({ status: "confirmed", approvedBy: "payment" })
-      .where(eq(bookingsTable.id, bookingId));
-
-    await tx
-      .update(vendorsTable)
-      .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(netCredit)}` })
-      .where(eq(vendorsTable.id, booking.vendorId));
-
-    activated = true;
-  });
-
-  if (!activated) return;
-
-  await db
-    .insert(availabilityTable)
-    .values({ vendorId: booking.vendorId, date: booking.bookingDate, status: "booked" })
-    .onConflictDoUpdate({
-      target: [availabilityTable.vendorId, availabilityTable.date],
-      set: { status: "booked" },
-    });
-
-  try {
-    const [evt] = await db.select().from(eventsTable).where(eq(eventsTable.id, booking.eventId)).limit(1);
-    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, booking.userId)).limit(1);
-    const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, booking.vendorId)).limit(1);
-    let vendorEmail = "";
-    if (vendor) {
-      const [vu] = await db.select().from(usersTable).where(eq(usersTable.id, vendor.userId)).limit(1);
-      vendorEmail = vu?.email ?? "";
-    }
-    if (user && evt && vendor) {
-      await sendBookingCreatedEmails({
-        bookingId: booking.id,
-        eventTitle: evt.title,
-        vendorName: vendor.businessName,
-        vendorEmail,
-        userName: user.name,
-        userEmail: user.email,
-        bookingDate: booking.bookingDate,
-        guests: booking.guests,
-        totalPrice: Number(booking.finalPrice),
-        notes: booking.notes || undefined,
-        phone: booking.phone || undefined,
-        pubMode: booking.pubMode || undefined,
-        ticketWomen: booking.ticketWomen || undefined,
-        ticketMen: booking.ticketMen || undefined,
-        ticketCouple: booking.ticketCouple || undefined,
-      });
-
-    }
-  } catch (err) {
-    logger.error({ err }, "[payments] Failed to send booking notifications");
-  }
-
-  try {
-    const priorPaid = await db
-      .select()
-      .from(bookingsTable)
-      .where(
-        and(
-          eq(bookingsTable.userId, booking.userId),
-          inArray(bookingsTable.status, ["confirmed", "completed"]),
-        ),
-      );
-    const otherPriorCount = priorPaid.filter((p) => p.id !== booking.id).length;
-    if (otherPriorCount === 0) {
-      const refRows = await db
-        .select()
-        .from(referralsTable)
-        .where(
-          and(
-            eq(referralsTable.referredId, booking.userId),
-            eq(referralsTable.status, "pending"),
-          ),
-        )
-        .limit(1);
-      const ref = refRows[0];
-      if (ref) {
-        const [referrer] = await db.select().from(usersTable).where(eq(usersTable.id, ref.referrerId)).limit(1);
-        const [referred] = await db.select().from(usersTable).where(eq(usersTable.id, booking.userId)).limit(1);
-        if (referrer) {
-          await db.update(usersTable).set({ points: (referrer.points || 0) + 50 }).where(eq(usersTable.id, referrer.id));
-        }
-        if (referred) {
-          await db.update(usersTable).set({ points: (referred.points || 0) + 50 }).where(eq(usersTable.id, referred.id));
-        }
-        await db
-          .update(referralsTable)
-          .set({ status: "completed", pointsAwarded: 50, completedAt: new Date() })
-          .where(eq(referralsTable.id, ref.id));
-      }
-    }
-  } catch (err) {
-    logger.error({ err }, "[payments] Failed to award referral points after payment");
-  }
-
-  try {
-    const [evt] = await db.select().from(eventsTable).where(eq(eventsTable.id, booking.eventId)).limit(1);
-    await createUserNotification({
-      userId: booking.userId,
-      title: "Booking confirmed!",
-      message: `Your booking for "${evt?.title ?? `#${booking.id}`}" is confirmed. See you there!`,
-      url: "/dashboard/bookings",
-      tag: `booking-${booking.id}`,
-    });
-  } catch (err) {
-    logger.error({ err }, "[payments] Failed to create booking confirmation notification");
-  }
-}
-
-async function activateSubscriptionAfterPayment(subscriptionId: number, phonepeTransactionId: string) {
-  const [sub] = await db
-    .select()
-    .from(subscriptionsTable)
-    .where(eq(subscriptionsTable.id, subscriptionId))
-    .limit(1);
-
-  if (!sub) return;
-
-  const gated = await db
-    .update(paymentsTable)
-    .set({ status: "success", phonepeTransactionId, updatedAt: new Date() })
-    .where(and(eq(paymentsTable.subscriptionId, subscriptionId), eq(paymentsTable.status, "initiated")))
-    .returning({ id: paymentsTable.id });
-
-  if (gated.length === 0) return;
-
-  await db
-    .update(subscriptionsTable)
-    .set({ status: "expired" })
-    .where(
-      and(
-        eq(subscriptionsTable.userId, sub.userId),
-        eq(subscriptionsTable.status, "active"),
-        ne(subscriptionsTable.id, subscriptionId),
-      ),
-    );
-
-  await db
-    .update(subscriptionsTable)
-    .set({ status: "active" })
-    .where(eq(subscriptionsTable.id, subscriptionId));
-
-  if (sub.planType === "partner") {
-    await db
-      .update(vendorsTable)
-      .set({ isPremium: true })
-      .where(eq(vendorsTable.userId, sub.userId));
-  }
-}
-
-async function handleBookingPaymentFailure(payment: { id: number; bookingId: number | null }) {
-  if (!payment.bookingId) return;
-
-  const marked = await db
-    .update(paymentsTable)
-    .set({ status: "failed", updatedAt: new Date() })
-    .where(and(eq(paymentsTable.id, payment.id), eq(paymentsTable.status, "initiated")))
-    .returning({ id: paymentsTable.id });
-
-  if (marked.length === 0) return;
-
-  const [booking] = await db
-    .select()
-    .from(bookingsTable)
-    .where(and(eq(bookingsTable.id, payment.bookingId), eq(bookingsTable.status, "payment_pending")))
-    .limit(1);
-
-  if (!booking) return;
-
-  await restoreBookingInstruments(booking);
-}
-
-async function handleSubscriptionPaymentFailure(payment: { id: number; subscriptionId: number | null }) {
-  if (!payment.subscriptionId) return;
-
-  const marked = await db
-    .update(paymentsTable)
-    .set({ status: "failed", updatedAt: new Date() })
-    .where(and(eq(paymentsTable.id, payment.id), eq(paymentsTable.status, "initiated")))
-    .returning({ id: paymentsTable.id });
-
-  if (marked.length === 0) return;
-
-  await db
-    .update(subscriptionsTable)
-    .set({ status: "expired" })
-    .where(and(eq(subscriptionsTable.id, payment.subscriptionId), eq(subscriptionsTable.status, "pending")));
-}
-
-const ALLOWED_CALLBACK_SCHEMES = new Set(["royvento"]);
-
-/**
- * GET /payments/booking-callback
- *
- * UX redirect after user returns from PhonePe. On success: activates booking.
- * On non-success: redirects user to failure page WITHOUT touching DB state —
- * the webhook is the authoritative finalizer for failed payments.
- */
-router.get("/payments/booking-callback", async (req, res) => {
-  const merchantTransactionId = req.query["merchantTransactionId"] as string | undefined;
-  const rawScheme = req.query["callbackScheme"] as string | undefined;
-  const callbackScheme = rawScheme && ALLOWED_CALLBACK_SCHEMES.has(rawScheme) ? rawScheme : undefined;
-  const appUrl = getAppUrl();
-
-  function buildBookingRedirect(status: "success" | "failed", extra?: Record<string, string>): string {
-    const params = new URLSearchParams({ status, payment: status, type: "booking", ...extra });
-    if (callbackScheme) {
-      return `${callbackScheme}://payment-result?${params.toString()}`;
-    }
-    return `${appUrl}/payment-result?${params.toString()}`;
-  }
-
-  if (!merchantTransactionId) {
-    return res.redirect(buildBookingRedirect("failed"));
-  }
-
-  const [payment] = await db
-    .select()
-    .from(paymentsTable)
-    .where(eq(paymentsTable.merchantTransactionId, merchantTransactionId))
-    .limit(1);
-
-  if (!payment || !payment.bookingId) {
-    req.log.warn(`[payments] booking-callback: no payment record for ${merchantTransactionId}`);
-    return res.redirect(buildBookingRedirect("failed"));
-  }
-
-  const bookingId = payment.bookingId;
-
-  try {
-    const result = await checkPaymentStatus(merchantTransactionId);
-
-    if (result.success) {
-      await activateBookingAfterPayment(bookingId, result.transactionId);
-      return res.redirect(buildBookingRedirect("success", { id: String(bookingId) }));
-    }
-
-    return res.redirect(buildBookingRedirect("failed", { code: result.code }));
-  } catch (err) {
-    req.log.error({ err }, "[payments] booking-callback error");
-    return res.redirect(buildBookingRedirect("failed"));
-  }
-});
-
-/**
- * GET /payments/subscription-callback
- *
- * UX redirect after user returns from PhonePe. On success: activates subscription.
- * On non-success: redirects user without touching DB state.
- */
-router.get("/payments/subscription-callback", async (req, res) => {
-  const merchantTransactionId = req.query["merchantTransactionId"] as string | undefined;
-  const rawScheme = req.query["callbackScheme"] as string | undefined;
-  const callbackScheme = rawScheme && ALLOWED_CALLBACK_SCHEMES.has(rawScheme) ? rawScheme : undefined;
-  const appUrl = getAppUrl();
-
-  function buildRedirectUrl(status: "success" | "failed", extra?: string): string {
-    if (callbackScheme) {
-      const base = `${callbackScheme}://subscription?payment=${status}`;
-      return extra ? `${base}&${extra}` : base;
-    }
-    const base = `${appUrl}/subscription?payment=${status}`;
-    return extra ? `${base}&${extra}` : base;
-  }
-
-  if (!merchantTransactionId) {
-    return res.redirect(buildRedirectUrl("failed"));
-  }
-
-  const [payment] = await db
-    .select()
-    .from(paymentsTable)
-    .where(eq(paymentsTable.merchantTransactionId, merchantTransactionId))
-    .limit(1);
-
-  if (!payment || !payment.subscriptionId) {
-    req.log.warn(`[payments] subscription-callback: no payment record for ${merchantTransactionId}`);
-    return res.redirect(buildRedirectUrl("failed"));
-  }
-
-  const subscriptionId = payment.subscriptionId;
-
-  try {
-    const result = await checkPaymentStatus(merchantTransactionId);
-
-    if (result.success) {
-      await activateSubscriptionAfterPayment(subscriptionId, result.transactionId);
-      return res.redirect(buildRedirectUrl("success"));
-    }
-
-    return res.redirect(buildRedirectUrl("failed", `code=${encodeURIComponent(result.code)}`));
-  } catch (err) {
-    req.log.error({ err }, "[payments] subscription-callback error");
-    return res.redirect(buildRedirectUrl("failed"));
-  }
-});
-
-/**
- * POST /payments/webhook
- *
- * Server-to-server authoritative finalizer from PhonePe.
- * Activates on success; cancels + restores instruments on failure.
- */
-router.post("/payments/webhook", async (req, res) => {
-  const xVerify = req.headers["x-verify"] as string | undefined;
-  const { response: base64Response } = req.body as { response?: string };
-
-  if (!base64Response || !xVerify) {
-    return res.status(400).json({ error: "Missing payload" });
-  }
-
-  if (!verifyPhonePeWebhookSignature(base64Response, xVerify)) {
-    req.log.warn("[payments] webhook signature mismatch");
-    return res.status(401).json({ error: "Invalid signature" });
-  }
-
-  const payload = decodeWebhookResponse(base64Response);
-  if (!payload) {
-    return res.status(400).json({ error: "Invalid payload" });
-  }
-
-  const merchantTransactionId: string = payload.data?.merchantTransactionId ?? payload.merchantTransactionId ?? "";
-  const transactionId: string = payload.data?.transactionId ?? "";
-  const isSuccess = payload.code === "PAYMENT_SUCCESS";
-
-  if (!merchantTransactionId) {
-    return res.status(400).json({ error: "Missing merchantTransactionId" });
-  }
-
-  const [payment] = await db
-    .select()
-    .from(paymentsTable)
-    .where(eq(paymentsTable.merchantTransactionId, merchantTransactionId))
-    .limit(1);
-
-  if (!payment) {
-    req.log.warn({ merchantTransactionId }, "[payments] webhook: no payment found");
-    return res.status(200).json({ ok: true });
-  }
-
-  if (isSuccess) {
-    if (payment.bookingId) {
-      await activateBookingAfterPayment(payment.bookingId, transactionId);
-    } else if (payment.subscriptionId) {
-      await activateSubscriptionAfterPayment(payment.subscriptionId, transactionId);
-    }
-  } else if (payment.status === "initiated") {
-    if (payment.bookingId) {
-      await handleBookingPaymentFailure({ id: payment.id, bookingId: payment.bookingId });
-    } else if (payment.subscriptionId) {
-      await handleSubscriptionPaymentFailure({ id: payment.id, subscriptionId: payment.subscriptionId });
-    }
-  }
-
-  return res.status(200).json({ ok: true });
-});
 
 // ─── Razorpay: activate booking after confirmed payment ────────────────────────
 
@@ -883,6 +461,118 @@ router.get("/payments/razorpay/config", requireAuth(), (_req, res) => {
     return res.status(503).json({ error: "Razorpay not configured" });
   }
   return res.json({ keyId: getKeyId() });
+});
+
+// ─── Hosted Razorpay checkout page (for native apps without an SDK) ──────────
+// The mobile app opens this page in an in-app browser (WebBrowser). It loads
+// Razorpay Checkout for an order that was ALREADY created server-side (so the
+// amount/charge is bound to the order id, not to any query param), then deep-
+// links back to the app on success / failure / dismiss. The Razorpay webhook is
+// the authoritative confirmation — this page is only the launch + UX redirect.
+//
+// Query params:
+//   order_id  (required)  Razorpay order id created by the booking/sub/party flow
+//   amount    (paise)     display only
+//   name                  checkout title (e.g. venue / "Royvento Premium")
+//   desc                  checkout description
+//   pname/email/contact   prefill fields
+//   rid                   context id echoed back (e.g. bookingId) — display/return only
+//   redirect              deep link base to return to (default royvento://payment-result)
+function jsStr(v: unknown): string {
+  // JSON-encode a value, then neutralise sequences that could break out of
+  // the surrounding <script> block (XSS-safe embedding).
+  return JSON.stringify(String(v ?? ""))
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
+}
+
+router.get("/pay/checkout", (req, res) => {
+  const q = req.query as Record<string, string | undefined>;
+  const orderId = (q["order_id"] ?? "").trim();
+  if (!isRazorpayConfigured()) {
+    return res.status(503).send("Online payments are not configured.");
+  }
+  if (!orderId) {
+    return res.status(400).send("Missing order_id.");
+  }
+  const redirect = (q["redirect"] ?? "royvento://payment-result").trim();
+  const rid = (q["rid"] ?? "").trim();
+  const amount = Number(q["amount"] ?? 0) || 0;
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Secure payment · Royvento</title>
+<style>
+  html,body{height:100%;margin:0;background:#0a0a0a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+  .wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+  .spin{width:34px;height:34px;border:3px solid rgba(255,255,255,.15);border-top-color:#e8291c;border-radius:50%;animation:s 1s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .muted{color:#a0a0a0;font-size:14px}
+  button{margin-top:8px;background:#e8291c;color:#fff;border:0;border-radius:12px;padding:12px 20px;font-size:15px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="spin"></div>
+  <div class="muted">Opening secure Razorpay checkout…</div>
+  <button id="retry" style="display:none" onclick="startPay()">Pay now</button>
+</div>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+  var KEY = ${jsStr(getKeyId())};
+  var ORDER = ${jsStr(orderId)};
+  var AMOUNT = ${Math.max(0, Math.round(amount))};
+  var NAME = ${jsStr(q["name"] || "Royvento")};
+  var DESC = ${jsStr(q["desc"] || "Payment")};
+  var REDIRECT = ${jsStr(redirect)};
+  var RID = ${jsStr(rid)};
+  function back(status, paymentId){
+    var sep = REDIRECT.indexOf('?') >= 0 ? '&' : '?';
+    var url = REDIRECT + sep + 'payment=' + encodeURIComponent(status)
+      + (RID ? '&id=' + encodeURIComponent(RID) : '')
+      + (paymentId ? '&razorpay_payment_id=' + encodeURIComponent(paymentId) : '');
+    window.location.href = url;
+  }
+  function startPay(){
+    document.getElementById('retry').style.display = 'none';
+    var options = {
+      key: KEY,
+      order_id: ORDER,
+      amount: AMOUNT,
+      currency: 'INR',
+      name: NAME,
+      description: DESC,
+      prefill: { name: ${jsStr(q["pname"] || "")}, email: ${jsStr(q["email"] || "")}, contact: ${jsStr(q["contact"] || "")} },
+      theme: { color: '#e8291c' },
+      handler: function(resp){ back('success', resp && resp.razorpay_payment_id); },
+      modal: { ondismiss: function(){ document.getElementById('retry').style.display='inline-block'; back('cancelled'); } }
+    };
+    try {
+      var rzp = new Razorpay(options);
+      rzp.on('payment.failed', function(){ back('failed'); });
+      rzp.open();
+    } catch (e) {
+      document.getElementById('retry').style.display = 'inline-block';
+    }
+  }
+  window.onload = startPay;
+</script>
+</body>
+</html>`;
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  // This one page must run Razorpay's inline checkout — allow its script/frames
+  // explicitly (the global policy is report-only, but be explicit here).
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://checkout.razorpay.com; " +
+    "style-src 'self' 'unsafe-inline'; frame-src https://api.razorpay.com https://checkout.razorpay.com; " +
+    "connect-src https://api.razorpay.com https://checkout.razorpay.com https://lumberjack.razorpay.com; " +
+    "img-src 'self' data: https:; font-src 'self' data:;",
+  );
+  return res.send(html);
 });
 
 export default router;

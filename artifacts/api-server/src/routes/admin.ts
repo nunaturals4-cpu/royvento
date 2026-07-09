@@ -2112,7 +2112,7 @@ async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
     eventIds.length ? db.select().from(eventsTable).where(inArray(eventsTable.id, eventIds)) : Promise.resolve([]),
     db.select().from(usersTable).where(inArray(usersTable.id, userIds)),
     vendorIds.length ? db.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)) : Promise.resolve([]),
-    db.select({ bookingId: paymentsTable.bookingId, phonepeTransactionId: paymentsTable.phonepeTransactionId, status: paymentsTable.status })
+    db.select({ bookingId: paymentsTable.bookingId, razorpayOrderId: paymentsTable.razorpayOrderId, status: paymentsTable.status })
       .from(paymentsTable)
       .where(inArray(paymentsTable.bookingId, bookingIds)),
     orgIds.length ? db.select().from(organizersTable).where(inArray(organizersTable.id, orgIds)) : Promise.resolve([]),
@@ -2145,7 +2145,7 @@ async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
           : `RV-${String(b.id).padStart(6, "0")}`);
     let paymentMethod: string;
     if (pay) {
-      paymentMethod = pay.phonepeTransactionId ? "PhonePe" : "Online";
+      paymentMethod = pay.razorpayOrderId ? "Razorpay" : "Online";
     } else {
       paymentMethod = Number(b.finalPrice) === 0 ? "Free" : "COD";
     }

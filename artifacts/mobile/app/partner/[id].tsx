@@ -35,6 +35,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventCard } from "@/components/EventCard";
+import { FollowButton } from "@/components/FollowButton";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
@@ -444,6 +445,11 @@ export default function PartnerDetailScreen() {
       </View>
 
       <View style={styles.content}>
+        {/* Follow the venue to get its new food & drink discounts and exclusive
+            deals as instant push notifications. */}
+        <View style={{ alignItems: "flex-start", marginBottom: 4 }}>
+          <FollowButton targetType="vendor" targetId={vendor.id} name={vendor.businessName} />
+        </View>
         {/* Primary Book a Table CTA — opens the booking form directly. */}
         {primaryBookEvent ? (
           <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>

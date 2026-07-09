@@ -23,7 +23,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
-import * as WebBrowser from "expo-web-browser";
+import { openRazorpayCheckout } from "@/lib/razorpayCheckout";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -42,6 +42,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MobileFooter } from "@/components/MobileFooter";
+import { FollowButton } from "@/components/FollowButton";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -390,18 +391,22 @@ export default function EventDetailScreen() {
   const bookingMutation = useCreateBooking({
     mutation: {
       onSuccess: async (data: unknown) => {
-        const d = data as { requiresPayment?: boolean; redirectUrl?: string } | undefined;
-        if (d?.requiresPayment && d?.redirectUrl) {
+        const d = data as { paymentPending?: boolean; razorpayOrderId?: string; amountPaise?: number; id?: number; bookingId?: number } | undefined;
+        if (d?.paymentPending && d?.razorpayOrderId) {
           setShowBooking(false);
-          const browserResult = await WebBrowser.openAuthSessionAsync(d.redirectUrl, "royvento://");
-          if (browserResult.type === "success") {
-            const parsed = new URL(browserResult.url);
-            const payment = parsed.searchParams.get("payment") ?? "failed";
-            const id = parsed.searchParams.get("id") ?? undefined;
-            router.replace(`/payment-result?payment=${encodeURIComponent(payment)}${id ? `&bookingId=${encodeURIComponent(id)}` : ""}`);
-          } else {
-            router.replace("/payment-result?payment=failed");
-          }
+          const bId = d.id ?? d.bookingId;
+          const pay = await openRazorpayCheckout({
+            orderId: d.razorpayOrderId,
+            amountPaise: d.amountPaise ?? 0,
+            name: event?.title ?? "Royvento",
+            description: "Booking payment",
+            prefillName: user?.name,
+            prefillEmail: user?.email,
+            prefillContact: user?.phone,
+            rid: bId,
+          });
+          const status = pay === "success" ? "success" : pay === "cancelled" ? "cancelled" : "failed";
+          router.replace(`/payment-result?payment=${status}${bId ? `&bookingId=${encodeURIComponent(String(bId))}` : ""}`);
           return;
         }
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -597,6 +602,16 @@ export default function EventDetailScreen() {
           </View>
 
           <Text style={[styles.eventTitle, { color: colors.foreground }]}>{event.title}</Text>
+
+          {/* Follow the venue (or event) for instant push on new food & drink
+              discounts and exclusive deals — mirrors the web event page. */}
+          <View style={{ alignItems: "flex-start", marginTop: 10 }}>
+            <FollowButton
+              targetType={vendorId ? "vendor" : "event"}
+              targetId={vendorId ?? eventId}
+              name={event.title}
+            />
+          </View>
 
           <Pressable
             onPress={handleOpenMaps}

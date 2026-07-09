@@ -43,6 +43,7 @@ const KIND_RANK: Record<VenueUpdateKind, number> = {
   cover_charge: 3,
   ticket: 2,
   free_drinks: 2,
+  exclusive: 2,
   food_drink: 1,
 };
 
@@ -66,7 +67,7 @@ export async function runDailyOfferReminders(): Promise<void> {
     // Active food & drink offers: active flag on, inside their start/end window,
     // created before today.
     const offers = await db
-      .select({ vendorId: vendorOffersTable.vendorId })
+      .select({ vendorId: vendorOffersTable.vendorId, category: vendorOffersTable.category })
       .from(vendorOffersTable)
       .where(and(
         eq(vendorOffersTable.active, true),
@@ -82,7 +83,7 @@ export async function runDailyOfferReminders(): Promise<void> {
       if (!cur || KIND_RANK[kind] > KIND_RANK[cur]) bestKind.set(vendorId, kind);
     };
     for (const p of plans) consider(p.vendorId, drinkPlanKind(p.type));
-    for (const o of offers) consider(o.vendorId, "food_drink");
+    for (const o of offers) consider(o.vendorId, o.category === "exclusive" ? "exclusive" : "food_drink");
 
     if (bestKind.size === 0) {
       logger.info("[dailyOfferReminders] No active offers to remind about — skipping");

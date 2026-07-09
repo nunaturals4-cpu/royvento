@@ -35,7 +35,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 
-type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "announcements" | "reports" | "commissions" | "settlements" | "live-occupancy" | "reviews" | "plans" | "create-pub" | "event-organizers" | "game-organizers" | "solo-connect";
+type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "announcements" | "reports" | "commissions" | "settlements" | "live-occupancy" | "reviews" | "plans" | "create-pub" | "event-organizers" | "game-organizers" | "solo-connect" | "private-parties";
 
 interface ContactMessage {
   id: number;
@@ -2951,6 +2951,7 @@ export default function AdminPanelScreen() {
     { key: "event-organizers" as AdminTab, icon: "easel-outline" as const, label: "Event Orgs" },
     { key: "game-organizers" as AdminTab, icon: "game-controller-outline" as const, label: "Game Orgs" },
     { key: "solo-connect" as AdminTab, icon: "shield-checkmark-outline" as const, label: "Solo Mod" },
+    { key: "private-parties" as AdminTab, icon: "balloon-outline" as const, label: "Parties" },
     { key: "create-pub" as AdminTab, icon: "add-circle-outline" as const, label: "Create Pub" },
   ];
 
@@ -3024,6 +3025,7 @@ export default function AdminPanelScreen() {
       {activeTab === "event-organizers" && <AdminEventOrganizersTab colors={colors} />}
       {activeTab === "game-organizers" && <AdminGameOrganizersTab colors={colors} />}
       {activeTab === "solo-connect" && <AdminSoloModerationTab colors={colors} />}
+      {activeTab === "private-parties" && <AdminPrivatePartiesTab colors={colors} />}
       {activeTab === "create-pub" && <AdminCreatePubTab colors={colors} />}
 
       {/* Blog editor sheet — full-screen modal so the long content textarea
@@ -3699,3 +3701,114 @@ const styles = StyleSheet.create({
   rejectBox: { borderWidth: 1, borderRadius: 14, padding: 16, marginBottom: 10 },
   reasonInput: { borderWidth: 1, borderRadius: 10, padding: 10, minHeight: 60, textAlignVertical: "top", fontSize: 13, fontFamily: "Inter_400Regular" },
 });
+
+// ─── Private Parties (Create Your Own Party) moderation ─────────────────────
+interface AdminPartyRow {
+  id: number;
+  name: string;
+  city: string;
+  venueName: string;
+  visibility: string;
+  joinType: string;
+  status: string;
+  partyDate: string | null;
+  organizerName: string;
+  organizerEmail: string;
+  ticketType: string;
+  ticketPrice: string;
+  guestsGoing: number;
+  confirmedBookings: number;
+  revenue: string;
+  netEarnings: string;
+}
+
+function AdminPrivatePartiesTab({ colors }: { colors: AdminPal }) {
+  const [rows, setRows] = useState<AdminPartyRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "published" | "cancelled">("all");
+
+  const load = useCallback(() => {
+    setLoading(true);
+    customFetch<AdminPartyRow[]>("/api/admin/create-your-party")
+      .then((r) => setRows(asArray(r)))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function cancelParty(id: number, reason: string) {
+    try {
+      await customFetch(`/api/admin/create-your-party/${id}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      load();
+    } catch (e) {
+      Alert.alert("Failed", (e as Error).message);
+    }
+  }
+
+  const filtered = filter === "all" ? rows : rows.filter((r) => r.status === filter);
+  const statusColor = (s: string) => (s === "published" ? "#22c55e" : s === "cancelled" ? colors.red : "#f59e0b");
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+      <Text style={{ color: colors.foreground, fontSize: 16, fontFamily: "Inter_700Bold", marginBottom: 10 }}>
+        Private Parties ({rows.length})
+      </Text>
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+        {(["all", "published", "cancelled"] as const).map((f) => (
+          <TouchableOpacity
+            key={f}
+            onPress={() => setFilter(f)}
+            style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, backgroundColor: filter === f ? colors.primary : colors.muted, borderColor: filter === f ? colors.primary : colors.border }}
+          >
+            <Text style={{ color: filter === f ? colors.primaryForeground : colors.mutedForeground, fontSize: 12, textTransform: "capitalize" }}>{f}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
+      ) : filtered.length === 0 ? (
+        <ModEmpty colors={colors} label="No parties match." />
+      ) : filtered.map((p) => (
+        <ModCard key={p.id} colors={colors}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", flex: 1 }} numberOfLines={1}>{p.name}</Text>
+            <View style={{ backgroundColor: statusColor(p.status) + "22", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
+              <Text style={{ color: statusColor(p.status), fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{p.status}</Text>
+            </View>
+          </View>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
+            {[p.venueName, p.city].filter(Boolean).join(", ")} · {p.visibility === "private" ? "Private" : "Public"} · {p.ticketType === "paid" ? `₹${Number(p.ticketPrice).toLocaleString("en-IN")}` : "Free"}
+          </Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
+            Host: {p.organizerName}{p.organizerEmail ? ` (${p.organizerEmail})` : ""}
+          </Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
+            {p.guestsGoing} going · {p.confirmedBookings} bookings{p.ticketType === "paid" ? ` · ₹${Number(p.revenue).toLocaleString("en-IN")} revenue` : ""}
+          </Text>
+          {p.status !== "cancelled" && (
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+              <ModBtn
+                colors={colors}
+                label="Remove party"
+                tone="danger"
+                onPress={() =>
+                  Alert.prompt
+                    ? Alert.prompt("Remove party", "Reason (shown to the host)", (reason) => cancelParty(p.id, reason || ""))
+                    : Alert.alert("Remove this party?", "It will be cancelled and the host notified.", [
+                        { text: "Cancel", style: "cancel" },
+                        { text: "Remove", style: "destructive", onPress: () => cancelParty(p.id, "") },
+                      ])
+                }
+              />
+            </View>
+          )}
+        </ModCard>
+      ))}
+    </ScrollView>
+  );
+}

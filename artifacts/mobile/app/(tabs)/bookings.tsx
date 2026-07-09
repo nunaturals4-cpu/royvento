@@ -3,7 +3,7 @@ import { customFetch, useListMyBookings, getListMyBookingsQueryKey } from "@work
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
-import * as WebBrowser from "expo-web-browser";
+import { openRazorpayCheckout } from "@/lib/razorpayCheckout";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { router } from "expo-router";
@@ -632,31 +632,30 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                       onPress={async () => {
                         setRetryingId(b.id);
                         try {
-                          const result = await customFetch<{ redirectUrl?: string; error?: string }>(
+                          const result = await customFetch<{ paymentPending?: boolean; razorpayOrderId?: string; amountPaise?: number; error?: string }>(
                             `/api/bookings/${b.id}/retry-payment`,
                             {
                               method: "POST",
-                              body: JSON.stringify({ callbackScheme: "royvento" }),
+                              body: JSON.stringify({}),
                               headers: { "Content-Type": "application/json" },
                             },
                           );
-                          if (result?.redirectUrl) {
-                            const browserResult = await WebBrowser.openAuthSessionAsync(result.redirectUrl, "royvento://");
-                            if (browserResult.type === "success") {
-                              const parsed = new URL(browserResult.url);
-                              const payment = parsed.searchParams.get("payment") ?? "failed";
-                              const id = parsed.searchParams.get("id") ?? undefined;
-                              router.replace(`/payment-result?payment=${encodeURIComponent(payment)}${id ? `&bookingId=${encodeURIComponent(id)}` : ""}`);
-                            } else {
-                              router.replace("/payment-result?payment=failed");
-                            }
+                          if (result?.paymentPending && result?.razorpayOrderId) {
+                            const pay = await openRazorpayCheckout({
+                              orderId: result.razorpayOrderId,
+                              amountPaise: result.amountPaise ?? 0,
+                              name: "Royvento",
+                              description: "Complete booking payment",
+                              rid: b.id,
+                            });
+                            const status = pay === "success" ? "success" : pay === "cancelled" ? "cancelled" : "failed";
+                            router.replace(`/payment-result?payment=${status}&bookingId=${encodeURIComponent(String(b.id))}`);
                           } else {
-                            throw new Error(result?.error ?? "Could not initiate payment");
+                            // Retry endpoint unavailable → re-book from the event page (Razorpay).
+                            router.push(`/event/${b.eventId}` as never);
                           }
-                        } catch (e: unknown) {
-                          const err = e as { message?: string };
+                        } catch {
                           router.push(`/event/${b.eventId}` as never);
-                          console.warn("[retry-payment] fallback to event page:", err?.message);
                         } finally {
                           setRetryingId(null);
                         }

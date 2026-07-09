@@ -52,7 +52,6 @@ import {
   sendCustomerCancelledBookingEmail,
   sendTicketScannedEmail,
 } from "../lib/notifications";
-import { initiatePayment, isPhonePeConfigured, getAppUrl } from "../lib/phonepe";
 import { createOrder as createRazorpayOrder, isRazorpayConfigured, getKeyId as getRazorpayKeyId } from "../lib/razorpay";
 import { computeEffectiveRevenues, bookingDiscountRatio } from "../lib/effectiveRevenue";
 import { bookingLocationFromBody } from "../lib/geo";

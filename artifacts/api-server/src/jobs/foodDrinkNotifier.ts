@@ -31,7 +31,7 @@ export async function runFoodDrinkNotifier(): Promise<void> {
 
     // Oldest unpublished, currently-active offers first.
     const offers = await db
-      .select({ id: vendorOffersTable.id, vendorId: vendorOffersTable.vendorId })
+      .select({ id: vendorOffersTable.id, vendorId: vendorOffersTable.vendorId, category: vendorOffersTable.category })
       .from(vendorOffersTable)
       .where(and(
         isNull(vendorOffersTable.notifiedAt),
@@ -48,7 +48,10 @@ export async function runFoodDrinkNotifier(): Promise<void> {
     // Sequential so the per-user 30-min spacing chains in creation order (each
     // enqueue reads the previous offer's just-scheduled slot for a shared user).
     for (const o of offers) {
-      await notifyVenueFollowers(o.vendorId, "food_drink", o.id);
+      // Food & drink discount categories share the "food_drink" copy; the
+      // "exclusive" category gets its own "exclusive deal" notification.
+      const kind = o.category === "exclusive" ? "exclusive" : "food_drink";
+      await notifyVenueFollowers(o.vendorId, kind, o.id);
       await db
         .update(vendorOffersTable)
         .set({ notifiedAt: new Date() })

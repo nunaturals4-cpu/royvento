@@ -15,6 +15,7 @@ export type FollowNotifyKind =
   | "ticket"
   | "cover_charge"
   | "food_drink"
+  | "exclusive"
   | "promo";
 
 interface Template {
@@ -62,6 +63,15 @@ const TEMPLATES: Record<FollowNotifyKind, Template[]> = {
     { title: "🍕 {name} just got tastier", body: "A fresh food & drink deal landed at {name}. Your taste buds say go." },
     { title: "🍻 Deal alert at {name}", body: "{name} added a new food & drink offer. Great excuse to go out, right?" },
     { title: "😋 {name} has a treat for you", body: "New discounts just dropped at {name}. Tap, book, feast." },
+  ],
+  // An exclusive / special promotional deal at a followed venue (not tied to a
+  // food or drink discount) — the "exclusive" vendor-offer category.
+  exclusive: [
+    { title: "💎 Exclusive deal at {name}", body: "{name} just unlocked an exclusive offer. Members move first — that's you." },
+    { title: "🔓 {name} dropped something special", body: "A new exclusive deal just landed at {name}. Tap before it's gone." },
+    { title: "⭐ VIP treatment at {name}", body: "{name} has an exclusive offer waiting. Don't let this one slip by." },
+    { title: "🎁 {name} saved you the good stuff", body: "Fresh exclusive deal at {name}. First come, first served — go go go." },
+    { title: "🥇 Only at {name}", body: "{name} just posted an exclusive offer you won't find anywhere else." },
   ],
   // Generic promotion fallback.
   promo: [
@@ -115,6 +125,14 @@ const DAILY_TEMPLATES: Record<FollowNotifyKind, Template[]> = {
     { title: "🍟 Round two at {name}?", body: "{name}'s deal is still good today. Make plans, make memories." },
     { title: "🥡 Dinner idea: {name}", body: "{name}'s food & drink offer is running today too. Just saying 😉" },
     { title: "🌮 {name} is still treating you", body: "Today's a great day for {name}'s deal. Tap to see it." },
+  ],
+  exclusive: [
+    { title: "💎 {name}'s exclusive deal is still on", body: "That exclusive offer at {name} hasn't expired. Claim it tonight." },
+    { title: "🔓 Still unlocked at {name}", body: "{name}'s exclusive deal is live again today. Don't sleep on it." },
+    { title: "⭐ Your {name} VIP reminder", body: "{name}'s exclusive offer is still standing. Tap to make it count." },
+    { title: "🎁 {name} kept it just for you", body: "The exclusive deal at {name} runs today too. Grab it while it lasts." },
+    { title: "🥇 Encore: {name}'s exclusive offer", body: "{name}'s exclusive deal is on again. First in wins — that could be you." },
+    { title: "⏳ Still exclusive at {name}", body: "{name}'s special offer hasn't gone anywhere. Tap before it does." },
   ],
   promo: [
     { title: "🔥 {name} still has something for you", body: "{name}'s offer is live again today. Tap before it's gone." },

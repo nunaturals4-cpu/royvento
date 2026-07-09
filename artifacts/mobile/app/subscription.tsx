@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
-import * as WebBrowser from "expo-web-browser";
+import { openRazorpayCheckout } from "@/lib/razorpayCheckout";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -104,34 +104,38 @@ export default function SubscriptionScreen() {
     }
     setLoading(true);
     try {
-      const result = await customFetch<{ requiresPayment?: boolean; redirectUrl?: string } | Record<string, unknown>>(
+      const result = await customFetch<{ paymentPending?: boolean; razorpayOrderId?: string; amountPaise?: number; subscriptionId?: number } | Record<string, unknown>>(
         "/api/subscriptions",
         {
           method: "POST",
-          body: JSON.stringify({ planType, planPeriod: "monthly", callbackScheme: "royvento" }),
+          body: JSON.stringify({ planType, planPeriod: "monthly" }),
           headers: { "Content-Type": "application/json" },
         }
       );
 
-      if (result && typeof result === "object" && "requiresPayment" in result && result.requiresPayment && result.redirectUrl) {
-        const browserResult = await WebBrowser.openAuthSessionAsync(
-          result.redirectUrl as string,
-          "royvento://"
-        );
+      const r = result as { paymentPending?: boolean; razorpayOrderId?: string; amountPaise?: number; subscriptionId?: number };
+      if (r && r.paymentPending && r.razorpayOrderId) {
+        const pay = await openRazorpayCheckout({
+          orderId: r.razorpayOrderId,
+          amountPaise: r.amountPaise ?? 0,
+          name: "Royvento Premium",
+          description: planType === "user" ? "Member subscription" : "Partner Premium",
+          prefillName: user.name,
+          prefillEmail: user.email,
+          prefillContact: user.phone,
+          rid: r.subscriptionId,
+        });
 
         const { data: refreshedSub } = await activeQuery.refetch();
 
-        if (browserResult.type === "success") {
-          const url = browserResult.url;
-          if (url.includes("payment=success")) {
-            Alert.alert("Subscription activated", "Welcome to Royvento Premium!");
-          } else {
-            Alert.alert("Payment incomplete", "Your payment was not completed. Please try again.");
-          }
-        } else if (browserResult.type === "cancel" || browserResult.type === "dismiss") {
+        if (pay === "success") {
+          Alert.alert("Subscription activated", "Welcome to Royvento Premium!");
+        } else if (pay === "cancelled") {
           if (!refreshedSub) {
             Alert.alert("Payment cancelled", "You closed the payment screen before completing.");
           }
+        } else {
+          Alert.alert("Payment incomplete", "Your payment was not completed. Please try again.");
         }
       } else {
         await activeQuery.refetch();
