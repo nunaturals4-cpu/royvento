@@ -49,6 +49,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDayRanges } from "@/lib/days";
 import { todayIst } from "@/lib/utils";
 import { DrinkDealCard } from "@/components/DrinkDealCards";
+import { GuestTypeBadge } from "@/components/GuestTypeBadge";
 import { NightlifeOfferCard } from "@/components/NightlifeOfferCard";
 import { OfferDayPills } from "@/components/OfferDayPills";
 import { OfferSectionHeader } from "@/components/OfferSectionHeader";
@@ -161,8 +162,8 @@ function fmtWhenStamp(dateStr?: string | null, timeStr?: string | null): string 
 }
 
 function getPlanSummary(plan: { type: string; gender: string; productName?: string; lineItems?: { name: string }[] | null }, t: (key: string, opts?: Record<string, unknown>) => string): string {
-  if (plan.type === "welcome") return plan.gender === "female" ? t("events.drink_welcome_ladies") : t("events.drink_welcome_all");
-  if (plan.type === "unlimited") return plan.gender === "female" ? t("events.drink_unlimited_ladies") : t("events.drink_unlimited_all");
+  if (plan.type === "welcome") return plan.gender === "female" ? t("events.drink_welcome_ladies") : plan.gender === "male" ? t("events.drink_welcome_men") : t("events.drink_welcome_all");
+  if (plan.type === "unlimited") return plan.gender === "female" ? t("events.drink_unlimited_ladies") : plan.gender === "male" ? t("events.drink_unlimited_men") : t("events.drink_unlimited_all");
   if (plan.type === "ticket") {
     const count = (plan.lineItems ?? []).filter((i) => i.name).length;
     if (count === 1) return t("events.drink_ticket_items_one");
@@ -2476,13 +2477,12 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                             <ul className="space-y-2">
                               {plans.map((p: any) => {
                                 const items = (p.lineItems ?? []).filter((it: any) => it.name);
-                                const ladies = p.gender === "female";
                                 const headline = p.productName || (p.type === "unlimited" ? "Unlimited drinks" : p.type === "ticket" ? "Drinks with ticket" : "Free welcome drink");
                                 return (
                                   <li key={p.id} className="rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2">
                                     <div className="flex items-center gap-2">
                                       <span className="text-[13px] font-semibold text-white leading-tight flex-1">{headline}</span>
-                                      {ladies && <span className="shrink-0 rounded-full bg-pink-500/15 border border-pink-500/25 px-2 py-0.5 text-[9px] font-semibold text-pink-400 uppercase tracking-wide">{t("pub_offers.filter_ladies")}</span>}
+                                      <GuestTypeBadge gender={p.gender} className="shrink-0 normal-case shadow-none px-2 py-0.5" />
                                     </div>
                                     {items.length > 0 && (
                                       <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -2572,6 +2572,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                                           <p className="font-bold text-sm text-foreground tracking-wide truncate flex items-center gap-1.5">
                                             {p.productName || "Package"}
                                             {p.gender === "female" && <span className="rounded-full bg-pink-500/10 border border-pink-500/30 px-1.5 py-0.5 text-[9px] font-semibold text-pink-400 uppercase tracking-wide shrink-0">Girls only</span>}
+                                            {p.gender === "male" && <span className="rounded-full bg-blue-500/10 border border-blue-500/30 px-1.5 py-0.5 text-[9px] font-semibold text-blue-400 uppercase tracking-wide shrink-0">Men only</span>}
                                           </p>
                                           {(p.peoplePerPackage ?? 0) > 0 && (
                                             <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1.5">
@@ -3272,6 +3273,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                               <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{(o.timeFrom && o.timeTo) ? `${fmtTime(o.timeFrom)} – ${fmtTime(o.timeTo)}` : "All day"}</span>
                               {validity && <span className="inline-flex items-center gap-1 text-muted-foreground/80">Valid {validity}</span>}
                               {o.gender === "female" && <span className="inline-flex items-center rounded-full bg-pink-500/10 border border-pink-500/30 px-2 py-0.5 text-[10px] font-semibold text-pink-400">Girls only</span>}
+                              {o.gender === "male" && <span className="inline-flex items-center rounded-full bg-blue-500/10 border border-blue-500/30 px-2 py-0.5 text-[10px] font-semibold text-blue-400">Men only</span>}
                             </div>
                           </div>
                         );

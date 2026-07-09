@@ -654,7 +654,7 @@ const DrinkPlanLineItem = z.object({
 export const DrinkPlanBody = z.object({
   type: z.enum(["welcome", "unlimited", "ticket", "custom", "cover_charge"]),
   productName: z.string().max(255).default(""),
-  gender: z.enum(["all", "female"]).default("all"),
+  gender: z.enum(["all", "female", "male"]).default("all"),
   price: z.number().int().min(0).default(0),
   // Cover-charge packages: people admitted per package (informational). 0/null = unset.
   peoplePerPackage: z.number().int().min(0).max(100).nullable().optional(),

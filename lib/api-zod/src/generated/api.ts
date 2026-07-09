@@ -1732,7 +1732,7 @@ export const ListVendorDrinkOffersResponseItem = zod.object({
   "plans": zod.array(zod.object({
   "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']),
   "productName": zod.string(),
-  "gender": zod.enum(['all', 'female']),
+  "gender": zod.enum(['all', 'female', 'male']),
   "peoplePerPackage": zod.number().nullish().describe('Cover-charge packages: people admitted per package (informational).'),
   "lineItems": zod.array(zod.object({
   "name": zod.string(),
@@ -1765,7 +1765,7 @@ export const ListVendorDrinkPlansResponseItem = zod.object({
   "vendorId": zod.number(),
   "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']),
   "productName": zod.string(),
-  "gender": zod.enum(['all', 'female']),
+  "gender": zod.enum(['all', 'female', 'male']),
   "price": zod.number(),
   "peoplePerPackage": zod.number().nullish().describe('Cover-charge packages: people admitted per package (informational).'),
   "days": zod.array(zod.string()),
@@ -1800,7 +1800,7 @@ export const createDrinkPlanBodyLineItemsItemDiscountedPriceMin = 0;
 export const CreateDrinkPlanBody = zod.object({
   "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']),
   "productName": zod.string().optional(),
-  "gender": zod.enum(['all', 'female']).optional(),
+  "gender": zod.enum(['all', 'female', 'male']).optional(),
   "price": zod.number().min(createDrinkPlanBodyPriceMin).optional(),
   "peoplePerPackage": zod.number().min(createDrinkPlanBodyPeoplePerPackageMin).max(createDrinkPlanBodyPeoplePerPackageMax).nullish().describe('Cover-charge packages: people admitted per package (informational).'),
   "days": zod.array(zod.string()).optional(),
@@ -1826,7 +1826,7 @@ export const CreateDrinkPlanResponse = zod.object({
   "vendorId": zod.number(),
   "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']),
   "productName": zod.string(),
-  "gender": zod.enum(['all', 'female']),
+  "gender": zod.enum(['all', 'female', 'male']),
   "price": zod.number(),
   "peoplePerPackage": zod.number().nullish().describe('Cover-charge packages: people admitted per package (informational).'),
   "days": zod.array(zod.string()),
@@ -1864,7 +1864,7 @@ export const updateDrinkPlanBodyLineItemsItemDiscountedPriceMin = 0;
 export const UpdateDrinkPlanBody = zod.object({
   "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']),
   "productName": zod.string().optional(),
-  "gender": zod.enum(['all', 'female']).optional(),
+  "gender": zod.enum(['all', 'female', 'male']).optional(),
   "price": zod.number().min(updateDrinkPlanBodyPriceMin).optional(),
   "peoplePerPackage": zod.number().min(updateDrinkPlanBodyPeoplePerPackageMin).max(updateDrinkPlanBodyPeoplePerPackageMax).nullish().describe('Cover-charge packages: people admitted per package (informational).'),
   "days": zod.array(zod.string()).optional(),
@@ -1890,7 +1890,7 @@ export const UpdateDrinkPlanResponse = zod.object({
   "vendorId": zod.number(),
   "type": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge']),
   "productName": zod.string(),
-  "gender": zod.enum(['all', 'female']),
+  "gender": zod.enum(['all', 'female', 'male']),
   "price": zod.number(),
   "peoplePerPackage": zod.number().nullish().describe('Cover-charge packages: people admitted per package (informational).'),
   "days": zod.array(zod.string()),

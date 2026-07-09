@@ -42,7 +42,7 @@ const OfferBody = z.object({
   discountType: z.enum(["percent", "fixed", "bogo", "free_item", "nothing"]),
   discountValue: z.number().min(0).max(100000).default(0),
   freeItemName: z.string().max(120).default(""),
-  gender: z.enum(["all", "female"]).default("all"),
+  gender: z.enum(["all", "female", "male"]).default("all"),
   days: z.array(DAY_ENUM).default([]),
   timeFrom: HHMM.default(""),
   timeTo: HHMM.default(""),

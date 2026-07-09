@@ -48,7 +48,6 @@ import { COUNTRY_NAMES, getStates, getCities } from "@/lib/locations";
 import { EVENT_CATEGORIES as ANNOUNCEMENT_CATEGORIES } from "@/lib/eventCategories";
 import { uploadImage as uploadImageToStorage, validateImageFile } from "@/lib/uploadImage";
 import { resolveImageMime } from "@workspace/validators";
-import { SquareImage } from "@/components/SquareImage";
 import { useFormErrors, fieldClass } from "@/lib/formErrors";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatDayRanges } from "@/lib/days";
@@ -5868,15 +5867,15 @@ function LineItemsEditor({
   );
 }
 
-// "For guests" audience picker (All Guests / Girls Only) — shared across the
-// Free Drinks, Included with Ticket, Cover Charges and Food & Drink Discounts
-// forms so every deal can be targeted the same way.
-function ForGuestsRadio({ value, onChange, name }: { value: "all" | "female"; onChange: (v: "all" | "female") => void; name: string }) {
+// "For guests" audience picker (All Guests / Girls Only / Men Only) — shared
+// across the Free Drinks, Included with Ticket, Cover Charges and Food &
+// Drink Discounts forms so every deal can be targeted the same way.
+function ForGuestsRadio({ value, onChange, name }: { value: "all" | "female" | "male"; onChange: (v: "all" | "female" | "male") => void; name: string }) {
   return (
     <div>
       <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">For guests</Label>
       <div className="flex gap-3">
-        {([["all", "All Guests"], ["female", "Girls Only"]] as const).map(([val, label]) => (
+        {([["all", "All Guests"], ["female", "Girls Only"], ["male", "Men Only"]] as const).map(([val, label]) => (
           <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
             <input type="radio" name={name} value={val} checked={value === val} onChange={() => onChange(val)} className="accent-primary" />
             {label}
@@ -6262,7 +6261,7 @@ interface VendorOffer {
   discountType: OfferDiscountType;
   discountValue: string;
   freeItemName: string;
-  gender: "all" | "female";
+  gender: "all" | "female" | "male";
   days: OfferDay[];
   timeFrom: string;
   timeTo: string;
@@ -6286,7 +6285,7 @@ interface OfferFormState {
   discountType: OfferDiscountType;
   discountValue: string;
   freeItemName: string;
-  gender: "all" | "female";
+  gender: "all" | "female" | "male";
   days: OfferDay[];
   timeFrom: string;
   timeTo: string;
@@ -6626,7 +6625,7 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
             <div className="sm:col-span-2">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">For guests</Label>
               <div className="flex gap-2">
-                {([["all", "All Guests"], ["female", "Girls Only"]] as const).map(([val, label]) => (
+                {([["all", "All Guests"], ["female", "Girls Only"], ["male", "Men Only"]] as const).map(([val, label]) => (
                   <button
                     key={val}
                     type="button"
@@ -6692,6 +6691,7 @@ export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { v
                             <div className="font-medium truncate flex items-center gap-1.5">
                               {o.title}
                               {o.gender === "female" && <span className="rounded-full bg-pink-500/10 border border-pink-500/25 px-1.5 py-0.5 text-[9px] text-pink-400 font-semibold uppercase tracking-wide shrink-0">Girls only</span>}
+                              {o.gender === "male" && <span className="rounded-full bg-blue-500/10 border border-blue-500/25 px-1.5 py-0.5 text-[9px] text-blue-400 font-semibold uppercase tracking-wide shrink-0">Men only</span>}
                             </div>
                             {o.description && <div className="text-xs text-muted-foreground line-clamp-1">{o.description}</div>}
                           </div>
@@ -6902,7 +6902,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
   // Add form — Free Entry section
   const [freeEntryChecked, setFreeEntryChecked] = useState(false);
   const [feDrinkTypes, setFeDrinkTypes] = useState<string[]>(["welcome"]);
-  const [feGender, setFeGender] = useState<"all" | "female">("all");
+  const [feGender, setFeGender] = useState<"all" | "female" | "male">("all");
   const [feDrinksOffer, setFeDrinksOffer] = useState("");
   const [feFoodDiscount, setFeFoodDiscount] = useState("");
   const [feDays, setFeDays] = useState<string[]>([]);
@@ -6911,13 +6911,11 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
   const [feDescription, setFeDescription] = useState("");
   const [feValidFrom, setFeValidFrom] = useState("");
   const [feValidUntil, setFeValidUntil] = useState("");
-  const [feImageFile, setFeImageFile] = useState<File | null>(null);
-  const [feImagePreview, setFeImagePreview] = useState("");
 
   // Add form — Included with Ticket section
   const [ticketChecked, setTicketChecked] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
-  const [ticketGender, setTicketGender] = useState<"all" | "female">("all");
+  const [ticketGender, setTicketGender] = useState<"all" | "female" | "male">("all");
   const [ticketItems, setTicketItems] = useState<DrinkPlanLineItem[]>([emptyItem()]);
   const [ticketDrinksOffer, setTicketDrinksOffer] = useState("");
   const [ticketFoodDiscount, setTicketFoodDiscount] = useState("");
@@ -6927,12 +6925,10 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
   const [ticketDescription, setTicketDescription] = useState("");
   const [ticketValidFrom, setTicketValidFrom] = useState("");
   const [ticketValidUntil, setTicketValidUntil] = useState("");
-  const [ticketImageFile, setTicketImageFile] = useState<File | null>(null);
-  const [ticketImagePreview, setTicketImagePreview] = useState("");
 
   // Add form — Cover Charges section
   const [coverChargeChecked, setCoverChargeChecked] = useState(false);
-  const [coverChargeGender, setCoverChargeGender] = useState<"all" | "female">("all");
+  const [coverChargeGender, setCoverChargeGender] = useState<"all" | "female" | "male">("all");
   const [coverChargeName, setCoverChargeName] = useState("");
   const [coverChargePrice, setCoverChargePrice] = useState("");
   const [coverChargePeople, setCoverChargePeople] = useState("");
@@ -6943,13 +6939,11 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
   const [coverChargeDescription, setCoverChargeDescription] = useState("");
   const [coverChargeValidFrom, setCoverChargeValidFrom] = useState("");
   const [coverChargeValidUntil, setCoverChargeValidUntil] = useState("");
-  const [coverChargeImageFile, setCoverChargeImageFile] = useState<File | null>(null);
-  const [coverChargeImagePreview, setCoverChargeImagePreview] = useState("");
 
   // Edit form state
   const [editType, setEditType] = useState<"welcome" | "unlimited" | "ticket" | "custom" | "cover_charge">("welcome");
   const [editProductName, setEditProductName] = useState("");
-  const [editGender, setEditGender] = useState<"all" | "female">("all");
+  const [editGender, setEditGender] = useState<"all" | "female" | "male">("all");
   const [editPackagePrice, setEditPackagePrice] = useState("");
   const [editPackagePeople, setEditPackagePeople] = useState("");
   const [editItems, setEditItems] = useState<DrinkPlanLineItem[]>([emptyItem()]);
@@ -6961,9 +6955,6 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
   const [editFoodDiscount, setEditFoodDiscount] = useState("");
   const [editValidFrom, setEditValidFrom] = useState("");
   const [editValidUntil, setEditValidUntil] = useState("");
-  const [editImageUrl, setEditImageUrl] = useState("");
-  const [editImageFile, setEditImageFile] = useState<File | null>(null);
-  const [editImagePreview, setEditImagePreview] = useState("");
 
   const errMsg = (err: unknown): string =>
     err instanceof Error ? err.message : typeof err === "string" ? err : "Please try again.";
@@ -6996,16 +6987,13 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
     setFreeEntryChecked(false); setFeDrinkTypes(["welcome"]); setFeGender("all");
     setFeDrinksOffer(""); setFeFoodDiscount(""); setFeValidUntil(""); setFeValidFrom("");
     setFeDays([]); setFeTimeFrom(""); setFeTimeTo(""); setFeDescription("");
-    setFeImageFile(null); setFeImagePreview("");
     setTicketChecked(false); setTicketGender("all"); setTicketItems([emptyItem()]);
     setTicketDrinksOffer(""); setTicketFoodDiscount(""); setTicketValidUntil(""); setTicketValidFrom("");
     setTicketDays([]); setTicketTimeFrom(""); setTicketTimeTo(""); setTicketDescription("");
-    setTicketImageFile(null); setTicketImagePreview("");
     setCoverChargeChecked(false); setCoverChargeGender("all"); setCoverChargeName(""); setCoverChargePrice(""); setCoverChargePeople("");
     setCoverChargeItems([emptyItem()]);
     setCoverChargeValidUntil(""); setCoverChargeValidFrom("");
     setCoverChargeDays([]); setCoverChargeTimeFrom(""); setCoverChargeTimeTo(""); setCoverChargeDescription("");
-    setCoverChargeImageFile(null); setCoverChargeImagePreview("");
   };
 
   const startEdit = (plan: DrinkPlan) => {
@@ -7024,9 +7012,6 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
     setEditFoodDiscount(plan.foodDiscountLabel ?? "");
     setEditValidFrom(plan.validFrom ?? "");
     setEditValidUntil(plan.validUntil ?? "");
-    setEditImageUrl(plan.imageUrl ?? "");
-    setEditImageFile(null);
-    setEditImagePreview(plan.imageUrl ?? "");
   };
 
   const cancelEdit = () => setEditingId(null);
@@ -7049,24 +7034,10 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
     if (coverChargeChecked && (!coverChargePrice || Number(coverChargePrice) <= 0)) {
       toast({ title: "Package price must be greater than 0 for Cover Charges", variant: "destructive" }); return;
     }
-    // The deal image is optional for every plan type. When a partner/admin
-    // leaves it blank, the deal card falls back to the venue's cover photo
-    // (see DrinkDealCard's fallbackImage). Offers are likewise optional for a
-    // cover-charge package — empty rows are dropped on submit (.filter below).
+    // Offers are optional for a cover-charge package — empty rows are dropped
+    // on submit (.filter below).
     setSaving(true);
     try {
-      let feUploadedUrl: string | null = null;
-      if (freeEntryChecked && feImageFile) {
-        feUploadedUrl = await uploadImageToStorage(feImageFile);
-      }
-      let ticketUploadedUrl: string | null = null;
-      if (ticketChecked && ticketImageFile) {
-        ticketUploadedUrl = await uploadImageToStorage(ticketImageFile);
-      }
-      let coverChargeUploadedUrl: string | null = null;
-      if (coverChargeChecked && coverChargeImageFile) {
-        coverChargeUploadedUrl = await uploadImageToStorage(coverChargeImageFile);
-      }
       if (freeEntryChecked) {
         for (const drinkType of feDrinkTypes) {
           await apiPost(writeBasePath, {
@@ -7079,7 +7050,6 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
             foodDiscountLabel: "",
             validFrom: feValidFrom || null,
             validUntil: feValidUntil || null,
-            imageUrl: feUploadedUrl,
           });
         }
       }
@@ -7093,7 +7063,6 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
           foodDiscountLabel: "",
           validFrom: ticketValidFrom || null,
           validUntil: ticketValidUntil || null,
-          imageUrl: ticketUploadedUrl,
         });
       }
       if (coverChargeChecked) {
@@ -7108,7 +7077,6 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
           foodDiscountLabel: "",
           validFrom: coverChargeValidFrom || null,
           validUntil: coverChargeValidUntil || null,
-          imageUrl: coverChargeUploadedUrl,
         });
       }
       toast({ title: "Drink plan(s) added" });
@@ -7141,10 +7109,6 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
       const isTicket = editType === "ticket";
       const isFreeEntry = editType === "welcome" || editType === "unlimited";
       const editingPlan = plans.find((p) => p.id === editingId);
-      let finalEditImageUrl = editImageUrl || null;
-      if (editImageFile) {
-        finalEditImageUrl = await uploadImageToStorage(editImageFile);
-      }
       const updated: DrinkPlan = await apiPatch(`${writeBasePath}/${editingId}`, {
         type: editType,
         productName: isTicket ? "Included with Ticket" : isFreeEntry ? (editType === "welcome" ? "Free Drink" : "Unlimited Drinks") : editProductName,
@@ -7158,7 +7122,6 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
         foodDiscountLabel: "",
         validFrom: editValidFrom || null,
         validUntil: editValidUntil || null,
-        imageUrl: finalEditImageUrl,
       });
       setPlans((prev) => prev.map((p) => p.id === editingId ? updated : p));
       setEditingId(null);
@@ -7246,7 +7209,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                   <div>
                     <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">For guests</Label>
                     <div className="flex gap-3">
-                      {([["all", "All Guests"], ["female", "Girls Only"]] as const).map(([val, label]) => (
+                      {([["all", "All Guests"], ["female", "Girls Only"], ["male", "Men Only"]] as const).map(([val, label]) => (
                         <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
                           <input type="radio" name="feGender" value={val} checked={feGender === val}
                             onChange={() => setFeGender(val)} className="accent-primary" />
@@ -7282,37 +7245,6 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                     <Textarea value={feDescription} onChange={(e) => setFeDescription(e.target.value)}
                       placeholder="Any extra details customers should know…" rows={2}
                       className="bg-black/40 border-white/10 resize-none text-sm" maxLength={500} />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
-                      Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
-                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card at 1:1 (square). Your whole image is displayed, nothing is cropped. Leave empty to use your venue cover photo.</span>
-                    </Label>
-                    {feImagePreview ? (
-                      <div className="relative mt-1 rounded-xl overflow-hidden group max-w-[220px]">
-                        <SquareImage src={feImagePreview} alt="Preview" className="rounded-xl max-w-[220px]" />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
-                            <Upload className="h-3 w-3" /> Change
-                            <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
-                              onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setFeImageFile(f); setFeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
-                          </label>
-                          <button type="button" onClick={() => { setFeImageFile(null); setFeImagePreview(""); }}
-                            className="px-3 py-1.5 rounded-lg bg-destructive/80 hover:bg-destructive text-xs text-white">Remove</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <label
-                        className="mt-1 flex flex-col items-center justify-center gap-2 h-32 rounded-xl border-2 border-dashed cursor-pointer transition-colors border-white/20 bg-black/20 hover:border-primary/50 hover:bg-primary/5"
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setFeImageFile(f); setFeImagePreview(URL.createObjectURL(f)); }}
-                      >
-                        <ImageIcon className="h-7 w-7 text-white/25" />
-                        <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 5 MB</span>
-                        <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
-                          onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setFeImageFile(f); setFeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
-                      </label>
-                    )}
                   </div>
                 </div>
               </div>
@@ -7365,37 +7297,6 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                     <Textarea value={ticketDescription} onChange={(e) => setTicketDescription(e.target.value)}
                       placeholder="Any extra details customers should know…" rows={2}
                       className="bg-black/40 border-white/10 resize-none text-sm" maxLength={500} />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
-                      Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
-                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card at 1:1 (square). Your whole image is displayed, nothing is cropped. Leave empty to use your venue cover photo.</span>
-                    </Label>
-                    {ticketImagePreview ? (
-                      <div className="relative mt-1 rounded-xl overflow-hidden group max-w-[220px]">
-                        <SquareImage src={ticketImagePreview} alt="Preview" className="rounded-xl max-w-[220px]" />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
-                            <Upload className="h-3 w-3" /> Change
-                            <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
-                              onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setTicketImageFile(f); setTicketImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
-                          </label>
-                          <button type="button" onClick={() => { setTicketImageFile(null); setTicketImagePreview(""); }}
-                            className="px-3 py-1.5 rounded-lg bg-destructive/80 hover:bg-destructive text-xs text-white">Remove</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <label
-                        className="mt-1 flex flex-col items-center justify-center gap-2 h-32 rounded-xl border-2 border-dashed cursor-pointer transition-colors border-white/20 bg-black/20 hover:border-primary/50 hover:bg-primary/5"
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setTicketImageFile(f); setTicketImagePreview(URL.createObjectURL(f)); }}
-                      >
-                        <ImageIcon className="h-7 w-7 text-white/25" />
-                        <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 5 MB</span>
-                        <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
-                          onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setTicketImageFile(f); setTicketImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
-                      </label>
-                    )}
                   </div>
                 </div>
               </div>
@@ -7474,37 +7375,6 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                       placeholder="Any extra details customers should know…" rows={2}
                       className="bg-black/40 border-white/10 resize-none text-sm" maxLength={500} />
                   </div>
-                  <div className="sm:col-span-2">
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
-                      Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
-                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card at 1:1 (square). Your whole image is displayed, nothing is cropped. Leave empty to use your venue cover photo.</span>
-                    </Label>
-                    {coverChargeImagePreview ? (
-                      <div className="relative mt-1 rounded-xl overflow-hidden group max-w-[220px]">
-                        <SquareImage src={coverChargeImagePreview} alt="Preview" className="rounded-xl max-w-[220px]" />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
-                            <Upload className="h-3 w-3" /> Change
-                            <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
-                              onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setCoverChargeImageFile(f); setCoverChargeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
-                          </label>
-                          <button type="button" onClick={() => { setCoverChargeImageFile(null); setCoverChargeImagePreview(""); }}
-                            className="px-3 py-1.5 rounded-lg bg-destructive/80 hover:bg-destructive text-xs text-white">Remove</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <label
-                        className="mt-1 flex flex-col items-center justify-center gap-2 h-32 rounded-xl border-2 border-dashed cursor-pointer transition-colors border-white/20 bg-black/20 hover:border-primary/50 hover:bg-primary/5"
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setCoverChargeImageFile(f); setCoverChargeImagePreview(URL.createObjectURL(f)); }}
-                      >
-                        <ImageIcon className="h-7 w-7 text-white/25" />
-                        <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 5 MB</span>
-                        <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
-                          onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setCoverChargeImageFile(f); setCoverChargeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
-                      </label>
-                    )}
-                  </div>
                 </div>
               </div>
             )}
@@ -7554,7 +7424,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                         <div>
                           <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">For guests</Label>
                           <div className="flex gap-3">
-                            {([["all", "All Guests"], ["female", "Girls Only"]] as const).map(([val, label]) => (
+                            {([["all", "All Guests"], ["female", "Girls Only"], ["male", "Men Only"]] as const).map(([val, label]) => (
                               <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
                                 <input type="radio" name="editGender" value={val} checked={editGender === val}
                                   onChange={() => setEditGender(val)} className="accent-primary" />
@@ -7647,37 +7517,6 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                         <Label>Description</Label>
                         <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} className="bg-black/40 border-white/10 resize-none" maxLength={500} />
                       </div>
-                      <div className="sm:col-span-2">
-                        <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
-                          Deal image <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
-                          <span className="normal-case text-muted-foreground/60 font-normal ml-1">— leave empty to use your venue cover photo.</span>
-                        </Label>
-                        {editImagePreview ? (
-                          <div className="relative mt-1 rounded-xl overflow-hidden group max-w-[220px]">
-                            <SquareImage src={editImagePreview} alt="Preview" className="rounded-xl" />
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                              <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
-                                <Upload className="h-3 w-3" /> Change
-                                <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
-                                  onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setEditImageFile(f); setEditImageUrl(""); setEditImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
-                              </label>
-                              <button type="button" onClick={() => { setEditImageUrl(""); setEditImageFile(null); setEditImagePreview(""); }}
-                                className="px-3 py-1.5 rounded-lg bg-destructive/80 hover:bg-destructive text-xs text-white">Remove</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <label
-                            className="mt-1 flex flex-col items-center justify-center gap-2 h-32 rounded-xl border-2 border-dashed cursor-pointer transition-colors border-white/20 bg-black/20 hover:border-primary/50 hover:bg-primary/5"
-                            onDragOver={(e) => e.preventDefault()}
-                            onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setEditImageFile(f); setEditImageUrl(""); setEditImagePreview(URL.createObjectURL(f)); }}
-                          >
-                            <ImageIcon className="h-7 w-7 text-white/25" />
-                            <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 5 MB</span>
-                            <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only"
-                              onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setEditImageFile(f); setEditImageUrl(""); setEditImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
-                          </label>
-                        )}
-                      </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <Button type="submit" disabled={editSaving} size="sm">{editSaving ? "Saving…" : "Save changes"}</Button>
@@ -7707,6 +7546,11 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                         {plan.gender === "female" && (
                           <span className="rounded-full bg-pink-500/10 border border-pink-500/25 px-2.5 py-0.5 text-[10px] text-pink-400 font-semibold">
                             Girls only
+                          </span>
+                        )}
+                        {plan.gender === "male" && (
+                          <span className="rounded-full bg-blue-500/10 border border-blue-500/25 px-2.5 py-0.5 text-[10px] text-blue-400 font-semibold">
+                            Men only
                           </span>
                         )}
                         {plan.gender === "all" && (plan.type === "welcome" || plan.type === "unlimited") && (

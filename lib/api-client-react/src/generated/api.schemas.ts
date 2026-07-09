@@ -1968,6 +1968,7 @@ export type DrinkPlanGender = typeof DrinkPlanGender[keyof typeof DrinkPlanGende
 export const DrinkPlanGender = {
   all: 'all',
   female: 'female',
+  male: 'male',
 } as const;
 
 export interface DrinkPlan {
@@ -2006,6 +2007,7 @@ export type DrinkPlanBodyGender = typeof DrinkPlanBodyGender[keyof typeof DrinkP
 export const DrinkPlanBodyGender = {
   all: 'all',
   female: 'female',
+  male: 'male',
 } as const;
 
 export interface DrinkPlanBody {
@@ -2046,6 +2048,7 @@ export type DrinkPlanSummaryGender = typeof DrinkPlanSummaryGender[keyof typeof 
 export const DrinkPlanSummaryGender = {
   all: 'all',
   female: 'female',
+  male: 'male',
 } as const;
 
 export interface DrinkPlanSummary {

@@ -12,4 +12,5 @@ export type DrinkPlanSummaryGender = typeof DrinkPlanSummaryGender[keyof typeof 
 export const DrinkPlanSummaryGender = {
   all: 'all',
   female: 'female',
+  male: 'male',
 } as const;

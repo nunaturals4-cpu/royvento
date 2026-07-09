@@ -1,6 +1,7 @@
 import { Utensils, Wine, Clock, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDayRanges } from "@/lib/days";
+import { GuestTypeBadge } from "@/components/GuestTypeBadge";
 
 export interface VendorOffer {
   id: number;
@@ -11,8 +12,8 @@ export interface VendorOffer {
   discountType: "percent" | "fixed" | "bogo" | "free_item" | string;
   discountValue: string | number;
   freeItemName: string;
-  /** Audience: "all" guests or "female" (girls only). */
-  gender?: "all" | "female" | string;
+  /** Audience: "all" guests, "female" (girls only) or "male" (men only). */
+  gender?: "all" | "female" | "male" | string;
   days: string[];
   timeFrom: string;
   timeTo: string;
@@ -148,11 +149,7 @@ export function OfferCard({
               <Clock className="w-3 h-3" />
               {formatWindow(offer.timeFrom, offer.timeTo)}
             </span>
-            {offer.gender === "female" ? (
-              <span className="inline-flex items-center rounded-full bg-pink-500/10 border border-pink-500/30 px-2 py-0.5 text-[10px] font-semibold text-pink-400">Girls only</span>
-            ) : (
-              <span className="inline-flex items-center rounded-full bg-white/5 border border-white/10 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">All guests</span>
-            )}
+            <GuestTypeBadge gender={offer.gender} className="normal-case shadow-none px-2 py-0.5" />
           </div>
         </div>
         {trailing && <div className="shrink-0">{trailing}</div>}

@@ -5449,7 +5449,7 @@ components:
           type: string
         gender:
           type: string
-          enum: [all, female]
+          enum: [all, female, male]
         price:
           type: integer
         peoplePerPackage:
@@ -5491,7 +5491,7 @@ components:
           type: string
         gender:
           type: string
-          enum: [all, female]
+          enum: [all, female, male]
         price:
           type: integer
           minimum: 0
@@ -5534,7 +5534,7 @@ components:
           type: string
         gender:
           type: string
-          enum: [all, female]
+          enum: [all, female, male]
         peoplePerPackage:
           type: integer
           nullable: true
