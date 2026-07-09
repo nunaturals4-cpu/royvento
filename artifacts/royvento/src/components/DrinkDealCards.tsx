@@ -1,7 +1,7 @@
 import { Wine, Ticket, Clock, Coins, Check } from "lucide-react";
-import { useTranslation } from "react-i18next";
 import { CarouselRow } from "@/components/CarouselRow";
 import { NightlifeOfferCard } from "@/components/NightlifeOfferCard";
+import { GuestTypeBadge } from "@/components/GuestTypeBadge";
 import { OfferDayPills } from "@/components/OfferDayPills";
 import { OfferSectionHeader } from "@/components/OfferSectionHeader";
 import { OFFER_THEMES, type OfferTheme } from "@/components/offerThemes";
@@ -118,13 +118,11 @@ export function DrinkDealCard({
   theme,
   onClick,
 }: DrinkDealCardProps) {
-  const { t } = useTranslation();
   const { badge, headline } = summarizePlan(plan);
   const items = (plan.lineItems ?? []).filter((it) => it.name);
   const isTicket = plan.type === "ticket";
   const isCoverCharge = plan.type === "cover_charge";
   const imageUrl = toImg(plan.imageUrl) ?? toImg(fallbackImage) ?? null;
-  const gender = plan.gender === "female" ? t("pub_offers.filter_ladies") : null;
   const timeStr = (plan.timeFrom && plan.timeTo)
     ? `${fmtTime(plan.timeFrom)} – ${fmtTime(plan.timeTo)}`
     : null;
@@ -142,9 +140,7 @@ export function DrinkDealCard({
       ? <Ticket className={iconSize} />
       : <Wine className={iconSize} />;
   const priceLabel = isCoverCharge && (plan.price ?? 0) > 0 ? `₹${((plan.price ?? 0) / 100).toFixed(0)}` : undefined;
-  const statusBadge = gender ? (
-    <span className="rounded-full bg-pink-500/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-md">{gender}</span>
-  ) : undefined;
+  const statusBadge = <GuestTypeBadge gender={plan.gender} />;
 
   // Clean day · time footer row — mirrors the Happening Tonight card style.
   const daysLabel = formatDayRanges(plan.days ?? []);

@@ -96,6 +96,9 @@ export interface TonightItem {
   bucket: Bucket;
   /** For "offer" items: the vendor_offers category (food/drink/exclusive). */
   category?: string;
+  /** Guest type ("all"/"female") for "happyhour"/"offer" items — drives the
+   *  Everyone/Ladies badge on the card. */
+  gender?: string;
   dealLabel: string;
   rating: number;
   todayBookings: number;
@@ -324,7 +327,7 @@ router.get("/happening-tonight", async (req, res) => {
     // ── Happy hours (active vendor offers) ───────────────────────────────────
     const offerRows = (await db.execute(sql`
       SELECT vo.id, vo.title, vo.category, vo.description, vo.days, vo.time_from AS "timeFrom",
-        vo.time_to AS "timeTo", vo.starts_at AS "startsAt", vo.ends_at AS "endsAt", vo.active,
+        vo.time_to AS "timeTo", vo.starts_at AS "startsAt", vo.ends_at AS "endsAt", vo.active, vo.gender,
         vo.discount_type AS "discountType", vo.discount_value AS "discountValue",
         v.id AS "vendorId", v.business_name AS "vendorName", v.city, v.state,
         -- The offer's own deal image, then the venue cover/banner, then the pub's
@@ -378,6 +381,7 @@ router.get("/happening-tonight", async (req, res) => {
         startTime: String(r["timeFrom"] ?? ""),
         endTime: String(r["timeTo"] ?? ""),
         category: offerCategory,
+        gender: String(r["gender"] ?? "all"),
         dealLabel: String(r["title"] ?? ""),
         rating: Number(r["rating"] ?? 0),
         todayBookings: 0,
@@ -399,7 +403,7 @@ router.get("/happening-tonight", async (req, res) => {
     const PLAN_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const todayName = PLAN_DAY_NAMES[now.getDay()] ?? "Sun";
     const planRows = (await db.execute(sql`
-      SELECT dp.id, dp.type, dp.product_name AS "productName", dp.days,
+      SELECT dp.id, dp.type, dp.product_name AS "productName", dp.gender, dp.days,
         dp.time_from AS "timeFrom", dp.time_to AS "timeTo",
         v.id AS "vendorId", v.business_name AS "vendorName", v.city, v.state,
         COALESCE(
@@ -456,6 +460,7 @@ router.get("/happening-tonight", async (req, res) => {
         href: pubEventId ? `/events/${pubEventId}?to=happyhours` : "/pub-offers",
         startTime: String(r["timeFrom"] ?? ""),
         endTime: String(r["timeTo"] ?? ""),
+        gender: String(r["gender"] ?? "all"),
         dealLabel: label,
         rating: Number(r["rating"] ?? 0),
         todayBookings: 0,

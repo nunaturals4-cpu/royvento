@@ -9,6 +9,7 @@ import { apiGet } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CarouselRow } from "@/components/CarouselRow";
 import { NightlifeOfferCard } from "@/components/NightlifeOfferCard";
+import { GuestTypeBadge } from "@/components/GuestTypeBadge";
 import { OFFER_THEMES } from "@/components/offerThemes";
 
 // ── Happening Tonight ───────────────────────────────────────────────────────
@@ -32,6 +33,8 @@ interface TonightItem {
   bucket: "now" | "soon" | null;
   /** For "offer" items: the vendor_offers category (food/drink/exclusive). */
   category?: string;
+  /** Guest type ("all"/"female") — drives the Everyone/Ladies badge. */
+  gender?: string;
   dealLabel: string;
   rating: number;
   todayBookings: number;
@@ -94,6 +97,14 @@ function TonightCard({ item }: { item: TonightItem }) {
     const timeLabel = item.startTime
       ? `${item.startTime}${item.endTime ? ` – ${item.endTime}` : ""}`
       : "Tonight";
+    // Guest type must always show alongside the live/soon urgency badge on
+    // every offer/happy-hour card here, matching the Happy Hour page cards.
+    const combinedBadge = (
+      <div className="flex flex-wrap items-center gap-1.5">
+        {statusBadge}
+        <GuestTypeBadge gender={item.gender} />
+      </div>
+    );
     return (
       <div className="h-full w-[300px] sm:w-[330px]">
         <NightlifeOfferCard
@@ -107,7 +118,7 @@ function TonightCard({ item }: { item: TonightItem }) {
           offerEyebrow={item.kind === "happyhour" ? "Enjoy" : isExclusive ? "Exclusive" : "Deal"}
           offerIcon={isExclusive ? <Sparkles className="h-5 w-5" /> : <GlassWater className="h-5 w-5" />}
           location={loc || "Tonight"}
-          statusBadge={statusBadge}
+          statusBadge={combinedBadge}
         >
           <div className="flex items-center gap-1.5 text-[11px] text-white/55">
             <Clock className="h-3 w-3 shrink-0" style={{ color: theme.accent }} />

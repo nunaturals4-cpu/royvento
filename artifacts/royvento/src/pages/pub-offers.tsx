@@ -13,6 +13,7 @@ import { useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react"
 import type { VendorDrinkOffer } from "@workspace/api-client-react";
 import { FreeDrinkSection, TicketSection, CoverChargeSection, splitVendorsByPlanType } from "@/components/DrinkDealCards";
 import { NightlifeOfferCard } from "@/components/NightlifeOfferCard";
+import { GuestTypeBadge } from "@/components/GuestTypeBadge";
 import { OfferDayPills } from "@/components/OfferDayPills";
 import { OfferSectionHeader } from "@/components/OfferSectionHeader";
 import { OFFER_THEMES, type OfferTheme } from "@/components/offerThemes";
@@ -33,6 +34,7 @@ interface AllDrinkDeal {
   discountType: "percent" | "fixed" | "bogo" | "free_item" | "nothing";
   discountValue: string;
   freeItemName: string;
+  gender: string;
   days: string[];
   timeFrom: string;
   timeTo: string;
@@ -84,6 +86,7 @@ function DiscountCard({ deal, theme }: { deal: AllDrinkDeal; theme: OfferTheme }
       offerLabel={value}
       offerEyebrow={eyebrow}
       location={deal.vendorCity}
+      statusBadge={<GuestTypeBadge gender={deal.gender} />}
     >
       <div className="flex flex-col gap-1.5">
         <OfferDayPills days={deal.days} accent={theme.accent} glow={theme.glow} />
