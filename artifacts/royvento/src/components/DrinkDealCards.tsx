@@ -1,4 +1,4 @@
-import { Wine, Ticket, Clock, Coins, Check } from "lucide-react";
+import { Wine, Ticket, Clock, Coins, Check, Crown } from "lucide-react";
 import { CarouselRow } from "@/components/CarouselRow";
 import { NightlifeOfferCard } from "@/components/NightlifeOfferCard";
 import { GuestTypeBadge } from "@/components/GuestTypeBadge";
@@ -62,6 +62,9 @@ function summarizePlan(plan: DrinkDealPlanLike): { badge: string; headline: stri
   if (plan.type === "cover_charge") {
     return { badge: "COVER CHARGE", headline: plan.productName || "Cover charge package" };
   }
+  if (plan.type === "vip_table") {
+    return { badge: "VIP TABLE", headline: plan.productName || "VIP table package" };
+  }
   return { badge: "DRINKS DEAL", headline: plan.productName || "Drinks discount" };
 }
 
@@ -72,6 +75,7 @@ function offerEyebrowFor(type: string): string {
     case "unlimited":    return "Enjoy";
     case "ticket":       return "Bundle";
     case "cover_charge": return "Entry";
+    case "vip_table":    return "VIP";
     default:             return "Offer";
   }
 }
@@ -121,7 +125,9 @@ export function DrinkDealCard({
   const { badge, headline } = summarizePlan(plan);
   const items = (plan.lineItems ?? []).filter((it) => it.name);
   const isTicket = plan.type === "ticket";
-  const isCoverCharge = plan.type === "cover_charge";
+  // "Cover Charge" and "VIP Table Booking" plans share the identical priced-
+  // package presentation (icon, price label, included-offers list).
+  const isCoverCharge = plan.type === "cover_charge" || plan.type === "vip_table";
   const imageUrl = toImg(plan.imageUrl) ?? toImg(fallbackImage) ?? null;
   const timeStr = (plan.timeFrom && plan.timeTo)
     ? `${fmtTime(plan.timeFrom)} – ${fmtTime(plan.timeTo)}`
@@ -314,10 +320,25 @@ export function CoverChargeSection({ vendors }: { vendors: VendorWithPlans[] }) 
   );
 }
 
+export function VipTableBookingSection({ vendors }: { vendors: VendorWithPlans[] }) {
+  if (vendors.length === 0) return null;
+  return (
+    <DealPanel
+      vendors={vendors}
+      accent="violet"
+      title="VIP Table Booking"
+      subtitle="Premium tables & bottle-service packages"
+      hideImage
+      theme={OFFER_THEMES.vipTable}
+      sectionIcon={Crown}
+    />
+  );
+}
+
 export function splitVendorsByPlanType(
   offers: VendorDrinkOffer[],
   genderFilter?: "" | "female" | "other",
-): { freeVendors: VendorWithPlans[]; ticketVendors: VendorWithPlans[]; coverChargeVendors: VendorWithPlans[] } {
+): { freeVendors: VendorWithPlans[]; ticketVendors: VendorWithPlans[]; coverChargeVendors: VendorWithPlans[]; vipTableVendors: VendorWithPlans[] } {
   const genderMatch = (p: DrinkPlanSummary) =>
     !genderFilter ||
     (genderFilter === "female" ? p.gender === "female" : p.gender !== "female");
@@ -352,5 +373,12 @@ export function splitVendorsByPlanType(
     }))
     .filter((v) => v.plans.length > 0);
 
-  return { freeVendors, ticketVendors, coverChargeVendors };
+  const vipTableVendors = filtered
+    .map((offer) => ({
+      offer,
+      plans: offer.plans.filter((p) => p.type === "vip_table" && genderMatch(p)),
+    }))
+    .filter((v) => v.plans.length > 0);
+
+  return { freeVendors, ticketVendors, coverChargeVendors, vipTableVendors };
 }

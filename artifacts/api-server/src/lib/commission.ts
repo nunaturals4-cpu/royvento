@@ -40,7 +40,7 @@
  * a realised ledger entry.
  */
 
-export type BookingType = "free_entry" | "ticket" | "table" | "event_booking" | "cover_charge";
+export type BookingType = "free_entry" | "ticket" | "table" | "event_booking" | "cover_charge" | "vip_table";
 
 export type CommissionTrigger =
   | "online_payment"
@@ -53,6 +53,8 @@ export interface CommissionRatesInput {
   /** Ticket commission as a percentage (0–100), e.g. 10 = 10% of ticket revenue. */
   ticketRate: string | number | null | undefined;
   tableBookingRate: string | number | null | undefined;
+  /** VIP Table Booking commission — flat ₹ amount per verified guest, same shape as tableBookingRate. */
+  vipTableBookingRate?: string | number | null | undefined;
   /** Event booking commission as a percentage (0–100) of ticket revenue. */
   eventRate?: string | number | null | undefined;
   /** When false, no event commission is charged (overrides eventRate). */
@@ -153,6 +155,7 @@ export function classifyBookingType(b: { pubMode: string; finalPrice: string | n
   const price = Number(b.finalPrice);
   if (b.pubMode === "event_booking") return "event_booking";
   if (b.pubMode === "cover_charge") return "cover_charge";
+  if (b.pubMode === "vip_table") return "vip_table";
   if (b.pubMode === "table" || b.pubMode === "event") return "table";
   if (price === 0 || b.pubMode === "free") return "free_entry";
   return "ticket";
@@ -187,6 +190,7 @@ export function computeCommissionFromPlanned(
   const freeEntryFee = Number(rates.freeEntryRate ?? 0);
   const ticketPct = Number(rates.ticketRate ?? 0); // stored as percentage (0–100)
   const tablePct = Number(rates.tableBookingRate ?? 0); // stored as flat ₹ per person
+  const vipTablePct = Number(rates.vipTableBookingRate ?? 0); // stored as flat ₹ per person
 
   const coverChargePct = Number(rates.coverChargeRate ?? 0); // stored as percentage (0–100)
 
@@ -212,6 +216,12 @@ export function computeCommissionFromPlanned(
     const unitCount = Math.max(0, b.guests);
     const amount = round2(tablePct * unitCount);
     return { bookingType, ratePerUnit: tablePct, unitCount, amount };
+  }
+
+  if (bookingType === "vip_table") {
+    const unitCount = Math.max(0, b.guests);
+    const amount = round2(vipTablePct * unitCount);
+    return { bookingType, ratePerUnit: vipTablePct, unitCount, amount };
   }
 
   if (bookingType === "free_entry") {
@@ -320,6 +330,21 @@ export function computeCommissionFromActuals(
     const units = totalUnits > 0 ? totalUnits : Math.max(0, ag);
     const amount = round2(tableRatePerPerson * units);
     return { bookingType: "table", ratePerUnit: tableRatePerPerson, unitCount: units, amount };
+  }
+
+  // ── VIP Table: flat ₹ per verified guest (same shape as Table) ──────────
+  if (bookingType === "vip_table") {
+    const vipTableRatePerPerson = Number(rates.vipTableBookingRate ?? 0); // flat ₹ per person
+
+    const aw = b.actualWomen ?? b.ticketWomen;
+    const am = b.actualMen ?? b.ticketMen;
+    const ac = b.actualCouple ?? b.ticketCouple;
+    const ag = b.actualGuests ?? b.guests;
+    const totalUnits = aw + am + ac;
+
+    const units = totalUnits > 0 ? totalUnits : Math.max(0, ag);
+    const amount = round2(vipTableRatePerPerson * units);
+    return { bookingType: "vip_table", ratePerUnit: vipTableRatePerPerson, unitCount: units, amount };
   }
 
   // ── Ticket: percentage of actual ticket revenue ──────────────────────────

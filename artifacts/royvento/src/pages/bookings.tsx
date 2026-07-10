@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Users, Tag, Wine, Ticket as TicketIcon, Printer, Download, AlertCircle, Share2 } from "lucide-react";
+import { Calendar, Users, Tag, Wine, Ticket as TicketIcon, Printer, Download, AlertCircle, Share2, Gem } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatINR, formatINRExact, apiPatch } from "@/lib/api";
@@ -162,8 +162,9 @@ function BookingCard({ b, onRefetch }: { b: BookingRecord; onRefetch: () => void
   };
   const isOrganizer = b.kind === "organizer";
   const isEventBooking = b.pubMode === "event_booking";
-  const isPubTicket = b.pubMode === "ticket" || b.pubMode === "free" || b.pubMode === "event" || b.pubMode === "cover_charge";
+  const isPubTicket = b.pubMode === "ticket" || b.pubMode === "free" || b.pubMode === "event" || b.pubMode === "cover_charge" || b.pubMode === "vip_table";
   const isCoverCharge = b.pubMode === "cover_charge";
+  const isVipTable = b.pubMode === "vip_table";
   const showTicket = (isPubTicket || isOrganizer || isEventBooking) && (b.status === "confirmed" || b.status === "completed");
   const [cancelOpen, setCancelOpen] = useState(false);
   // cancellationAllowed is computed server-side; fall back to true so old API responses stay functional
@@ -187,6 +188,7 @@ function BookingCard({ b, onRefetch }: { b: BookingRecord; onRefetch: () => void
               {isEventBooking && <Badge className="bg-purple-600/20 border-purple-500/40 text-purple-200"><TicketIcon className="h-3 w-3 mr-1" />Event Ticket</Badge>}
               {b.pubMode === "ticket" && <Badge variant="outline"><TicketIcon className="h-3 w-3 mr-1" />{t("bookings.ticket_badge")}</Badge>}
               {isCoverCharge && <Badge variant="outline"><TicketIcon className="h-3 w-3 mr-1" />Cover Charge</Badge>}
+              {isVipTable && <Badge className="bg-red-950/60 border-white/50 text-white"><TicketIcon className="h-3 w-3 mr-1" />VIP Table Booking</Badge>}
               {b.pubMode === "event" && <Badge variant="outline">{t("bookings.event_booking_badge")}</Badge>}
               <span className="text-xs text-muted-foreground">{t("bookings.booked_on")} {new Date(b.createdAt).toLocaleDateString()}</span>
             </div>
@@ -227,6 +229,9 @@ function BookingCard({ b, onRefetch }: { b: BookingRecord; onRefetch: () => void
             )}
             {isCoverCharge && b.selectedPubEvent && (
               <p className="text-sm text-muted-foreground">Package: <span className="text-foreground/80 font-medium">{b.selectedPubEvent}</span>{b.guests > 1 ? ` × ${b.guests}` : ""}</p>
+            )}
+            {isVipTable && b.selectedPubEvent && (
+              <p className="text-sm text-muted-foreground">VIP Package: <span className="text-foreground/80 font-medium">{b.selectedPubEvent}</span></p>
             )}
             {b.notes && <p className="text-sm italic text-muted-foreground">"{b.notes}"</p>}
             {b.status === "pending" && (
@@ -376,10 +381,10 @@ function CancelBookingDialog({
   );
 }
 
-function TicketField({ label, value }: { label: string; value: React.ReactNode }) {
+function TicketField({ label, value, vip }: { label: string; value: React.ReactNode; vip?: boolean }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-[0.22em] text-amber-400/50 mb-0.5">{label}</p>
+      <p className={`text-[10px] uppercase tracking-[0.22em] mb-0.5 ${vip ? "text-white/55" : "text-amber-400/50"}`}>{label}</p>
       <p className="text-sm text-white/90 font-medium leading-tight">{value}</p>
     </div>
   );
@@ -390,7 +395,28 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
   const { toast } = useToast();
   const isOrganizer = b.kind === "organizer";
   const isCoverCharge = b.pubMode === "cover_charge";
+  const isVipTable = b.pubMode === "vip_table";
   const isEventBooking = b.pubMode === "event_booking";
+  // Two distinct plate themes: standard bookings get a pure dark-black plate
+  // with a golden border; VIP Table Booking gets a rich deep-navy plate
+  // (#160517 anchor) with a white border, so it reads as a clearly separate,
+  // higher tier ticket without touching any other booking type's design.
+  const ticketBg = isVipTable
+    ? "linear-gradient(150deg, #3B0E3E 0%, #160517 50%, #0A020A 100%)"
+    : "linear-gradient(155deg, #0c0c0c 0%, #070707 55%, #000000 100%)";
+  const ticketBorder = isVipTable ? "2px solid rgba(255,255,255,0.7)" : "2px solid rgba(212,168,83,0.55)";
+  const ticketShadow = isVipTable
+    // Double-ring foil edge — a crisp white hairline just inside the border,
+    // plus a soft white glow and the aubergine's own ambient shadow, for a
+    // richer, more premium plate than a single flat border.
+    ? "0 28px 80px rgba(22,5,23,0.7), 0 0 46px -12px rgba(255,255,255,0.3), 0 0 0 1px rgba(22,5,23,0.9) inset, 0 0 0 4px rgba(255,255,255,0.18) inset"
+    : "0 24px 64px rgba(0,0,0,0.75), 0 0 0 1px rgba(212,168,83,0.14) inset";
+  const ornStroke = isVipTable ? "rgba(255,255,255,0.85)" : "#d4a853";
+  const ornFill = isVipTable ? "rgba(255,255,255,0.4)" : "rgba(212,168,83,0.4)";
+  const qrRingStyle = isVipTable
+    ? { background: "#fff", border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 0 0 3px rgba(22,5,23,0.5)" }
+    : { background: "#fff", border: "2px solid rgba(212,168,83,0.5)" };
+  const venueNameStyle = isVipTable ? { color: "#ffffff" } : { color: "#d4a853" };
   const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
   const isEventMode = b.pubMode !== "ticket";
   const ticketSum = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
@@ -425,6 +451,8 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
   const printTicket = async (w: Window | null) => {
     if (!w) return;
 
+    const vipClass = isVipTable ? " vip" : "";
+
     const esc = (v: unknown): string =>
       String(v ?? "")
         .replace(/&/g, "&amp;")
@@ -441,9 +469,9 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
         color: { dark: "#1a1008", light: "#ffffff" },
         width: 150,
       });
-      qrSvgHtml = `<div class="qr-frame">${svgString}<p class="qr-venue">${esc(b.vendorName)}</p></div>`;
+      qrSvgHtml = `<div class="qr-frame${vipClass}">${svgString}<p class="qr-venue">${esc(b.vendorName)}</p></div>`;
     } catch (_) {
-      qrSvgHtml = `<div class="qr-frame"><p class="qr-venue">${esc(b.vendorName)}</p></div>`;
+      qrSvgHtml = `<div class="qr-frame${vipClass}"><p class="qr-venue">${esc(b.vendorName)}</p></div>`;
     }
 
     const pdfBreakdownParts = [
@@ -454,6 +482,8 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
     const ticketBreakdown = pdfBreakdownParts.join(" &middot; ");
     const ticketsFieldHtml = isCoverCharge
       ? `<div class="field-val-sm">${esc(b.selectedPubEvent || "Cover charge")}<br/><span style="color:rgba(255,255,255,.4);font-size:11px;">× ${total}</span></div>`
+      : isVipTable
+      ? `<div class="field-val-sm">${esc(b.selectedPubEvent || "VIP table package")}<br/><span style="color:rgba(255,255,255,.4);font-size:11px;">${total} ${esc(t("bookings.guests"))}</span></div>`
       : isEventBooking
       ? `<div class="field-val">${total} ticket${total !== 1 ? "s" : ""}</div>`
       : ticketBreakdown
@@ -467,41 +497,60 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
       <style>
         *{box-sizing:border-box;margin:0;padding:0;}
         body{background:#0c0810;font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:32px;}
-        .ticket{position:relative;background:linear-gradient(145deg,#14090f 0%,#1e0e1a 45%,#100c18 100%);border:1px solid rgba(212,168,83,.35);border-radius:24px;max-width:680px;width:100%;overflow:hidden;box-shadow:0 40px 80px rgba(0,0,0,.7),0 0 0 1px rgba(212,168,83,.1) inset;}
+        .ticket{position:relative;background:linear-gradient(155deg,#0c0c0c 0%,#070707 55%,#000000 100%);border:2px solid rgba(212,168,83,.55);border-radius:24px;max-width:680px;width:100%;overflow:hidden;box-shadow:0 40px 80px rgba(0,0,0,.8),0 0 0 1px rgba(212,168,83,.14) inset;}
+        .ticket.vip{background:linear-gradient(150deg,#3B0E3E 0%,#160517 50%,#0A020A 100%);border:2px solid rgba(255,255,255,.7);box-shadow:0 40px 90px rgba(22,5,23,.65),0 0 54px -14px rgba(255,255,255,.32),0 0 0 1px rgba(22,5,23,.9) inset,0 0 0 4px rgba(255,255,255,.18) inset;}
+        .sheen{position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.09) 48%,rgba(255,255,255,.02) 55%,transparent 65%);}
         .wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:96px;font-family:'Playfair Display',serif;color:rgba(212,168,83,.04);white-space:nowrap;pointer-events:none;letter-spacing:.15em;}
+        .wm.vip{font-size:40px;letter-spacing:.25em;color:rgba(255,255,255,.07);}
         .orn{position:absolute;width:60px;height:60px;opacity:.35;}
         .orn-tl{top:16px;left:16px;}
         .orn-tr{top:16px;right:16px;transform:scaleX(-1);}
         .body-sec{padding:32px 36px 28px;}
         .top-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
         .brand{font-size:11px;letter-spacing:.55em;text-transform:uppercase;color:rgba(212,168,83,.6);font-family:'Inter',sans-serif;}
+        .brand.vip{color:rgba(255,255,255,.65);}
         .badge{font-size:10px;font-family:ui-monospace,Menlo,monospace;color:rgba(212,168,83,.7);background:rgba(212,168,83,.08);border:1px solid rgba(212,168,83,.2);padding:3px 10px;border-radius:6px;letter-spacing:.08em;}
+        .badge.vip{color:rgba(255,255,255,.8);background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3);}
+        .vip-ribbon{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.16em;color:#ffffff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.5);box-shadow:0 0 16px -4px rgba(255,255,255,.35);padding:5px 12px;border-radius:99px;margin-bottom:14px;}
         .hero{display:flex;justify-content:space-between;align-items:flex-start;gap:28px;}
         .hero-info{flex:1;min-width:0;}
         .venue-name{font-family:'Playfair Display',serif;font-size:32px;color:#d4a853;line-height:1.1;font-weight:600;}
+        .venue-name.vip{color:#ffffff;}
         .event-title{font-size:16px;color:rgba(255,255,255,.75);margin-top:6px;font-weight:400;}
         .event-city{font-size:11px;color:rgba(255,255,255,.35);margin-top:3px;letter-spacing:.06em;}
         .fields{display:grid;grid-template-columns:1fr 1fr;gap:18px 28px;margin-top:24px;}
         .field-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.28em;color:rgba(212,168,83,.45);margin-bottom:3px;}
+        .field-lbl.vip{color:rgba(255,255,255,.55);}
         .field-val{font-size:15px;color:rgba(255,255,255,.88);font-weight:500;}
         .field-val-sm{font-size:13px;color:rgba(255,255,255,.75);}
-        .qr-frame{display:flex;flex-direction:column;align-items:center;gap:8px;background:#fff;border:2px solid rgba(212,168,83,.45);border-radius:14px;padding:12px;flex-shrink:0;}
+        .qr-frame{display:flex;flex-direction:column;align-items:center;gap:8px;background:#fff;border:2px solid rgba(212,168,83,.5);border-radius:14px;padding:12px;flex-shrink:0;}
+        .qr-frame.vip{border:2px solid rgba(255,255,255,.9);box-shadow:0 0 0 3px rgba(22,5,23,.5);}
         .qr-frame svg{display:block;width:140px;height:140px;}
         .qr-venue{font-size:9px;color:#5a4010;font-family:ui-monospace,Menlo,monospace;letter-spacing:.1em;text-align:center;max-width:140px;word-break:break-word;}
         .divider-row{display:flex;align-items:center;margin:0 -0px;}
-        .notch{width:22px;height:44px;background:#0c0810;border-radius:0 22px 22px 0;flex-shrink:0;}
+        .notch{width:22px;height:44px;background:#000000;border-radius:0 22px 22px 0;flex-shrink:0;}
+        .notch.vip{background:#0A020A;}
         .notch-r{border-radius:22px 0 0 22px;}
-        .perf{flex:1;border-top:2px dashed rgba(212,168,83,.22);height:0;position:relative;}
-        .tear-code{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:ui-monospace,Menlo,monospace;font-size:18px;letter-spacing:.35em;color:#d4a853;background:linear-gradient(145deg,#14090f,#1e0e1a);padding:4px 18px;white-space:nowrap;}
+        .perf{flex:1;border-top:2px dashed rgba(212,168,83,.3);height:0;position:relative;}
+        .perf.vip{border-top-color:rgba(255,255,255,.35);}
+        .tear-code{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:ui-monospace,Menlo,monospace;font-size:18px;letter-spacing:.35em;color:#d4a853;background:linear-gradient(155deg,#0c0c0c,#070707);padding:4px 18px;white-space:nowrap;}
+        .tear-code.vip{color:#ffffff;background:linear-gradient(150deg,#3B0E3E,#160517);}
         .footer-sec{padding:22px 36px 28px;display:flex;justify-content:space-between;align-items:center;}
         .price-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.28em;color:rgba(212,168,83,.45);margin-bottom:4px;}
+        .price-lbl.vip{color:rgba(255,255,255,.55);}
         .price-val{font-family:'Playfair Display',serif;font-size:28px;color:#d4a853;}
+        .price-val.vip{color:#ffffff;}
         .disclaimer{font-size:10px;color:rgba(255,255,255,.25);text-align:right;line-height:1.6;max-width:200px;}
         @media print{
           body{background:#fff;padding:0;}
           .ticket{background:linear-gradient(145deg,#fdf8f0 0%,#fffbf2 100%);border:2px solid #c5963a;box-shadow:none;}
+          .ticket.vip{background:linear-gradient(145deg,#f7f1f7 0%,#ffffff 100%);border:2px solid #160517;}
+          .sheen{display:none;}
           .wm{color:rgba(180,140,60,.06);}
           .venue-name{color:#9a6f1a;}
+          .venue-name.vip{color:#160517;}
+          .price-val.vip{color:#160517;}
+          .vip-ribbon{color:#160517;background:rgba(22,5,23,.08);border-color:rgba(22,5,23,.35);box-shadow:none;}
           .event-title{color:#333;}
           .event-city{color:#888;}
           .brand,.badge{color:#b8831e;}
@@ -510,48 +559,52 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
           .field-val,.field-val-sm{color:#222;}
           .perf{border-top-color:rgba(180,140,60,.3);}
           .tear-code{color:#9a6f1a;background:#fdf8f0;}
+          .tear-code.vip{color:#160517;background:#f7f1f7;}
           .qr-frame{border-color:rgba(180,140,60,.4);}
+          .qr-frame.vip{border-color:rgba(22,5,23,.35);box-shadow:none;}
           .qr-venue{color:#6b4f0a;}
           .price-lbl{color:rgba(180,140,60,.6);}
           .price-val{color:#9a6f1a;}
           .disclaimer{color:#aaa;}
           .orn{opacity:.2;}
-          .notch{background:#fff;}
+          .notch,.notch.vip{background:#fff;}
         }
       </style></head><body>
-      <div class="ticket">
-        <div class="wm">ROYVENTO</div>
-        <svg class="orn orn-tl" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L22 2 L2 22 Z" stroke="#d4a853" stroke-width="1" fill="none"/><path d="M2 2 L10 2 L2 10 Z" fill="rgba(212,168,83,.3)"/><circle cx="30" cy="2" r="1.5" fill="#d4a853"/><circle cx="2" cy="30" r="1.5" fill="#d4a853"/></svg>
-        <svg class="orn orn-tr" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L22 2 L2 22 Z" stroke="#d4a853" stroke-width="1" fill="none"/><path d="M2 2 L10 2 L2 10 Z" fill="rgba(212,168,83,.3)"/><circle cx="30" cy="2" r="1.5" fill="#d4a853"/><circle cx="2" cy="30" r="1.5" fill="#d4a853"/></svg>
+      <div class="ticket${vipClass}">
+        ${isVipTable ? `<div class="sheen"></div>` : ""}
+        <div class="wm${vipClass}">${isVipTable ? "ROYVENTO VIP MEMBER" : "ROYVENTO"}</div>
+        <svg class="orn orn-tl" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L22 2 L2 22 Z" stroke="${isVipTable ? "rgba(255,255,255,.75)" : "#d4a853"}" stroke-width="1" fill="none"/><path d="M2 2 L10 2 L2 10 Z" fill="${isVipTable ? "rgba(255,255,255,.35)" : "rgba(212,168,83,.3)"}"/><circle cx="30" cy="2" r="1.5" fill="${isVipTable ? "rgba(255,255,255,.75)" : "#d4a853"}"/><circle cx="2" cy="30" r="1.5" fill="${isVipTable ? "rgba(255,255,255,.75)" : "#d4a853"}"/></svg>
+        <svg class="orn orn-tr" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L22 2 L2 22 Z" stroke="${isVipTable ? "rgba(255,255,255,.75)" : "#d4a853"}" stroke-width="1" fill="none"/><path d="M2 2 L10 2 L2 10 Z" fill="${isVipTable ? "rgba(255,255,255,.35)" : "rgba(212,168,83,.3)"}"/><circle cx="30" cy="2" r="1.5" fill="${isVipTable ? "rgba(255,255,255,.75)" : "#d4a853"}"/><circle cx="2" cy="30" r="1.5" fill="${isVipTable ? "rgba(255,255,255,.75)" : "#d4a853"}"/></svg>
         <div class="body-sec">
           <div class="top-bar">
-            <span class="brand">ROYVENTO</span>
-            <span class="badge">${esc(ticketCode)}</span>
+            <span class="brand${vipClass}">ROYVENTO</span>
+            <span class="badge${vipClass}">${esc(ticketCode)}</span>
           </div>
+          ${isVipTable ? `<span class="vip-ribbon">&#9670; VIP Table Booking</span>` : ""}
           <div class="hero">
             <div class="hero-info">
-              <div class="venue-name">${esc(isEventBooking ? (b.selectedPubEvent || b.eventTitle) : b.vendorName)}</div>
+              <div class="venue-name${vipClass}">${esc(isEventBooking ? (b.selectedPubEvent || b.eventTitle) : b.vendorName)}</div>
               <div class="event-title">${esc(isEventBooking ? b.vendorName : b.eventTitle)}</div>
               ${b.eventCity ? `<div class="event-city">${esc(b.eventCity)}</div>` : ""}
               <div class="fields">
-                <div><div class="field-lbl">${esc(t("bookings.guest"))}</div><div class="field-val">${esc(b.personName || b.userName)}</div></div>
-                <div><div class="field-lbl">${esc(t("bookings.date"))}</div><div class="field-val">${esc(b.bookingDate)}</div></div>
-                <div><div class="field-lbl">${esc(t("bookings.tickets"))}</div>${ticketsFieldHtml}</div>
-                <div><div class="field-lbl">${esc(t("bookings.approved_by"))}</div><div class="field-val" style="text-transform:capitalize;">${esc(b.approvedBy || t("bookings.partner"))}</div></div>
+                <div><div class="field-lbl${vipClass}">${esc(t("bookings.guest"))}</div><div class="field-val">${esc(b.personName || b.userName)}</div></div>
+                <div><div class="field-lbl${vipClass}">${esc(t("bookings.date"))}</div><div class="field-val">${esc(b.bookingDate)}</div></div>
+                <div><div class="field-lbl${vipClass}">${esc(t("bookings.tickets"))}</div>${ticketsFieldHtml}</div>
+                <div><div class="field-lbl${vipClass}">${esc(t("bookings.approved_by"))}</div><div class="field-val" style="text-transform:capitalize;">${esc(b.approvedBy || t("bookings.partner"))}</div></div>
               </div>
             </div>
             ${qrSvgHtml}
           </div>
         </div>
         <div class="divider-row">
-          <div class="notch"></div>
-          <div class="perf"><span class="tear-code">${esc(ticketCode)}</span></div>
-          <div class="notch notch-r"></div>
+          <div class="notch${vipClass}"></div>
+          <div class="perf${vipClass}"><span class="tear-code${vipClass}">${esc(ticketCode)}</span></div>
+          <div class="notch notch-r${vipClass}"></div>
         </div>
         <div class="footer-sec">
           ${hideAmountPaid ? "" : `<div>
-            <div class="price-lbl">${esc(amountLabel)}</div>
-            <div class="price-val">${esc(formatINR(totalPayable))}</div>
+            <div class="price-lbl${vipClass}">${esc(amountLabel)}</div>
+            <div class="price-val${vipClass}">${esc(formatINR(totalPayable))}</div>
           </div>`}
           <div class="disclaimer">${esc(t("bookings.present_at_entrance"))}<br/>${esc(t("bookings.non_transferable"))} &middot; Royvento</div>
         </div>
@@ -614,33 +667,42 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
       <div
         className="relative rounded-2xl overflow-hidden"
         style={{
-          background: "linear-gradient(145deg, #14090f 0%, #1e0e1a 45%, #100c18 100%)",
-          border: "1px solid rgba(212,168,83,0.35)",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,168,83,0.08) inset",
+          background: ticketBg,
+          border: ticketBorder,
+          boxShadow: ticketShadow,
         }}
       >
+        {/* VIP foil sheen — a soft diagonal highlight band for a richer plate finish */}
+        {isVipTable && (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            aria-hidden
+            style={{ background: "linear-gradient(115deg, transparent 35%, rgba(255,255,255,0.08) 48%, rgba(255,255,255,0.02) 55%, transparent 65%)" }}
+          />
+        )}
+
         {/* Watermark */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden" aria-hidden>
           <span
-            className="font-serif text-7xl sm:text-8xl tracking-[0.2em] whitespace-nowrap"
-            style={{ color: "rgba(212,168,83,0.035)", transform: "rotate(-28deg) translateY(10%)" }}
+            className={isVipTable ? "font-serif text-2xl sm:text-4xl tracking-[0.3em] whitespace-nowrap" : "font-serif text-7xl sm:text-8xl tracking-[0.2em] whitespace-nowrap"}
+            style={{ color: isVipTable ? "rgba(255,255,255,0.07)" : "rgba(212,168,83,0.035)", transform: "rotate(-28deg) translateY(10%)" }}
           >
-            ROYVENTO
+            {isVipTable ? "ROYVENTO VIP MEMBER" : "ROYVENTO"}
           </span>
         </div>
 
         {/* Corner ornaments */}
         <svg className="absolute top-3 left-3 sm:top-4 sm:left-4 w-9 h-9 sm:w-12 sm:h-12 opacity-30" aria-hidden viewBox="0 0 48 48" fill="none">
-          <path d="M2 2 L18 2 L2 18 Z" stroke="#d4a853" strokeWidth="1" fill="none"/>
-          <path d="M2 2 L8 2 L2 8 Z" fill="rgba(212,168,83,0.4)"/>
-          <circle cx="24" cy="2" r="1.2" fill="#d4a853"/>
-          <circle cx="2" cy="24" r="1.2" fill="#d4a853"/>
+          <path d="M2 2 L18 2 L2 18 Z" stroke={ornStroke} strokeWidth="1" fill="none"/>
+          <path d="M2 2 L8 2 L2 8 Z" fill={ornFill}/>
+          <circle cx="24" cy="2" r="1.2" fill={ornStroke}/>
+          <circle cx="2" cy="24" r="1.2" fill={ornStroke}/>
         </svg>
         <svg className="absolute top-3 right-3 sm:top-4 sm:right-4 w-9 h-9 sm:w-12 sm:h-12 opacity-30" aria-hidden viewBox="0 0 48 48" fill="none" style={{ transform: "scaleX(-1)" }}>
-          <path d="M2 2 L18 2 L2 18 Z" stroke="#d4a853" strokeWidth="1" fill="none"/>
-          <path d="M2 2 L8 2 L2 8 Z" fill="rgba(212,168,83,0.4)"/>
-          <circle cx="24" cy="2" r="1.2" fill="#d4a853"/>
-          <circle cx="2" cy="24" r="1.2" fill="#d4a853"/>
+          <path d="M2 2 L18 2 L2 18 Z" stroke={ornStroke} strokeWidth="1" fill="none"/>
+          <path d="M2 2 L8 2 L2 8 Z" fill={ornFill}/>
+          <circle cx="24" cy="2" r="1.2" fill={ornStroke}/>
+          <circle cx="2" cy="24" r="1.2" fill={ornStroke}/>
         </svg>
 
         {/* Top section */}
@@ -648,32 +710,63 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
 
           {/* Brand + ticket code */}
           <div className="flex justify-between items-center mb-4 sm:mb-5">
-            <span className="text-[9px] sm:text-[10px] tracking-[0.4em] sm:tracking-[0.55em] uppercase text-amber-400/55 font-medium">ROYVENTO</span>
+            <span
+              className={`text-[9px] sm:text-[10px] tracking-[0.4em] sm:tracking-[0.55em] uppercase font-medium ${isVipTable ? "text-white/60" : "text-amber-400/55"}`}
+            >
+              ROYVENTO
+            </span>
             <span
               className="text-[8px] sm:text-[10px] font-mono px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded max-w-[52%] truncate"
-              style={{
-                letterSpacing: "0.06em",
-                color: "rgba(212,168,83,0.7)",
-                background: "rgba(212,168,83,0.07)",
-                border: "1px solid rgba(212,168,83,0.2)",
-              }}
+              style={
+                isVipTable
+                  ? {
+                      letterSpacing: "0.06em",
+                      color: "rgba(255,255,255,0.8)",
+                      background: "rgba(255,255,255,0.1)",
+                      border: "1px solid rgba(255,255,255,0.3)",
+                    }
+                  : {
+                      letterSpacing: "0.06em",
+                      color: "rgba(212,168,83,0.7)",
+                      background: "rgba(212,168,83,0.07)",
+                      border: "1px solid rgba(212,168,83,0.2)",
+                    }
+              }
             >
               {ticketCode}
             </span>
           </div>
 
+          {/* VIP ribbon — only for VIP Table Booking */}
+          {isVipTable && (
+            <div className="mb-3 sm:mb-4">
+              <span
+                className="inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.18em] px-2.5 py-1 rounded-full"
+                style={{
+                  color: "#ffffff",
+                  background: "rgba(255,255,255,0.1)",
+                  border: "1px solid rgba(255,255,255,0.5)",
+                  boxShadow: "0 0 16px -4px rgba(255,255,255,0.35)",
+                }}
+              >
+                <Gem className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                VIP Table Booking
+              </span>
+            </div>
+          )}
+
           {/* Venue name + event + city — full width on all sizes */}
-          <h2 className="font-serif text-xl sm:text-2xl leading-tight" style={{ color: "#d4a853" }}>{isEventBooking ? (b.selectedPubEvent || b.eventTitle) : b.vendorName}</h2>
+          <h2 className="font-serif text-xl sm:text-2xl leading-tight" style={venueNameStyle}>{isEventBooking ? (b.selectedPubEvent || b.eventTitle) : b.vendorName}</h2>
           <p className="text-sm sm:text-base text-white/75 mt-1 font-light">{isEventBooking ? b.vendorName : b.eventTitle}</p>
           {b.eventCity && <p className="text-[11px] sm:text-xs text-white/35 mt-0.5 tracking-wide">{b.eventCity}</p>}
 
           {/* QR code — mobile only, centered below venue info */}
           <div className="flex justify-center mt-4 sm:hidden">
             <div className="flex flex-col items-center gap-2">
-              <div className="p-2 rounded-xl" style={{ background: "#fff", border: "2px solid rgba(212,168,83,0.4)" }}>
+              <div className="p-2 rounded-xl" style={qrRingStyle}>
                 <QRCodeSVG value={ticketCode} size={112} level="M" />
               </div>
-              <p className="text-[9px] font-mono tracking-wider text-center leading-tight" style={{ color: "rgba(212,168,83,0.5)", maxWidth: 120 }}>
+              <p className="text-[9px] font-mono tracking-wider text-center leading-tight" style={{ color: isVipTable ? "rgba(255,255,255,0.55)" : "rgba(212,168,83,0.5)", maxWidth: 120 }}>
                 {b.vendorName}
               </p>
             </div>
@@ -684,24 +777,30 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
             <div className="grid grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-3 sm:gap-y-4 flex-1 min-w-0">
               {isOrganizer ? (
                 <>
-                  <TicketField label={t("bookings.guest")} value={b.personName || b.userName} />
-                  <TicketField label="Booking ID" value={`#${b.id}`} />
-                  <TicketField label={t("bookings.date")} value={`${b.bookingDate}${b.eventStartTime ? ` · ${b.eventStartTime}` : ""}`} />
-                  <TicketField label="Ticket type" value={`${b.ticketType || "Ticket"}${b.guests > 1 ? ` ×${b.guests}` : ""}`} />
-                  {b.venueName && <TicketField label="Venue" value={b.venueName} />}
-                  {b.venueAddress && <TicketField label="Address" value={b.venueAddress} />}
+                  <TicketField vip={isVipTable} label={t("bookings.guest")} value={b.personName || b.userName} />
+                  <TicketField vip={isVipTable} label="Booking ID" value={`#${b.id}`} />
+                  <TicketField vip={isVipTable} label={t("bookings.date")} value={`${b.bookingDate}${b.eventStartTime ? ` · ${b.eventStartTime}` : ""}`} />
+                  <TicketField vip={isVipTable} label="Ticket type" value={`${b.ticketType || "Ticket"}${b.guests > 1 ? ` ×${b.guests}` : ""}`} />
+                  {b.venueName && <TicketField vip={isVipTable} label="Venue" value={b.venueName} />}
+                  {b.venueAddress && <TicketField vip={isVipTable} label="Address" value={b.venueAddress} />}
                 </>
               ) : (
                 <>
-                  <TicketField label={t("bookings.guest")} value={b.personName || b.userName} />
-                  <TicketField label={t("bookings.date")} value={b.bookingDate} />
+                  <TicketField vip={isVipTable} label={t("bookings.guest")} value={b.personName || b.userName} />
+                  <TicketField vip={isVipTable} label={t("bookings.date")} value={b.bookingDate} />
                   <TicketField
-                    label={isCoverCharge ? "Package" : t("bookings.tickets")}
+                    vip={isVipTable}
+                    label={isCoverCharge ? "Package" : isVipTable ? "VIP Package" : t("bookings.tickets")}
                     value={
                       isCoverCharge ? (
                         <>
                           {b.selectedPubEvent || "Cover charge"}
                           <span className="text-white/35 ml-1 text-xs">(× {total})</span>
+                        </>
+                      ) : isVipTable ? (
+                        <>
+                          {b.selectedPubEvent || "VIP table package"}
+                          <span className="text-white/35 ml-1 text-xs">({total} {t("bookings.guests")})</span>
                         </>
                       ) : isEventBooking ? (
                         `${total} ticket${total !== 1 ? "s" : ""}`
@@ -713,17 +812,17 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
                       ) : `${total} ${t("bookings.guests")}`
                     }
                   />
-                  <TicketField label={t("bookings.approved_by")} value={<span className="capitalize">{b.approvedBy || t("bookings.partner")}</span>} />
+                  <TicketField vip={isVipTable} label={t("bookings.approved_by")} value={<span className="capitalize">{b.approvedBy || t("bookings.partner")}</span>} />
                 </>
               )}
             </div>
 
             {/* QR — desktop only */}
             <div className="hidden sm:flex flex-col items-center gap-2 shrink-0">
-              <div className="p-2.5 rounded-xl" style={{ background: "#fff", border: "2px solid rgba(212,168,83,0.4)" }}>
+              <div className="p-2.5 rounded-xl" style={qrRingStyle}>
                 <QRCodeSVG value={ticketCode} size={120} level="M" />
               </div>
-              <p className="text-[9px] font-mono tracking-wider text-center max-w-[132px] leading-tight" style={{ color: "rgba(212,168,83,0.5)" }}>
+              <p className="text-[9px] font-mono tracking-wider text-center max-w-[132px] leading-tight" style={{ color: isVipTable ? "rgba(255,255,255,0.55)" : "rgba(212,168,83,0.5)" }}>
                 {b.vendorName}
               </p>
             </div>
@@ -733,13 +832,13 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
         {/* Perforated tear line */}
         <div className="relative z-10 flex items-center">
           <div className="w-4 sm:w-5 h-8 sm:h-10 rounded-r-full shrink-0" style={{ background: "rgba(0,0,0,0.55)" }} />
-          <div className="relative flex-1 flex items-center justify-center overflow-hidden" style={{ borderTop: "2px dashed rgba(212,168,83,0.22)", height: "2rem" }}>
+          <div className="relative flex-1 flex items-center justify-center overflow-hidden" style={{ borderTop: isVipTable ? "2px dashed rgba(255,255,255,0.35)" : "2px dashed rgba(212,168,83,0.3)", height: "2rem" }}>
             <span
               className="absolute font-mono text-[10px] sm:text-base px-2 sm:px-4 py-0.5 whitespace-nowrap"
               style={{
                 letterSpacing: "0.15em",
-                color: "#d4a853",
-                background: "linear-gradient(145deg, #14090f, #1e0e1a)",
+                color: isVipTable ? "#ffffff" : "#d4a853",
+                background: ticketBg,
               }}
             >
               {ticketCode}
@@ -752,12 +851,18 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
         <div className="relative z-10 flex justify-between items-center px-4 sm:px-7 py-4 sm:py-5 gap-3">
           {hideAmountPaid ? <div /> : (
             <div>
-              <p className="text-[9px] uppercase tracking-[0.28em] mb-1" style={{ color: "rgba(212,168,83,0.45)" }}>{amountLabel}</p>
-              <p className="font-serif text-xl sm:text-2xl" style={{ color: "#d4a853" }}>{formatINR(totalPayable)}</p>
+              <p className="text-[9px] uppercase tracking-[0.28em] mb-1" style={{ color: isVipTable ? "rgba(255,255,255,0.55)" : "rgba(212,168,83,0.45)" }}>{amountLabel}</p>
+              <p
+                className="font-serif text-xl sm:text-2xl"
+                style={isVipTable ? { color: "#ffffff", filter: "drop-shadow(0 0 10px rgba(255,255,255,0.3))" } : { color: "#d4a853" }}
+              >
+                {formatINR(totalPayable)}
+              </p>
             </div>
           )}
-          <p className="text-[9px] text-right leading-relaxed" style={{ color: "rgba(255,255,255,0.25)", maxWidth: 140 }}>
-            Present this ticket at the entrance.<br />Non-transferable · Royvento
+          <p className="text-[9px] text-right leading-relaxed flex items-center justify-end gap-1" style={{ color: "rgba(255,255,255,0.25)", maxWidth: 150 }}>
+            {isVipTable && <Gem className="h-2.5 w-2.5 shrink-0" style={{ color: "rgba(255,255,255,0.5)" }} />}
+            <span>Present this ticket at the entrance.<br />Non-transferable · Royvento</span>
           </p>
         </div>
       </div>

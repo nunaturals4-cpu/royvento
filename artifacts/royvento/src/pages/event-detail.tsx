@@ -31,7 +31,7 @@ import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet,
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { SquareImage } from "@/components/SquareImage";
 import { FollowButton } from "@/components/FollowButton";
-import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket, Check, Crown, ShieldCheck, Headphones, Zap, Share2, Megaphone, HelpCircle, FileText } from "lucide-react";
+import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket, Check, Crown, ShieldCheck, Headphones, Zap, Share2, Megaphone, HelpCircle, FileText, Gem } from "lucide-react";
 
 /* Standard Terms & Conditions shown on every pub profile by default. */
 const DEFAULT_PUB_TERMS: string[] = [
@@ -261,12 +261,13 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
 
   // Pub-specific state
   const isPub = (event as any)?.type === "pub";
-  const [pubMode, setPubMode] = useState<"ticket" | "event" | "event_booking" | "cover_charge">("ticket");
+  const [pubMode, setPubMode] = useState<"ticket" | "event" | "event_booking" | "cover_charge" | "vip_table">("ticket");
   const [ticketWomen, setTicketWomen] = useState(0);
   const [ticketMen, setTicketMen] = useState(0);
   const [ticketCouple, setTicketCouple] = useState(0);
   const [coverChargePlanId, setCoverChargePlanId] = useState("");
   const [coverChargeQty, setCoverChargeQty] = useState(1);
+  const [vipPackageId, setVipPackageId] = useState("");
   const [occasion, setOccasion] = useState("");
   const [arrivalTime, setArrivalTime] = useState("");
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState("");
@@ -302,7 +303,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   };
   // Switch booking type and clear any data entered for the previous type so
   // stale ticket counts / guests / occasion / event selection don't carry over.
-  const changePubMode = (v: "ticket" | "event" | "event_booking" | "cover_charge") => {
+  const changePubMode = (v: "ticket" | "event" | "event_booking" | "cover_charge" | "vip_table") => {
     if (v === pubMode) return;
     setPubMode(v);
     setTicketWomen(0);
@@ -310,6 +311,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     setTicketCouple(0);
     setCoverChargePlanId("");
     setCoverChargeQty(1);
+    setVipPackageId("");
     setGuests(1);
     setOccasion("");
     setArrivalTime("");
@@ -603,6 +605,13 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     if (plan && !planAppliesOnDate(plan, date)) setCoverChargePlanId("");
   }, [date, coverChargePlanId, drinkPlans]);
 
+  // Same drop-on-date-change behaviour for the selected VIP table package.
+  useEffect(() => {
+    if (!vipPackageId) return;
+    const plan = (drinkPlans as any[]).find((p) => String(p.id) === vipPackageId);
+    if (plan && !planAppliesOnDate(plan, date)) setVipPackageId("");
+  }, [date, vipPackageId, drinkPlans]);
+
   if (isLoading) return <div className="container mx-auto px-4 py-20">Loading…</div>;
   if (!event) return <div className="container mx-auto px-4 py-20">{t("events.not_found")}</div>;
 
@@ -631,6 +640,13 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   // valid range). Empty when nothing is available that day.
   const coverChargePlansForDate = coverChargePlans.filter((p) => planAppliesOnDate(p, date));
   const selectedCoverChargePlan = coverChargePlans.find((p) => String(p.id) === coverChargePlanId);
+
+  // VIP table packages: partner-created drink plans of type "vip_table". Same
+  // shape/rules as Cover Charges, but shown only under VIP Table Booking mode.
+  const vipTablePlans = (drinkPlans as any[]).filter((p) => p.type === "vip_table");
+  const hasVipTablePackages = vipTablePlans.length > 0;
+  const vipTablePlansForDate = vipTablePlans.filter((p) => planAppliesOnDate(p, date));
+  const selectedVipTablePlan = vipTablePlans.find((p) => String(p.id) === vipPackageId);
 
   const formatHour = (t: string): string => {
     const [h, m] = t.split(":").map(Number);
@@ -793,6 +809,10 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     subtotal = eventBookingPerPerson * Math.max(1, guests);
   } else if (isPub && pubMode === "cover_charge") {
     subtotal = (Number(selectedCoverChargePlan?.price ?? 0) / 100) * Math.max(1, coverChargeQty);
+  } else if (isPub && pubMode === "vip_table") {
+    // Flat package price — NOT multiplied by guests. Guests stays the party
+    // size / commission-headcount field, priced independently of the package.
+    subtotal = Number(selectedVipTablePlan?.price ?? 0) / 100;
   } else if (isPub && ferAllGendersFree) {
     subtotal = 0;
   } else {
@@ -801,10 +821,18 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   // Booking-level "fully free" gate. Used to hide coupon/points/payment/totals
   // when the user's selection has subtotal ₹0 due to per-gender free-entry
   // rules (or the legacy whole-day-free case).
+  //
+  // isFreeEntryDay's "ticket tiers are all ₹0" fallback is a ticket-mode-only
+  // signal (priceWomen/Men/Couple are irrelevant to table/cover-charge/VIP
+  // pricing) — using it for every mode meant a venue with no ticket tiers
+  // configured showed Table/Cover Charge/VIP Table bookings as "Free" even
+  // when a priced package was selected. Non-ticket modes go off their own
+  // computed subtotal instead.
   const _ticketsCount = ticketWomen + ticketMen + ticketCouple;
   const bookingIsFullyFree = isPub && (
     (pubMode === "event_booking" && (!!selectedAnnouncement || !!selectedHostedEventId) && subtotal === 0) ||
-    (pubMode !== "event_booking" && isFreeEntryDay) ||
+    (pubMode === "ticket" && isFreeEntryDay) ||
+    ((pubMode === "event" || pubMode === "cover_charge" || pubMode === "vip_table") && subtotal === 0) ||
     (ferDayActive && pubMode === "ticket" && _ticketsCount > 0 && subtotal === 0)
   );
 
@@ -817,9 +845,11 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       ? "ticket"
       : pubMode === "cover_charge"
         ? "cover_charge"
-        : pubMode === "event_booking"
-          ? "event_booking"
-          : "event";
+        : pubMode === "vip_table"
+          ? "vip_table"
+          : pubMode === "event_booking"
+            ? "event_booking"
+            : "event";
   // A coupon applies to this booking only when its target matches (or is "both",
   // or it's a user-granted coupon with no target). Keeps the on-screen total and
   // the server in agreement so a code never shows "applied" on a bill it can't
@@ -926,9 +956,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) {
       errs.ticketWomen = t("events.add_tickets");
     }
-    if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && !arrivalTime) {
+    if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge" || pubMode === "vip_table") && !arrivalTime) {
       errs.arrivalTime = t("events.required_field");
-    } else if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && arrivalTime && date) {
+    } else if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge" || pubMode === "vip_table") && arrivalTime && date) {
       if (date === todayIst()) {
         const now = new Date();
         const [h, m] = arrivalTime.split(":").map(Number);
@@ -940,7 +970,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     if (isPub && !personName.trim()) errs.personName = t("events.required_field");
     if (isPub && !phone.trim()) errs.phone = t("events.required_field");
     else if (isPub && !/^\d{10}$/.test(phone.replace(/\D/g, ""))) errs.phone = t("events.phone_validation");
-    if (isPub && pubMode === "event") {
+    if (isPub && (pubMode === "event" || pubMode === "vip_table")) {
       if (!eventType) errs.eventType = t("events.required_field");
       if (!budget) errs.budget = t("events.required_field");
     }
@@ -949,6 +979,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     }
     if (isPub && pubMode === "cover_charge" && !coverChargePlanId) {
       errs.coverChargePlanId = "Please select a cover charge package";
+    }
+    if (isPub && pubMode === "vip_table" && !vipPackageId) {
+      errs.vipPackageId = "Please select a VIP table package";
     }
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) {
@@ -1028,8 +1061,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               selectedPubEvent: selectedAnnouncement?.title ?? "",
               announcementId: pubMode === "event_booking" && selectedAnnouncementId ? Number(selectedAnnouncementId) : undefined,
               coverChargePlanId: pubMode === "cover_charge" && coverChargePlanId ? Number(coverChargePlanId) : undefined,
-              notes: pubMode === "event" ? occasion : notes,
-              arrivalTime: isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") ? arrivalTime : undefined,
+              vipPackageId: pubMode === "vip_table" && vipPackageId ? Number(vipPackageId) : undefined,
+              notes: (pubMode === "event" || pubMode === "vip_table") ? occasion : notes,
+              arrivalTime: isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge" || pubMode === "vip_table") ? arrivalTime : undefined,
             }
           : {}),
       });
@@ -1116,8 +1150,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) errs.ticketWomen = t("events.add_tickets");
       if (isPub && pubMode === "event_booking" && !selectedAnnouncementId && !selectedHostedEventId) errs.selectedPubEvent = "Please select an event to book";
       if (isPub && pubMode === "cover_charge" && !coverChargePlanId) errs.coverChargePlanId = "Please select a cover charge package";
-      if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && !arrivalTime) errs.arrivalTime = t("events.required_field");
-      else if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && arrivalTime && date) {
+      if (isPub && pubMode === "vip_table" && !vipPackageId) errs.vipPackageId = "Please select a VIP table package";
+      if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge" || pubMode === "vip_table") && !arrivalTime) errs.arrivalTime = t("events.required_field");
+      else if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge" || pubMode === "vip_table") && arrivalTime && date) {
         if (date === todayIst()) {
           const now = new Date();
           const [h, m] = arrivalTime.split(":").map(Number);
@@ -1136,7 +1171,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       if (isPub && !personName.trim()) errs.personName = t("events.required_field");
       if (isPub && !phone.trim()) errs.phone = t("events.required_field");
       else if (isPub && !/^\d{10}$/.test(phone.replace(/\D/g, ""))) errs.phone = t("events.phone_validation");
-      if (isPub && pubMode === "event") {
+      if (isPub && (pubMode === "event" || pubMode === "vip_table")) {
         if (!eventType) errs.eventType = t("events.required_field");
         if (!budget) errs.budget = t("events.required_field");
       }
@@ -2095,7 +2130,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               const freePlans = drinkPlans.filter((p: any) => p.type === "welcome" || p.type === "unlimited");
               const ticketPlans = drinkPlans.filter((p: any) => p.type === "ticket");
               const coverChargePlans = drinkPlans.filter((p: any) => p.type === "cover_charge");
-              const otherPlans = drinkPlans.filter((p: any) => !["welcome", "unlimited", "ticket", "cover_charge"].includes(p.type));
+              const vipTableDisplayPlans = drinkPlans.filter((p: any) => p.type === "vip_table");
+              const otherPlans = drinkPlans.filter((p: any) => !["welcome", "unlimited", "ticket", "cover_charge", "vip_table"].includes(p.type));
               const coverFallback = event.imageUrl || vendorCover || ev.vendor?.bannerImage || null;
 
               // Premium VIP offer card — the single standard offer-card design,
@@ -2126,6 +2162,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                   <Section icon={Wine} label="Free Drinks" plans={freePlans} theme={OFFER_THEMES.free} />
                   <Section icon={Ticket} label="Included With Ticket" plans={ticketPlans} theme={OFFER_THEMES.ticket} />
                   <Section icon={Coins} label="Cover Charges" plans={coverChargePlans} theme={OFFER_THEMES.cover} />
+                  <Section icon={Gem} label="VIP Table Booking" plans={vipTableDisplayPlans} theme={OFFER_THEMES.vipTable} />
                   <Section icon={Wine} label="Drink Deals" plans={otherPlans} theme={OFFER_THEMES.drink} />
                 </div>
               );
@@ -2423,7 +2460,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       {[
                         ...(hasCoverCharges ? [{ value: "cover_charge", label: "Cover Charges", desc: "Pre-paid entry packages", icon: Ticket, badge: null }] : []),
                         { value: "ticket", label: "Ticket Booking", desc: "Entry tickets for the night", icon: Ticket, badge: null },
-                        { value: "event", label: (event as any)?.vendorCategory === "Club" ? "VIP Table" : "Table Booking", desc: (event as any)?.vendorCategory === "Club" ? "Premium tables & bottle service" : "Reserve a table for your group", icon: Crown, badge: (event as any)?.freeEntryForTable ? "Free Entry" : null },
+                        { value: "event", label: "Table Booking", desc: "Reserve a table for your group", icon: Crown, badge: (event as any)?.freeEntryForTable ? "Free Entry" : null },
+                        ...(hasVipTablePackages ? [{ value: "vip_table", label: "VIP Table Booking", desc: "Premium tables & bottle-service packages", icon: Gem, badge: null }] : []),
                         ...((sortedAnnouncements.length > 0 || hostedEvents.length > 0) ? [{ value: "event_booking", label: "Event Ticket", desc: "Special events & parties", icon: CalIcon, badge: null }] : []),
                       ].map((opt: any) => {
                         const active = pubMode === opt.value;
@@ -2514,7 +2552,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                         </div>
                       );
                     })()}
-                    {pubMode === "event" && (
+                    {(pubMode === "event" || pubMode === "vip_table") && (
                       <div className="grid sm:grid-cols-2 gap-3 mt-2">
                         <div>
                           <Label htmlFor="occasion" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.occasion_label")}</Label>
@@ -2651,6 +2689,122 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                                   </p>
                                 </div>
                                 <span className="font-bold text-base text-foreground shrink-0">{formatINR((Number(selectedCoverChargePlan.price) / 100) * Math.max(1, coverChargeQty))}</span>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                    {pubMode === "vip_table" && (
+                      <div className="space-y-3 mt-2">
+                        <div>
+                          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Select VIP Package <span className="text-primary normal-case">*</span></p>
+                          {vipTablePlansForDate.length === 0 ? (
+                            <div className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-5 text-center">
+                              <CalIcon className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
+                              <p className="text-sm text-muted-foreground">No VIP table packages available on this date.</p>
+                              <p className="text-xs text-muted-foreground/70 mt-1">Try another day to see available packages.</p>
+                            </div>
+                          ) : (
+                          <div className="grid grid-cols-1 gap-2">
+                            {vipTablePlansForDate.map((p: any) => {
+                              const active = String(p.id) === vipPackageId;
+                              const offers = (p.lineItems ?? []).filter((it: any) => it.name);
+                              const sv = coverSavings(p);
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => setVipPackageId(String(p.id))}
+                                  aria-pressed={active}
+                                  className={`group relative w-full text-left rounded-2xl border p-4 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
+                                    active
+                                      ? "border-primary/60 bg-gradient-to-br from-primary/[0.14] via-primary/[0.06] to-transparent ring-1 ring-primary/40 shadow-[0_10px_40px_-16px_hsl(var(--primary))]"
+                                      : "border-white/10 bg-white/[0.02] hover:border-white/25 hover:bg-white/[0.045]"
+                                  }`}
+                                >
+                                  {active && (
+                                    <span className="absolute -top-2.5 -right-2.5 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg ring-2 ring-background">
+                                      <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                                    </span>
+                                  )}
+                                  <div className="flex items-start gap-3.5">
+                                    <span className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 transition-all ${active ? "bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-md shadow-primary/20" : "bg-white/[0.05] border border-white/10 text-primary group-hover:border-primary/30"}`}>
+                                      <Gem className="h-5 w-5" />
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <p className="font-bold text-sm text-foreground tracking-wide truncate flex items-center gap-1.5">
+                                            {p.productName || "Package"}
+                                            {p.gender === "female" && <span className="rounded-full bg-pink-500/10 border border-pink-500/30 px-1.5 py-0.5 text-[9px] font-semibold text-pink-400 uppercase tracking-wide shrink-0">Girls only</span>}
+                                            {p.gender === "male" && <span className="rounded-full bg-blue-500/10 border border-blue-500/30 px-1.5 py-0.5 text-[9px] font-semibold text-blue-400 uppercase tracking-wide shrink-0">Men only</span>}
+                                          </p>
+                                          {(p.peoplePerPackage ?? 0) > 0 && (
+                                            <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1.5">
+                                              <Users className="h-3 w-3 shrink-0 text-primary/90" />
+                                              {p.peoplePerPackage === 1 ? "For 1 person" : `For ${p.peoplePerPackage} people`}
+                                            </p>
+                                          )}
+                                          {offers.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5 mt-2">
+                                              {offers.slice(0, 4).map((it: any, i: number) => (
+                                                <span key={i} className="inline-flex items-center gap-1 rounded-lg bg-white/[0.07] border border-white/[0.14] px-2 py-1 text-[11px] font-medium text-white/90">
+                                                  <Check className="h-2.5 w-2.5 text-primary shrink-0" strokeWidth={3} />{it.name}
+                                                </span>
+                                              ))}
+                                              {offers.length > 4 && <span className="text-[11px] text-muted-foreground self-center">+{offers.length - 4} more</span>}
+                                            </div>
+                                          )}
+                                          <p className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground/70">
+                                            <Clock className="h-2.5 w-2.5 shrink-0" />{fmtPlanWhen(p)}
+                                          </p>
+                                        </div>
+                                        <div className="shrink-0 text-right">
+                                          {sv.savings > 0 && (
+                                            <p className="text-sm text-muted-foreground line-through tabular-nums leading-none mb-1">{formatINR(sv.realCost)}</p>
+                                          )}
+                                          <p className="font-bold text-lg text-foreground leading-none tabular-nums">{formatINR(Number(p.price) / 100)}</p>
+                                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mt-1">per package</p>
+                                          {sv.savings > 0 && (
+                                            <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-[11px] font-bold text-emerald-300">
+                                              <Sparkle className="h-3 w-3 shrink-0" /> Save {formatINR(sv.savings)}{sv.pct > 0 ? ` · ${sv.pct}% off` : ""}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          )}
+                          {fieldErrors.vipPackageId && <p className="text-xs text-destructive mt-1.5">{fieldErrors.vipPackageId}</p>}
+                        </div>
+                        {selectedVipTablePlan && (() => {
+                          const sv = coverSavings(selectedVipTablePlan);
+                          return (
+                            <>
+                              {sv.savings > 0 && (
+                                <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2.5 flex items-center justify-between gap-4">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-bold text-emerald-300 flex items-center gap-1.5">
+                                      <Sparkle className="h-3.5 w-3.5 shrink-0" /> You save {formatINR(sv.savings)}
+                                    </p>
+                                    <p className="text-[11px] text-white/60 mt-0.5 truncate">
+                                      vs. {formatINR(sv.realCost)} buying these offers separately
+                                    </p>
+                                  </div>
+                                  <span className="text-xl font-bold text-emerald-300 tabular-nums shrink-0">{sv.pct}%</span>
+                                </div>
+                              )}
+                              <div className="rounded-xl border border-primary/25 bg-primary/8 px-3 py-2.5 flex items-center justify-between gap-4">
+                                <div className="min-w-0">
+                                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total</p>
+                                  <p className="text-xs text-white/60 mt-0.5 truncate">Flat package price</p>
+                                </div>
+                                <span className="font-bold text-base text-foreground shrink-0">{formatINR(Number(selectedVipTablePlan.price) / 100)}</span>
                               </div>
                             </>
                           );
@@ -2839,7 +2993,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                 </div>
 
                 {/* ── Section 3: Arrival Time (time-picker widget) ── */}
-                {isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && (
+                {isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge" || pubMode === "vip_table") && (
                   <div className="rounded-2xl glass-card p-5 sm:p-6 space-y-3">
                     <div className="flex items-center gap-2.5 mb-1">
                       <span className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
@@ -2932,7 +3086,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                           {couponState?.valid && (couponMatchesMode ? (
                             <p className="text-xs text-emerald-400 mt-1.5">✓ {couponState.isVendorCoupon ? (couponState.discountType === "fixed" ? `₹${couponState.discountValue} off` : `${couponState.discountValue}% off`) : t("events.coupon_pct_off", { pct: couponState.discountPercent })}{couponDiscount > 0 ? ` — you save ${formatINRExact(couponDiscount)}` : ""}</p>
                           ) : (
-                            <p className="text-xs text-amber-400 mt-1.5">This coupon is valid for {couponState.applicableTo === "ticket" ? "ticket" : couponState.applicableTo === "cover_charge" ? "cover charge" : couponState.applicableTo === "event_booking" ? "event" : "table"} bookings only — switch booking type to use it.</p>
+                            <p className="text-xs text-amber-400 mt-1.5">This coupon is valid for {couponState.applicableTo === "ticket" ? "ticket" : couponState.applicableTo === "cover_charge" ? "cover charge" : couponState.applicableTo === "event_booking" ? "event" : couponState.applicableTo === "vip_table" ? "VIP table" : "table"} bookings only — switch booking type to use it.</p>
                           ))}
                           {myCoupons.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{myCoupons.slice(0, 3).map((c) => <button key={c.id} type="button" onClick={() => validateCoupon(c.code)} className={`text-[10px] px-2.5 py-1 rounded-lg border transition-colors ${couponState?.code === c.code ? "bg-primary/30 border-primary text-primary" : "bg-primary/15 border-primary/30 text-primary hover:bg-primary/25"}`}>{c.code} — {c.discountPercent}%</button>)}</div>}
                           {vendorCoupons.length > 0 && <div className="mt-2"><p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Available offers{vendorFollowing ? " · unlocked by following" : ""}</p><div className="flex flex-wrap gap-1.5">{vendorCoupons.map((vc) => { const applied = couponState?.code === vc.code; return <button key={vc.id} type="button" onClick={() => validateCoupon(vc.code)} title={vc.audience === "followers" ? "Follower-exclusive offer" : undefined} className={`text-[10px] px-2.5 py-1 rounded-lg border transition-colors font-mono ${applied ? "bg-emerald-500/30 border-emerald-400 text-emerald-200" : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25"}`}>{applied ? "✓ " : ""}{vc.audience === "followers" ? "★ " : ""}{vc.code} — {vc.discountType === "fixed" ? `₹${Number(vc.discountValue)}` : `${Number(vc.discountValue)}%`} off</button>; })}</div></div>}
@@ -3031,13 +3185,13 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                   <dl className="text-sm divide-y divide-white/8">
                     <div className="flex items-center justify-between gap-4 py-2.5">
                       <dt className="text-muted-foreground">Booking Type</dt>
-                      <dd className="font-medium text-right">{!isPub ? "Event Booking" : pubMode === "ticket" ? t("events.buy_tickets") : pubMode === "event" ? ((event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking")) : pubMode === "cover_charge" ? "Cover Charges" : "Events Booking"}</dd>
+                      <dd className="font-medium text-right">{!isPub ? "Event Booking" : pubMode === "ticket" ? t("events.buy_tickets") : pubMode === "event" ? t("events.table_booking") : pubMode === "cover_charge" ? "Cover Charges" : pubMode === "vip_table" ? "VIP Table Booking" : "Events Booking"}</dd>
                     </div>
                     <div className="flex items-center justify-between gap-4 py-2.5">
                       <dt className="text-muted-foreground">Date</dt>
                       <dd className="font-medium text-right">{date ? new Date(date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—"}</dd>
                     </div>
-                    {isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge") && arrivalTime && (
+                    {isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "cover_charge" || pubMode === "vip_table") && arrivalTime && (
                       <div className="flex items-center justify-between gap-4 py-2.5">
                         <dt className="text-muted-foreground">{t("events.arrival_time")}</dt>
                         <dd className="font-medium text-right">{arrivalTime}</dd>
@@ -3139,7 +3293,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       <Ticket className="h-4 w-4 text-primary shrink-0" />
                       <div className="min-w-0">
                         <p className="text-[11px] text-muted-foreground leading-tight">Booking Type</p>
-                        <p className="font-medium leading-tight truncate">{!isPub ? "Event Booking" : pubMode === "ticket" ? t("events.buy_tickets") : pubMode === "event" ? ((event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking")) : pubMode === "cover_charge" ? "Cover Charges" : "Events Booking"}</p>
+                        <p className="font-medium leading-tight truncate">{!isPub ? "Event Booking" : pubMode === "ticket" ? t("events.buy_tickets") : pubMode === "event" ? t("events.table_booking") : pubMode === "cover_charge" ? "Cover Charges" : pubMode === "vip_table" ? "VIP Table Booking" : "Events Booking"}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -3149,7 +3303,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                         <p className="font-medium leading-tight truncate">{date ? new Date(date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
                       </div>
                     </div>
-                    {isPub && (pubMode === "ticket" || pubMode === "event") && (
+                    {isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "vip_table") && (
                       <div className="flex items-center gap-3">
                         <Clock className="h-4 w-4 text-primary shrink-0" />
                         <div className="min-w-0">

@@ -428,6 +428,7 @@ router.get("/happening-tonight", async (req, res) => {
       if (type === "unlimited") return productName || "Free Unlimited Drinks";
       if (type === "ticket") return "Included with Ticket";
       if (type === "cover_charge") return productName || "Cover Charge";
+      if (type === "vip_table") return productName || "VIP Table Booking";
       return productName || "Drinks Deal";
     };
     for (const r of planRows) {

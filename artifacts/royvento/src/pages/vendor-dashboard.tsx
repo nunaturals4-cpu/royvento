@@ -537,7 +537,7 @@ export function VendorDashboard() {
               )}
               {isApprovedAndListed && <>
                 <TabsContent value="bookings" className="mt-0"><BookingReport bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} /></TabsContent>
-                <TabsContent value="analytics" className="mt-0"><AnalyticsPanel vendorCategory={vendor?.category ?? ""} /></TabsContent>
+                <TabsContent value="analytics" className="mt-0"><AnalyticsPanel /></TabsContent>
                 {!isOrganiserCategory(vendor?.category ?? "") && (
                   <TabsContent value="calendar" className="mt-0"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
                 )}
@@ -3046,7 +3046,7 @@ export function BookingReport({ bookTablePage, setBookTablePage, adminVendorId }
                         <td className="py-2.5 pr-3 text-muted-foreground text-xs tabular-nums">{(b as any).phone || "—"}</td>
                         <td className="py-2.5 pr-3 text-muted-foreground text-xs max-w-[140px] truncate" title={(b as any).bookingLocation || ""}>{(b as any).bookingLocation || "—"}</td>
                         <td className="py-2.5 pr-3 text-muted-foreground max-w-[120px] truncate">{b.eventTitle || "—"}</td>
-                        <td className="py-2.5 pr-3 capitalize text-muted-foreground">{b.pubMode === "event" ? "Table" : b.pubMode === "ticket" ? "Ticket" : "—"}</td>
+                        <td className="py-2.5 pr-3 capitalize text-muted-foreground">{b.pubMode === "event" ? "Table" : b.pubMode === "vip_table" ? "VIP Table" : b.pubMode === "ticket" ? "Ticket" : "—"}</td>
                         <td className="py-2.5 pr-3">
                           {b.checkedInAt
                             ? <span className="text-primary font-medium tabular-nums">{new Date(b.checkedInAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
@@ -4203,11 +4203,14 @@ interface AnalyticsData {
     freeEntryRate: string;
     ticketRate: string;
     tableBookingRate: string;
+    vipTableBookingRate: string;
   };
   commissionSummary: {
     freeEntry: AnalyticsTypeSummary;
     ticket: AnalyticsTypeSummary;
     table: AnalyticsTypeSummary;
+    coverCharge: AnalyticsTypeSummary;
+    vipTable: AnalyticsTypeSummary;
   };
   perEvent: {
     eventId: number;
@@ -4231,7 +4234,7 @@ function toAnalyticsDateStr(d: Date) {
   return _istFmt.format(d);
 }
 
-export function AnalyticsPanel({ vendorCategory = "", adminVendorId }: { vendorCategory?: string; adminVendorId?: number }) {
+export function AnalyticsPanel({ adminVendorId }: { adminVendorId?: number }) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -4332,11 +4335,11 @@ export function AnalyticsPanel({ vendorCategory = "", adminVendorId }: { vendorC
 
   // Donut data — booking type mix
   const cs = data.commissionSummary;
-  const tableLabel = vendorCategory === "Club" ? "VIP Table" : "Table";
   const typeMix = [
-    { key: "freeEntry", name: "Free Entry", value: cs.freeEntry.grossRevenue, color: "#22d3ee" },
-    { key: "ticket",    name: "Ticket",     value: cs.ticket.grossRevenue,    color: "hsl(var(--primary))" },
-    { key: "table",     name: tableLabel,   value: cs.table.grossRevenue,     color: "#f59e0b" },
+    { key: "freeEntry", name: "Free Entry",          value: cs.freeEntry.grossRevenue,          color: "#22d3ee" },
+    { key: "ticket",    name: "Ticket",               value: cs.ticket.grossRevenue,              color: "hsl(var(--primary))" },
+    { key: "table",     name: "Table Booking",        value: cs.table.grossRevenue,               color: "#f59e0b" },
+    { key: "vipTable",  name: "VIP Table Booking",    value: cs.vipTable.grossRevenue,             color: "#a855f7" },
   ].filter((t) => t.value > 0);
   const typeMixTotal = typeMix.reduce((s, t) => s + t.value, 0);
 
@@ -4690,7 +4693,9 @@ export function AnalyticsPanel({ vendorCategory = "", adminVendorId }: { vendorC
             const types: { key: keyof typeof cs; label: string }[] = [
               { key: "freeEntry", label: "Free Entry" },
               { key: "ticket", label: "Ticket" },
-              { key: "table", label: vendorCategory === "Club" ? "VIP Table Booking" : "Table Booking" },
+              { key: "table", label: "Table Booking" },
+              { key: "vipTable", label: "VIP Table Booking" },
+              { key: "coverCharge", label: "Cover Charge" },
             ];
             const active = types.filter((t) => cs[t.key].count > 0);
             if (active.length === 0) return null;
@@ -5173,7 +5178,7 @@ function LeadBookingTable({ bookings }: { bookings: any[] }) {
                   const hidePaid = Number(paid) === 0 || isFreeEntry;
                   const original = b.discountAmount > 0 ? b.totalPrice : null;
                   const payLabel = b.paymentMethod === "cod" ? "COD" : b.paymentMethod === "online" ? "Online" : (b.paymentMethod ?? "—");
-                  const mode = b.pubMode === "ticket" ? "Ticket" : b.pubMode === "event" ? "Table / Event" : (b.pubMode ?? "—");
+                  const mode = b.pubMode === "ticket" ? "Ticket" : b.pubMode === "event" ? "Table / Event" : b.pubMode === "vip_table" ? "VIP Table Booking" : (b.pubMode ?? "—");
                   return (
                     <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                       <td className="py-2.5 pr-3 text-muted-foreground tabular-nums">#{b.id}</td>
@@ -5775,6 +5780,7 @@ const PLAN_TYPE_BADGE: Record<string, string> = {
   ticket: "Included with Ticket",
   custom: "Custom Package",
   cover_charge: "Cover Charge",
+  vip_table: "VIP Table Booking",
 };
 
 // Wire/display shape — line items as they come back from the API and are
@@ -5945,7 +5951,7 @@ function CoverSavingsSummary({ items, packageRupees }: { items: DrinkPlanLineIte
 // ─── Coupons Panel ────────────────────────────────────────────────────────────
 
 type CouponAudience = "all" | "followers" | "non_followers";
-type CouponApplicableTo = "ticket" | "event" | "event_booking" | "cover_charge" | "both";
+type CouponApplicableTo = "ticket" | "event" | "event_booking" | "cover_charge" | "vip_table" | "both";
 
 interface VendorCoupon {
   id: number;
@@ -5964,7 +5970,7 @@ interface VendorCoupon {
 const BLANK_COUPON: { code: string; discountType: "percent" | "fixed"; discountValue: string; applicableTo: CouponApplicableTo; audience: CouponAudience; active: boolean; maxUses: string; expiresAt: string } = { code: "", discountType: "percent", discountValue: "10", applicableTo: "both", audience: "all", active: true, maxUses: "", expiresAt: "" };
 
 const AUDIENCE_LABELS: Record<CouponAudience, string> = { all: "Everyone", followers: "Followers only", non_followers: "Non-followers only" };
-const APPLICABLE_LABELS: Record<CouponApplicableTo, string> = { both: "All bookings", ticket: "Tickets only", event: "Table only", event_booking: "Event booking only", cover_charge: "Cover charges only" };
+const APPLICABLE_LABELS: Record<CouponApplicableTo, string> = { both: "All bookings", ticket: "Tickets only", event: "Table only", event_booking: "Event booking only", cover_charge: "Cover charges only", vip_table: "VIP Table Booking only" };
 
 function CouponsPanel() {
   const { toast } = useToast();
@@ -6110,6 +6116,7 @@ function CouponsPanel() {
                   <SelectItem value="event">Table Bookings Only</SelectItem>
                   <SelectItem value="event_booking">Event Booking Only</SelectItem>
                   <SelectItem value="cover_charge">Cover Charges Only</SelectItem>
+                  <SelectItem value="vip_table">VIP Table Booking Only</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -6940,8 +6947,22 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
   const [coverChargeValidFrom, setCoverChargeValidFrom] = useState("");
   const [coverChargeValidUntil, setCoverChargeValidUntil] = useState("");
 
+  // Add form — VIP Table Booking section (same shape as Cover Charges)
+  const [vipTableChecked, setVipTableChecked] = useState(false);
+  const [vipTableGender, setVipTableGender] = useState<"all" | "female" | "male">("all");
+  const [vipTableName, setVipTableName] = useState("");
+  const [vipTablePrice, setVipTablePrice] = useState("");
+  const [vipTablePeople, setVipTablePeople] = useState("");
+  const [vipTableItems, setVipTableItems] = useState<DrinkPlanLineItem[]>([emptyItem()]);
+  const [vipTableDays, setVipTableDays] = useState<string[]>([]);
+  const [vipTableTimeFrom, setVipTableTimeFrom] = useState("");
+  const [vipTableTimeTo, setVipTableTimeTo] = useState("");
+  const [vipTableDescription, setVipTableDescription] = useState("");
+  const [vipTableValidFrom, setVipTableValidFrom] = useState("");
+  const [vipTableValidUntil, setVipTableValidUntil] = useState("");
+
   // Edit form state
-  const [editType, setEditType] = useState<"welcome" | "unlimited" | "ticket" | "custom" | "cover_charge">("welcome");
+  const [editType, setEditType] = useState<"welcome" | "unlimited" | "ticket" | "custom" | "cover_charge" | "vip_table">("welcome");
   const [editProductName, setEditProductName] = useState("");
   const [editGender, setEditGender] = useState<"all" | "female" | "male">("all");
   const [editPackagePrice, setEditPackagePrice] = useState("");
@@ -6994,6 +7015,10 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
     setCoverChargeItems([emptyItem()]);
     setCoverChargeValidUntil(""); setCoverChargeValidFrom("");
     setCoverChargeDays([]); setCoverChargeTimeFrom(""); setCoverChargeTimeTo(""); setCoverChargeDescription("");
+    setVipTableChecked(false); setVipTableGender("all"); setVipTableName(""); setVipTablePrice(""); setVipTablePeople("");
+    setVipTableItems([emptyItem()]);
+    setVipTableValidUntil(""); setVipTableValidFrom("");
+    setVipTableDays([]); setVipTableTimeFrom(""); setVipTableTimeTo(""); setVipTableDescription("");
   };
 
   const startEdit = (plan: DrinkPlan) => {
@@ -7001,8 +7026,8 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
     setEditType(plan.type as typeof editType);
     setEditProductName(plan.productName);
     setEditGender(plan.gender as typeof editGender);
-    setEditPackagePrice(plan.type === "cover_charge" ? String(plan.price / 100) : "");
-    setEditPackagePeople(plan.type === "cover_charge" && plan.peoplePerPackage ? String(plan.peoplePerPackage) : "");
+    setEditPackagePrice(plan.type === "cover_charge" || plan.type === "vip_table" ? String(plan.price / 100) : "");
+    setEditPackagePeople((plan.type === "cover_charge" || plan.type === "vip_table") && plan.peoplePerPackage ? String(plan.peoplePerPackage) : "");
     setEditItems(plan.lineItems?.length ? plan.lineItems : [emptyItem()]);
     setEditDays(plan.days);
     setEditTimeFrom(plan.timeFrom);
@@ -7019,7 +7044,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddError(null);
-    if (!freeEntryChecked && !ticketChecked && !coverChargeChecked) {
+    if (!freeEntryChecked && !ticketChecked && !coverChargeChecked && !vipTableChecked) {
       toast({ title: "Select at least one plan type", variant: "destructive" }); return;
     }
     if (freeEntryChecked && feDrinkTypes.length === 0) {
@@ -7034,8 +7059,14 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
     if (coverChargeChecked && (!coverChargePrice || Number(coverChargePrice) <= 0)) {
       toast({ title: "Package price must be greater than 0 for Cover Charges", variant: "destructive" }); return;
     }
-    // Offers are optional for a cover-charge package — empty rows are dropped
-    // on submit (.filter below).
+    if (vipTableChecked && !vipTableName.trim()) {
+      toast({ title: "Package name is required for VIP Table Booking", variant: "destructive" }); return;
+    }
+    if (vipTableChecked && (!vipTablePrice || Number(vipTablePrice) <= 0)) {
+      toast({ title: "Package price must be greater than 0 for VIP Table Booking", variant: "destructive" }); return;
+    }
+    // Offers are optional for a cover-charge / VIP table package — empty rows
+    // are dropped on submit (.filter below).
     setSaving(true);
     try {
       if (freeEntryChecked) {
@@ -7079,6 +7110,20 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
           validUntil: coverChargeValidUntil || null,
         });
       }
+      if (vipTableChecked) {
+        await apiPost(writeBasePath, {
+          type: "vip_table", productName: vipTableName.trim(), gender: vipTableGender,
+          price: Math.round(Number(vipTablePrice) * 100),
+          peoplePerPackage: vipTablePeople ? Math.max(0, Number(vipTablePeople) || 0) : null,
+          lineItems: vipTableItems.filter((i) => i.name.trim()).map(itemForWire),
+          days: vipTableDays, timeFrom: vipTableTimeFrom.trim(), timeTo: vipTableTimeTo.trim(),
+          description: vipTableDescription.trim(),
+          drinksOfferLabel: "",
+          foodDiscountLabel: "",
+          validFrom: vipTableValidFrom || null,
+          validUntil: vipTableValidUntil || null,
+        });
+      }
       toast({ title: "Drink plan(s) added" });
       resetForm();
       await fetchPlans();
@@ -7094,7 +7139,10 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     const filledTicketItems = editItems.filter((i) => i.name.trim()).map(itemForWire);
-    const isCoverCharge = editType === "cover_charge";
+    // "Cover Charge" and "VIP Table Booking" plans share the identical
+    // package shape (name, price, peoplePerPackage, lineItems), so they're
+    // handled together here.
+    const isCoverCharge = editType === "cover_charge" || editType === "vip_table";
     if ((editType === "ticket" || isCoverCharge) && editItems.some((i) => !i.name.trim() && (i.qty !== 1 || (i.discountedPrice !== 0 && i.discountedPrice !== "")))) {
       toast({ title: "Each item must have a name", variant: "destructive" }); return;
     }
@@ -7380,6 +7428,85 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
             )}
           </div>
 
+          {/* VIP Table Booking — same package shape as Cover Charges, shown as
+              a package on the venue's "Book a Table" tab under VIP Table
+              Booking mode instead of the plain Cover Charges list. */}
+          <div className={`rounded-xl border p-4 transition-colors ${vipTableChecked ? "border-primary/40 bg-primary/5" : "border-white/10 bg-black/10"}`}>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={vipTableChecked}
+                onChange={(e) => setVipTableChecked(e.target.checked)}
+                className="h-4 w-4 accent-primary"
+              />
+              <span className="font-semibold text-sm">VIP Table Booking</span>
+              <span className="text-xs text-muted-foreground font-normal">— a premium table package shown when guests choose VIP Table Booking</span>
+            </label>
+            {vipTableChecked && (
+              <div className="mt-4 pl-7 space-y-3">
+                <ForGuestsRadio value={vipTableGender} onChange={setVipTableGender} name="vipTableGender" />
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Package name <span className="text-destructive">*</span></Label>
+                    <Input value={vipTableName} onChange={(e) => setVipTableName(e.target.value)}
+                      placeholder="e.g. VIP Bottle Service" className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Package price (₹) <span className="text-destructive">*</span></Label>
+                    <div className="relative">
+                      <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                      <Input type="number" min="0" value={vipTablePrice} onChange={(e) => setVipTablePrice(e.target.value)}
+                        placeholder="4999" className="bg-black/40 border-white/10 text-sm pl-7" />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">People per package <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <div className="relative">
+                      <Users className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                      <Input type="number" min="1" value={vipTablePeople} onChange={(e) => setVipTablePeople(e.target.value)}
+                        placeholder="e.g. 6" className="bg-black/40 border-white/10 text-sm pl-7" />
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground/70">How many guests one package admits. Shown to customers.</p>
+                  </div>
+                </div>
+                <div>
+                  <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Offers included <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                  <p className="mb-2 text-[11px] text-muted-foreground/70">Enter each offer's regular price (what it costs on its own). We add these up to show guests how much they save with the package.</p>
+                  <LineItemsEditor items={vipTableItems} onChange={setVipTableItems} showPrice addLabel="Add offer" />
+                  <CoverSavingsSummary items={vipTableItems} packageRupees={vipTablePrice} />
+                </div>
+                <div>
+                  <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Applicable days <span className="normal-case text-muted-foreground/60">(leave blank for all days)</span></Label>
+                  <DayPicker selected={vipTableDays} onToggle={(d) => setVipTableDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])} />
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Time from</Label>
+                    <Input type="time" value={vipTableTimeFrom} onChange={(e) => setVipTableTimeFrom(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Time to</Label>
+                    <Input type="time" value={vipTableTimeTo} onChange={(e) => setVipTableTimeTo(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Valid from <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Input type="date" value={vipTableValidFrom} onChange={(e) => setVipTableValidFrom(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Valid until <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Input type="date" value={vipTableValidUntil} onChange={(e) => setVipTableValidUntil(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Short description <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Textarea value={vipTableDescription} onChange={(e) => setVipTableDescription(e.target.value)}
+                      placeholder="Any extra details customers should know…" rows={2}
+                      className="bg-black/40 border-white/10 resize-none text-sm" maxLength={500} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {addError && (
             <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {addError}
@@ -7449,8 +7576,8 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                       </div>
                     )}
 
-                    {/* Cover charge edit controls */}
-                    {editType === "cover_charge" && (
+                    {/* Cover charge / VIP Table Booking edit controls — identical package shape */}
+                    {(editType === "cover_charge" || editType === "vip_table") && (
                       <div className="space-y-3">
                         <ForGuestsRadio value={editGender} onChange={setEditGender} name="editCoverGender" />
                         <div className="grid sm:grid-cols-2 gap-4">
@@ -7531,7 +7658,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                     ) : (
                       <span className="h-16 w-16 rounded-xl bg-gradient-to-br from-primary/15 to-primary/[0.03] border border-primary/20 flex items-center justify-center shrink-0 text-primary">
                         {(() => {
-                          const I = plan.type === "cover_charge" ? Crown : plan.type === "ticket" ? TicketIcon : plan.type === "unlimited" ? GlassWater : plan.type === "welcome" ? Wine : Tag;
+                          const I = plan.type === "cover_charge" || plan.type === "vip_table" ? Crown : plan.type === "ticket" ? TicketIcon : plan.type === "unlimited" ? GlassWater : plan.type === "welcome" ? Wine : Tag;
                           return <I className="h-6 w-6" />;
                         })()}
                       </span>
@@ -7563,7 +7690,7 @@ export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/dri
                             ₹{(plan.price / 100).toLocaleString()}
                           </span>
                         )}
-                        {plan.type === "cover_charge" && (plan.peoplePerPackage ?? 0) > 0 && (
+                        {(plan.type === "cover_charge" || plan.type === "vip_table") && (plan.peoplePerPackage ?? 0) > 0 && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2.5 py-0.5 text-[10px] text-muted-foreground font-medium">
                             <Users className="h-2.5 w-2.5" /> For {plan.peoplePerPackage}
                           </span>

@@ -388,6 +388,7 @@ interface DrinkPlan {
   productName: string;
   gender: string;
   price: number;
+  peoplePerPackage?: number | null;
   days: string[];
   timeFrom: string;
   timeTo: string;
@@ -399,14 +400,15 @@ interface DrinkPlan {
   validFrom?: string | null;
 }
 
-const PLAN_TYPES = ["welcome", "unlimited", "ticket", "custom"] as const;
+const PLAN_TYPES = ["welcome", "unlimited", "ticket", "custom", "vip_table"] as const;
 const PLAN_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 interface DrinkPlanFormState {
-  type: "welcome" | "unlimited" | "ticket" | "custom";
+  type: "welcome" | "unlimited" | "ticket" | "custom" | "vip_table";
   productName: string;
   gender: "all" | "female";
   price: string;
+  peoplePerPackage: string;
   days: string[];
   timeFrom: string;
   timeTo: string;
@@ -423,6 +425,7 @@ const BLANK_PLAN: DrinkPlanFormState = {
   productName: "",
   gender: "all",
   price: "",
+  peoplePerPackage: "",
   days: [],
   timeFrom: "",
   timeTo: "",
@@ -454,6 +457,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
     const isFreeEntryAdd = !editId && (freeEntryTypes.includes("welcome") || freeEntryTypes.includes("unlimited"))
       && (form.type === "welcome" || form.type === "unlimited");
     const isTicket = form.type === "ticket";
+    const isVipTable = form.type === "vip_table";
     if (isTicket && form.lineItems.some((i) => !i.name.trim())) {
       Alert.alert("Each ticket item must have a name");
       setSaving(false);
@@ -467,6 +471,20 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
       setSaving(false);
       return;
     }
+    if (isVipTable && !form.productName.trim()) {
+      Alert.alert("Package name is required for VIP Table Booking");
+      setSaving(false);
+      return;
+    }
+    if (isVipTable && (!form.price || Number(form.price) <= 0)) {
+      Alert.alert("Package price must be greater than 0 for VIP Table Booking");
+      setSaving(false);
+      return;
+    }
+    // Offers included are optional for a VIP table package — empty rows are dropped.
+    const vipLineItems = isVipTable
+      ? form.lineItems.filter((i) => i.name.trim()).map(lineItemForWire)
+      : undefined;
     try {
       const commonBody = {
         productName: form.productName.trim(),
@@ -481,6 +499,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
         validFrom: form.validFrom.trim() || null,
         validUntil: form.validUntil.trim() || null,
         ...(isTicket ? { lineItems: ticketLineItems } : {}),
+        ...(isVipTable ? { lineItems: vipLineItems, peoplePerPackage: form.peoplePerPackage ? Math.max(0, parseInt(form.peoplePerPackage) || 0) : null } : {}),
       };
       if (editId) {
         await customFetch(`/api/vendors/me/drink-plans/${editId}`, {
@@ -553,7 +572,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
     ]);
   }
 
-  const TYPE_LABEL: Record<string, string> = { welcome: "Welcome Drink", unlimited: "Unlimited", ticket: "Ticket Plan", custom: "Custom" };
+  const TYPE_LABEL: Record<string, string> = { welcome: "Welcome Drink", unlimited: "Unlimited", ticket: "Ticket Plan", custom: "Custom", vip_table: "VIP Table Booking" };
 
   if (isLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
 
@@ -600,6 +619,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   productName: plan.productName,
                   gender: validGender,
                   price: plan.price > 0 ? String(plan.price) : "",
+                  peoplePerPackage: plan.peoplePerPackage ? String(plan.peoplePerPackage) : "",
                   days: plan.days,
                   timeFrom: plan.timeFrom,
                   timeTo: plan.timeTo,
@@ -723,9 +743,9 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                       </View>
                     )}
                   </View>
-                  {/* Ticket / Custom */}
+                  {/* Ticket / Custom / VIP Table Booking */}
                   <View style={{ flexDirection: "row", gap: 8 }}>
-                    {(["ticket", "custom"] as const).map((t) => (
+                    {(["ticket", "custom", "vip_table"] as const).map((t) => (
                       <TouchableOpacity key={t} onPress={() => setForm((p) => ({ ...p, type: t }))}
                         style={{ flex: 1, paddingVertical: 9, borderRadius: 12, borderWidth: 1, alignItems: "center", backgroundColor: form.type === t ? colors.primary : colors.muted, borderColor: form.type === t ? colors.primary : colors.border }}>
                         <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.type === t ? colors.primaryForeground : colors.mutedForeground }}>
@@ -774,9 +794,22 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   />
                 </View>
               )}
-              {form.type === "ticket" && (
+              {form.type === "vip_table" && (
+                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PEOPLE PER PACKAGE (optional)</Text>
+                  <TextInput
+                    value={form.peoplePerPackage}
+                    onChangeText={(v) => setForm((p) => ({ ...p, peoplePerPackage: v }))}
+                    placeholder="e.g. 6"
+                    placeholderTextColor={colors.mutedForeground}
+                    keyboardType="numeric"
+                    style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
+                  />
+                </View>
+              )}
+              {(form.type === "ticket" || form.type === "vip_table") && (
                 <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 10 }}>
-                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>TICKET LINE ITEMS</Text>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{form.type === "vip_table" ? "OFFERS INCLUDED (optional)" : "TICKET LINE ITEMS"}</Text>
                   {form.lineItems.map((item, idx) => (
                     <View key={idx} style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
                       <TextInput

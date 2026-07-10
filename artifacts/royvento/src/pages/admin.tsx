@@ -5611,6 +5611,7 @@ interface CommissionRates {
   freeEntryRate: string;
   ticketRate: string;
   tableBookingRate: string;
+  vipTableBookingRate: string;
   eventRate: string;
   coverChargeRate: string;
   eventCommissionEnabled: boolean;
@@ -5621,7 +5622,7 @@ interface CommissionBookingLine {
   id: number;
   finalPrice: number;
   effectiveRevenue: number;
-  bookingType: "free_entry" | "ticket" | "table" | "event_booking" | "cover_charge";
+  bookingType: "free_entry" | "ticket" | "table" | "event_booking" | "cover_charge" | "vip_table";
   commissionRate: number;
   unitCount: number;
   commissionAmount: number;
@@ -5665,6 +5666,11 @@ interface CommissionVendorRow {
   coverChargeCommission: number;
   coverChargePeople: number;
   coverChargeBaseFee: number;
+  vipTableCount: number;
+  vipTableRevenue: number;
+  vipTableCommission: number;
+  vipTablePeople: number;
+  vipTableBaseFee: number;
   bookings: CommissionBookingLine[];
 }
 
@@ -5851,10 +5857,11 @@ function CommissionsAdmin() {
     const free = Number(rates.freeEntryRate);
     const ticket = Number(rates.ticketRate);
     const table = Number(rates.tableBookingRate);
+    const vipTable = Number(rates.vipTableBookingRate ?? 0);
     const evtRate = Number(rates.eventRate ?? 0);
     const coverRate = Number(rates.coverChargeRate ?? 0);
     const bfp = Number(rates.baseFeePercent);
-    if ([free, ticket, table, evtRate, coverRate, bfp].some((n) => !Number.isFinite(n) || n < 0)) {
+    if ([free, ticket, table, vipTable, evtRate, coverRate, bfp].some((n) => !Number.isFinite(n) || n < 0)) {
       toast({ title: "Fees must be valid non-negative numbers", variant: "destructive" });
       return;
     }
@@ -5865,7 +5872,7 @@ function CommissionsAdmin() {
     setSavingId(vendorId);
     try {
       await Promise.all([
-        apiPut(`/api/admin/vendors/${vendorId}/commission`, { freeEntryRate: free, ticketRate: ticket, tableBookingRate: table, eventRate: evtRate, coverChargeRate: coverRate, eventCommissionEnabled: rates.eventCommissionEnabled !== false }),
+        apiPut(`/api/admin/vendors/${vendorId}/commission`, { freeEntryRate: free, ticketRate: ticket, tableBookingRate: table, vipTableBookingRate: vipTable, eventRate: evtRate, coverChargeRate: coverRate, eventCommissionEnabled: rates.eventCommissionEnabled !== false }),
         apiPatch(`/api/admin/vendors/${vendorId}/base-fee`, { baseFeePercent: bfp }),
       ]);
       toast({ title: "Commission fees saved" });
@@ -5900,11 +5907,12 @@ function CommissionsAdmin() {
     });
   };
 
-  const bookingTypeLabel = (t: "free_entry" | "ticket" | "table" | "event_booking" | "cover_charge") => {
+  const bookingTypeLabel = (t: "free_entry" | "ticket" | "table" | "event_booking" | "cover_charge" | "vip_table") => {
     if (t === "free_entry") return "Free Entry";
     if (t === "ticket") return "Ticket";
     if (t === "event_booking") return "Events";
     if (t === "cover_charge") return "Cover Charge";
+    if (t === "vip_table") return "VIP Table Booking";
     return "Table";
   };
 
@@ -5990,6 +5998,7 @@ function CommissionsAdmin() {
                   <th className="text-right py-2 px-3">Free Entry ₹/person</th>
                   <th className="text-right py-2 px-3">Ticket %</th>
                   <th className="text-right py-2 px-3">Table ₹/person</th>
+                  <th className="text-right py-2 px-3">VIP Table ₹/person</th>
                   <th className="text-right py-2 px-3">Event %</th>
                   <th className="text-center py-2 px-3">Event Comm.</th>
                   <th className="text-right py-2 px-3">Cover Charge %</th>
@@ -6004,6 +6013,7 @@ function CommissionsAdmin() {
                     edits.freeEntryRate !== row.appliedRates.freeEntryRate ||
                     edits.ticketRate !== row.appliedRates.ticketRate ||
                     edits.tableBookingRate !== row.appliedRates.tableBookingRate ||
+                    edits.vipTableBookingRate !== (row.appliedRates.vipTableBookingRate ?? "0") ||
                     edits.eventRate !== (row.appliedRates.eventRate ?? "0") ||
                     edits.coverChargeRate !== (row.appliedRates.coverChargeRate ?? "0") ||
                     (edits.eventCommissionEnabled !== false) !== (row.appliedRates.eventCommissionEnabled !== false) ||
@@ -6044,6 +6054,17 @@ function CommissionsAdmin() {
                           step={0.01}
                           value={edits.tableBookingRate}
                           onChange={(e) => updateRate(row.vendorId, "tableBookingRate", e.target.value)}
+                          className="w-20 text-right h-8 text-sm ml-auto"
+                        />
+                      </td>
+                      <td className="py-2 px-3">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={99999.99}
+                          step={0.01}
+                          value={edits.vipTableBookingRate ?? "0"}
+                          onChange={(e) => updateRate(row.vendorId, "vipTableBookingRate", e.target.value)}
                           className="w-20 text-right h-8 text-sm ml-auto"
                         />
                       </td>
@@ -6195,6 +6216,8 @@ function CommissionsAdmin() {
                             <span className="opacity-40"> · </span>
                             <span className="whitespace-nowrap">Table ₹{row.appliedRates.tableBookingRate}/person</span>
                             <span className="opacity-40"> · </span>
+                            <span className="whitespace-nowrap">VIP Table ₹{row.appliedRates.vipTableBookingRate ?? "0"}/person</span>
+                            <span className="opacity-40"> · </span>
                             <span className="whitespace-nowrap">Cover {row.appliedRates.coverChargeRate ?? "0"}%</span>
                           </p>
                         </div>
@@ -6259,9 +6282,17 @@ function CommissionsAdmin() {
                                       <td className="text-right px-3 tabular-nums text-amber-400">{formatINR(row.coverChargeBaseFee ?? 0)}</td>
                                     </tr>
                                   )}
+                                  {(row.vipTableCount ?? 0) > 0 && (
+                                    <tr>
+                                      <td className="py-2 px-3">VIP Table Booking</td>
+                                      <td className="text-right px-3 tabular-nums">{row.vipTablePeople ?? 0}</td>
+                                      <td className="text-right px-3 tabular-nums text-primary">{formatINR(row.vipTableCommission ?? 0)}</td>
+                                      <td className="text-right px-3 tabular-nums text-amber-400">{formatINR(row.vipTableBaseFee ?? 0)}</td>
+                                    </tr>
+                                  )}
                                   <tr className="bg-white/[0.04] font-medium">
                                     <td className="py-2 px-3">Total</td>
-                                    <td className="text-right px-3 tabular-nums">{row.freeEntryPeople + row.ticketPeople + row.tablePeople + (row.eventBookingPeople ?? 0) + (row.coverChargePeople ?? 0)}</td>
+                                    <td className="text-right px-3 tabular-nums">{row.freeEntryPeople + row.ticketPeople + row.tablePeople + (row.eventBookingPeople ?? 0) + (row.coverChargePeople ?? 0) + (row.vipTablePeople ?? 0)}</td>
                                     <td className="text-right px-3 tabular-nums text-primary">{formatINR(row.totalCommission)}</td>
                                     <td className="text-right px-3 tabular-nums text-amber-400">{formatINR(row.totalBaseFee ?? 0)}</td>
                                   </tr>
@@ -10225,7 +10256,7 @@ function VenueDetailAdmin({ venueId, onBack }: { venueId: number; onBack: () => 
           {tab === "announcements" && <AnnouncementsPanel adminVendorId={venueId} />}
           {tab === "leads" && <LeadsPanel adminVendorId={venueId} />}
           {tab === "calendar" && <VenueCalendarAdmin venueId={venueId} />}
-          {tab === "analytics" && <AnalyticsPanel adminVendorId={venueId} vendorCategory={detail.category ?? ""} />}
+          {tab === "analytics" && <AnalyticsPanel adminVendorId={venueId} />}
           {tab === "bookings" && <PartnerBookingReport bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} adminVendorId={venueId} />}
           {tab === "commission" && (
             detail.assignmentStatus === "assigned"
@@ -10256,6 +10287,7 @@ function VenueCommissionAdmin({ venueId, initialBaseFeePercent, initialBaseFeeEn
   const [freeEntryRate, setFreeEntryRate] = useState("0");
   const [ticketRate, setTicketRate] = useState("0");
   const [tableBookingRate, setTableBookingRate] = useState("0");
+  const [vipTableBookingRate, setVipTableBookingRate] = useState("0");
   const [eventRate, setEventRate] = useState("0");
   const [coverChargeRate, setCoverChargeRate] = useState("0");
   const [eventCommissionEnabled, setEventCommissionEnabled] = useState(true);
@@ -10264,11 +10296,12 @@ function VenueCommissionAdmin({ venueId, initialBaseFeePercent, initialBaseFeeEn
 
   useEffect(() => {
     setLoading(true);
-    apiGet<{ freeEntryRate: string; ticketRate: string; tableBookingRate: string; eventRate: string; coverChargeRate: string; eventCommissionEnabled: boolean }>(`/api/admin/vendors/${venueId}/commission`)
+    apiGet<{ freeEntryRate: string; ticketRate: string; tableBookingRate: string; vipTableBookingRate: string; eventRate: string; coverChargeRate: string; eventCommissionEnabled: boolean }>(`/api/admin/vendors/${venueId}/commission`)
       .then((r) => {
         setFreeEntryRate(String(Number(r.freeEntryRate)));
         setTicketRate(String(Number(r.ticketRate)));
         setTableBookingRate(String(Number(r.tableBookingRate)));
+        setVipTableBookingRate(String(Number(r.vipTableBookingRate ?? 0)));
         setEventRate(String(Number(r.eventRate ?? 0)));
         setCoverChargeRate(String(Number(r.coverChargeRate ?? 0)));
         setEventCommissionEnabled(r.eventCommissionEnabled !== false);
@@ -10278,8 +10311,8 @@ function VenueCommissionAdmin({ venueId, initialBaseFeePercent, initialBaseFeeEn
   }, [venueId]);
 
   const save = async () => {
-    const free = Number(freeEntryRate), ticket = Number(ticketRate), table = Number(tableBookingRate), evt = Number(eventRate), cover = Number(coverChargeRate), bfp = Number(baseFeePercent);
-    if ([free, ticket, table, evt, cover, bfp].some((n) => !Number.isFinite(n) || n < 0)) {
+    const free = Number(freeEntryRate), ticket = Number(ticketRate), table = Number(tableBookingRate), vipTable = Number(vipTableBookingRate), evt = Number(eventRate), cover = Number(coverChargeRate), bfp = Number(baseFeePercent);
+    if ([free, ticket, table, vipTable, evt, cover, bfp].some((n) => !Number.isFinite(n) || n < 0)) {
       toast({ title: "Rates must be 0 or more", variant: "destructive" }); return;
     }
     if (ticket > 100 || evt > 100 || cover > 100 || bfp > 100) {
@@ -10288,7 +10321,7 @@ function VenueCommissionAdmin({ venueId, initialBaseFeePercent, initialBaseFeeEn
     setSaving(true);
     try {
       await apiPut(`/api/admin/vendors/${venueId}/commission`, {
-        freeEntryRate: free, ticketRate: ticket, tableBookingRate: table, eventRate: evt, coverChargeRate: cover, eventCommissionEnabled,
+        freeEntryRate: free, ticketRate: ticket, tableBookingRate: table, vipTableBookingRate: vipTable, eventRate: evt, coverChargeRate: cover, eventCommissionEnabled,
       });
       await apiPatch(`/api/admin/vendors/${venueId}/base-fee`, { baseFeePercent: bfp, baseFeeEnabled });
       toast({ title: "Commission & fees saved" });
@@ -10304,6 +10337,7 @@ function VenueCommissionAdmin({ venueId, initialBaseFeePercent, initialBaseFeeEn
     { label: "Free Entry (₹/person)", value: freeEntryRate, set: setFreeEntryRate },
     { label: "Ticket (%)", value: ticketRate, set: setTicketRate },
     { label: "Table Booking (₹/person)", value: tableBookingRate, set: setTableBookingRate },
+    { label: "VIP Table Booking (₹/person)", value: vipTableBookingRate, set: setVipTableBookingRate },
     { label: "Event (%)", value: eventRate, set: setEventRate },
     { label: "Cover Charge (%)", value: coverChargeRate, set: setCoverChargeRate },
   ];
@@ -10312,7 +10346,7 @@ function VenueCommissionAdmin({ venueId, initialBaseFeePercent, initialBaseFeeEn
     <div className="space-y-4 max-w-2xl">
       <section className="rounded-xl border border-white/10 p-4 space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Commission Rates</p>
-        <p className="text-xs text-muted-foreground">Free Entry &amp; Table Booking are a flat ₹ per verified guest; Ticket &amp; Event are a percentage of final verified revenue.</p>
+        <p className="text-xs text-muted-foreground">Free Entry, Table Booking &amp; VIP Table Booking are a flat ₹ per verified guest; Ticket &amp; Event are a percentage of final verified revenue.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {rateInputs.map((r) => (
             <div key={r.label} className="space-y-1.5">

@@ -134,6 +134,8 @@ export default function BookingsScreen() {
 
   const handleShareTicket = async (b: NonNullable<typeof data>[number]) => {
     const bx = b as typeof b & ExtendedBooking;
+    const isVipTable = bx.pubMode === "vip_table";
+    const vipClass = isVipTable ? " vip" : "";
     const ticketCode = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
     const esc = (v: unknown) =>
       String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -158,58 +160,75 @@ export default function BookingsScreen() {
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
-.ticket{background:linear-gradient(145deg,#14090f 0%,#1e0e1a 45%,#100c18 100%);border:1px solid rgba(212,168,83,.35);border-radius:20px;max-width:600px;width:100%;overflow:hidden;}
-.top{padding:28px 28px 20px;}
+.ticket{position:relative;background:linear-gradient(155deg,#0c0c0c 0%,#070707 50%,#000000 100%);border:2px solid rgba(212,168,83,.55);border-radius:20px;max-width:600px;width:100%;overflow:hidden;}
+.ticket.vip{background:linear-gradient(150deg,#3B0E3E 0%,#160517 45%,#0A020A 100%);border:2px solid rgba(255,255,255,.7);box-shadow:0 0 0 1px rgba(22,5,23,.9) inset,0 0 0 4px rgba(255,255,255,.18) inset;}
+.sheen{position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.09) 48%,rgba(255,255,255,.02) 55%,transparent 65%);}
+.wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:32px;font-weight:700;color:rgba(255,255,255,.06);white-space:nowrap;pointer-events:none;letter-spacing:.1em;}
+.top{position:relative;padding:28px 28px 20px;}
 .brand-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
 .brand{font-size:9px;letter-spacing:5px;text-transform:uppercase;color:rgba(212,168,83,.55);}
+.brand.vip{color:rgba(255,255,255,.6);}
 .code-badge{font-size:10px;font-family:monospace;color:rgba(212,168,83,.7);background:rgba(212,168,83,.08);border:1px solid rgba(212,168,83,.2);padding:3px 10px;border-radius:6px;letter-spacing:.1em;}
+.code-badge.vip{color:rgba(255,255,255,.8);background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3);}
+.vip-ribbon{display:inline-flex;align-items:center;gap:5px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.5);padding:4px 10px;border-radius:99px;margin-bottom:12px;}
 .hero{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;}
 .venue{font-size:26px;color:#d4a853;font-weight:700;line-height:1.15;margin-bottom:6px;}
+.venue.vip{color:#ffffff;}
 .event-name{font-size:14px;color:rgba(255,255,255,.7);margin-bottom:3px;}
 .fields{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;margin-top:18px;}
 .lbl{font-size:8px;text-transform:uppercase;letter-spacing:2.5px;color:rgba(212,168,83,.45);margin-bottom:3px;}
+.lbl.vip{color:rgba(255,255,255,.55);}
 .val{font-size:13px;color:rgba(255,255,255,.85);font-weight:500;}
 .qr-block{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;}
 .qr-frame{background:#fff;border:2px solid rgba(212,168,83,.45);border-radius:12px;padding:8px;}
+.qr-frame.vip{border:2px solid rgba(255,255,255,.85);}
 .qr-frame img{display:block;width:130px;height:130px;}
 .qr-venue{font-size:8px;color:rgba(212,168,83,.5);letter-spacing:1px;text-align:center;max-width:130px;word-break:break-word;text-transform:uppercase;}
+.qr-venue.vip{color:rgba(255,255,255,.55);}
 .perf{display:flex;align-items:center;margin:0 -1px;}
-.notch{width:16px;height:32px;background:#0c0810;border-radius:0 16px 16px 0;}
+.notch{width:16px;height:32px;background:#000000;border-radius:0 16px 16px 0;}
+.notch.vip{background:#0A020A;}
 .notch-r{border-radius:16px 0 0 16px;}
-.dash{flex:1;border-top:2px dashed rgba(212,168,83,.22);}
+.dash{flex:1;border-top:2px dashed rgba(212,168,83,.3);}
+.dash.vip{border-top-color:rgba(255,255,255,.35);}
 .tear{font-family:monospace;font-size:15px;letter-spacing:3px;color:#d4a853;text-align:center;padding:10px 0;}
-.footer{display:flex;justify-content:space-between;align-items:center;padding:16px 28px 24px;}
+.tear.vip{color:#ffffff;}
+.footer{position:relative;display:flex;justify-content:space-between;align-items:center;padding:16px 28px 24px;}
 .price-lbl{font-size:8px;text-transform:uppercase;letter-spacing:2px;color:rgba(212,168,83,.45);margin-bottom:3px;}
+.price-lbl.vip{color:rgba(255,255,255,.55);}
 .price{font-size:26px;color:#d4a853;font-weight:700;}
+.price.vip{color:#ffffff;}
 .disclaimer{font-size:9px;color:rgba(255,255,255,.22);text-align:right;line-height:1.7;max-width:180px;}
 </style></head><body>
-<div class="ticket">
+<div class="ticket${vipClass}">
+  ${isVipTable ? `<div class="sheen"></div><div class="wm">ROYVENTO VIP MEMBER</div>` : ""}
   <div class="top">
     <div class="brand-row">
-      <span class="brand">ROYVENTO</span>
-      <span class="code-badge">${esc(ticketCode)}</span>
+      <span class="brand${vipClass}">ROYVENTO</span>
+      <span class="code-badge${vipClass}">${esc(ticketCode)}</span>
     </div>
+    ${isVipTable ? `<span class="vip-ribbon">&#9670; VIP Table Booking</span>` : ""}
     <div class="hero">
       <div style="flex:1;min-width:0;">
-        <div class="venue">${esc(bx.vendorName ?? b.eventTitle)}</div>
+        <div class="venue${vipClass}">${esc(bx.vendorName ?? b.eventTitle)}</div>
         <div class="event-name">${esc(b.eventTitle)}</div>
         <div class="fields">
-          <div><div class="lbl">${esc(t("bookings.guest"))}</div><div class="val">${esc(bx.personName || bx.userName || "—")}</div></div>
-          <div><div class="lbl">${esc(t("bookings.date"))}</div><div class="val">${esc(b.bookingDate)}</div></div>
-          <div><div class="lbl">${esc(t("bookings.tickets"))}</div><div class="val">${esc(ticketBreakdown)}</div></div>
-          <div><div class="lbl">${esc(t("bookings.approved_by"))}</div><div class="val">${esc(bx.approvedBy || t("bookings.partner"))}</div></div>
+          <div><div class="lbl${vipClass}">${esc(t("bookings.guest"))}</div><div class="val">${esc(bx.personName || bx.userName || "—")}</div></div>
+          <div><div class="lbl${vipClass}">${esc(t("bookings.date"))}</div><div class="val">${esc(b.bookingDate)}</div></div>
+          <div><div class="lbl${vipClass}">${esc(t("bookings.tickets"))}</div><div class="val">${esc(ticketBreakdown)}</div></div>
+          <div><div class="lbl${vipClass}">${esc(t("bookings.approved_by"))}</div><div class="val">${esc(bx.approvedBy || t("bookings.partner"))}</div></div>
         </div>
       </div>
       <div class="qr-block">
-        <div class="qr-frame"><img src="${qrUrl}" alt="QR Code"/></div>
-        <div class="qr-venue">${esc(bx.vendorName)}</div>
+        <div class="qr-frame${vipClass}"><img src="${qrUrl}" alt="QR Code"/></div>
+        <div class="qr-venue${vipClass}">${esc(bx.vendorName)}</div>
       </div>
     </div>
   </div>
-  <div class="perf"><div class="notch"></div><div class="dash"></div><div class="notch notch-r"></div></div>
-  <div class="tear">${esc(ticketCode)}</div>
+  <div class="perf"><div class="notch${vipClass}"></div><div class="dash${vipClass}"></div><div class="notch notch-r${vipClass}"></div></div>
+  <div class="tear${vipClass}">${esc(ticketCode)}</div>
   <div class="footer">
-    ${isFreeBooking ? "<div></div>" : `<div><div class="price-lbl">${esc((bx.paymentMethod ?? "").toLowerCase() === "cod" ? t("bookings.amount_due") : t("bookings.amount_paid"))}</div><div class="price">${esc(price)}</div></div>`}
+    ${isFreeBooking ? "<div></div>" : `<div><div class="price-lbl${vipClass}">${esc((bx.paymentMethod ?? "").toLowerCase() === "cod" ? t("bookings.amount_due") : t("bookings.amount_paid"))}</div><div class="price${vipClass}">${esc(price)}</div></div>`}
     <div class="disclaimer">${esc(t("bookings.present_at_entrance"))}<br/>Royvento</div>
   </div>
 </div>
@@ -402,6 +421,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
             const isExpanded = expandedId === b.id;
             const qrValue = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
             const bx = b as typeof b & ExtendedBooking;
+            const isVipTable = bx.pubMode === "vip_table";
 
             return (
               <Pressable
@@ -466,38 +486,65 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                 {/* Confirmed ticket — premium design */}
                 {isExpanded && status === "confirmed" && (
                   <LinearGradient
-                    colors={["#14090f", "#1e0e1a", "#100c18"]}
+                    colors={isVipTable ? ["#3B0E3E", "#160517", "#0A020A"] : ["#0c0c0c", "#070707", "#000000"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.premiumTicket}
+                    style={[styles.premiumTicket, isVipTable && styles.premiumTicketVip]}
                   >
+                    {/* VIP foil sheen — soft diagonal highlight for a richer plate finish */}
+                    {isVipTable && (
+                      <LinearGradient
+                        colors={["transparent", "rgba(255,255,255,0.1)", "transparent"]}
+                        locations={[0.35, 0.48, 0.65]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.ptSheen}
+                        pointerEvents="none"
+                      />
+                    )}
+
+                    {/* VIP watermark */}
+                    {isVipTable && (
+                      <View style={styles.ptWatermarkWrap} pointerEvents="none">
+                        <Text style={styles.ptWatermarkText}>ROYVENTO VIP MEMBER</Text>
+                      </View>
+                    )}
+
                     {/* Top bar: brand + status */}
                     <View style={styles.ptTopBar}>
-                      <Text style={styles.ptBrand}>ROYVENTO</Text>
+                      <Text style={[styles.ptBrand, isVipTable && styles.ptBrandVip]}>ROYVENTO</Text>
                       <View style={styles.ptConfirmedBadge}>
                         <Ionicons name="checkmark-circle" size={11} color="#22c55e" />
                         <Text style={styles.ptConfirmedText}>{t("bookings.status_confirmed")}</Text>
                       </View>
                     </View>
 
+                    {/* VIP ribbon */}
+                    {isVipTable && (
+                      <View style={styles.ptVipRibbon}>
+                        <Ionicons name="diamond-outline" size={11} color="#ffffff" />
+                        <Text style={styles.ptVipRibbonText}>VIP Table Booking</Text>
+                      </View>
+                    )}
+
                     {/* Venue name hero */}
-                    <Text style={styles.ptVenueName} numberOfLines={2}>{bx.vendorName ?? b.eventTitle}</Text>
+                    <Text style={[styles.ptVenueName, isVipTable && styles.ptVenueNameVip]} numberOfLines={2}>{bx.vendorName ?? b.eventTitle}</Text>
                     <Text style={styles.ptEventTitle} numberOfLines={2}>{b.eventTitle}</Text>
 
                     {/* Details grid */}
                     <View style={styles.ptFieldsRow}>
                       <View style={styles.ptField}>
-                        <Text style={styles.ptFieldLabel}>{t("bookings.guest")}</Text>
+                        <Text style={[styles.ptFieldLabel, isVipTable && styles.ptFieldLabelVip]}>{t("bookings.guest")}</Text>
                         <Text style={styles.ptFieldValue}>{bx.personName || bx.userName || "—"}</Text>
                       </View>
                       <View style={styles.ptField}>
-                        <Text style={styles.ptFieldLabel}>{t("bookings.date")}</Text>
+                        <Text style={[styles.ptFieldLabel, isVipTable && styles.ptFieldLabelVip]}>{t("bookings.date")}</Text>
                         <Text style={styles.ptFieldValue}>{formatDate(b.bookingDate)}</Text>
                       </View>
                     </View>
                     <View style={styles.ptFieldsRow}>
                       <View style={styles.ptField}>
-                        <Text style={styles.ptFieldLabel}>{t("bookings.tickets")}</Text>
+                        <Text style={[styles.ptFieldLabel, isVipTable && styles.ptFieldLabelVip]}>{t("bookings.tickets")}</Text>
                         <Text style={styles.ptFieldValue}>
                           {(() => {
                             const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -518,35 +565,35 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                         </Text>
                       </View>
                       <View style={styles.ptField}>
-                        <Text style={styles.ptFieldLabel}>{t("bookings.approved_by")}</Text>
+                        <Text style={[styles.ptFieldLabel, isVipTable && styles.ptFieldLabelVip]}>{t("bookings.approved_by")}</Text>
                         <Text style={[styles.ptFieldValue, { textTransform: "capitalize" }]}>{bx.approvedBy || t("bookings.partner")}</Text>
                       </View>
                     </View>
 
                     {/* QR code block */}
                     <View style={styles.ptQrBlock}>
-                      <View style={styles.ptQrFrame}>
+                      <View style={[styles.ptQrFrame, isVipTable && styles.ptQrFrameVip]}>
                         <QRCode value={qrValue} size={160} backgroundColor="#ffffff" color="#1a1008" />
                       </View>
-                      <Text style={styles.ptQrVenue} numberOfLines={1}>{bx.vendorName ?? ""}</Text>
+                      <Text style={[styles.ptQrVenue, isVipTable && styles.ptQrVenueVip]} numberOfLines={1}>{bx.vendorName ?? ""}</Text>
                     </View>
 
                     {/* Perforated divider */}
                     <View style={styles.ptPerfRow}>
-                      <View style={styles.ptNotch} />
-                      <View style={styles.ptPerf} />
-                      <View style={[styles.ptNotch, styles.ptNotchR]} />
+                      <View style={[styles.ptNotch, isVipTable && styles.ptNotchVip]} />
+                      <View style={[styles.ptPerf, isVipTable && styles.ptPerfVip]} />
+                      <View style={[styles.ptNotch, styles.ptNotchR, isVipTable && styles.ptNotchVip]} />
                     </View>
 
                     {/* Ticket code */}
-                    <Text style={styles.ptCode}>{qrValue}</Text>
+                    <Text style={[styles.ptCode, isVipTable && styles.ptCodeVip]}>{qrValue}</Text>
 
                     {/* Footer: price + disclaimer */}
                     <View style={styles.ptFooter}>
                       {Number(bx.finalPrice ?? b.totalPrice ?? 0) > 0 && (
                         <View style={styles.ptPriceRow}>
-                          <Text style={styles.ptPriceLabel}>{(bx.paymentMethod ?? "").toLowerCase() === "cod" ? t("bookings.amount_due") : t("bookings.amount_paid")}</Text>
-                          <Text style={styles.ptPriceValue}>
+                          <Text style={[styles.ptPriceLabel, isVipTable && styles.ptPriceLabelVip]}>{(bx.paymentMethod ?? "").toLowerCase() === "cod" ? t("bookings.amount_due") : t("bookings.amount_paid")}</Text>
+                          <Text style={[styles.ptPriceValue, isVipTable && styles.ptPriceValueVip]}>
                             {bx.finalPrice != null
                               ? `₹${Number(bx.finalPrice).toLocaleString("en-IN")}`
                               : b.totalPrice != null
@@ -788,7 +835,7 @@ const styles = StyleSheet.create({
   retryBtn: { marginTop: 10, alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
   retryBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#fff" },
 
-  premiumTicket: { marginTop: 0, borderRadius: 0, overflow: "hidden", padding: 0 },
+  premiumTicket: { marginTop: 0, borderRadius: 0, overflow: "hidden", padding: 0, borderWidth: 2, borderColor: "rgba(212,168,83,0.55)" },
   ptTopBar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 },
   ptBrand: { fontSize: 9, fontFamily: "Inter_600SemiBold", letterSpacing: 5, textTransform: "uppercase", color: "rgba(212,168,83,0.55)" },
   ptConfirmedBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(34,197,94,0.12)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
@@ -812,6 +859,31 @@ const styles = StyleSheet.create({
   ptPriceLabel: { fontSize: 9, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 2, color: "rgba(212,168,83,0.45)" },
   ptPriceValue: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#d4a853" },
   ptFooterHint: { fontSize: 9, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.2)", letterSpacing: 0.5, textAlign: "center" },
+
+  // VIP Table Booking ticket theme — dark maroon plate + white accents
+  // (vs. the standard matte-black plate + gold border above), so it reads
+  // as a clearly distinct, higher tier ticket.
+  // Double-ring foil edge: an outer white border on the plate itself, plus a
+  // soft white glow (shadow) so it reads richer than a single flat border.
+  premiumTicketVip: {
+    borderWidth: 2.5, borderColor: "rgba(255,255,255,0.75)",
+    shadowColor: "#ffffff", shadowOpacity: 0.3, shadowRadius: 14, shadowOffset: { width: 0, height: 0 },
+  },
+  ptSheen: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  ptWatermarkWrap: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  ptWatermarkText: { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: 4, color: "rgba(255,255,255,0.07)", transform: [{ rotate: "-28deg" }] },
+  ptVipRibbon: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", marginHorizontal: 20, marginBottom: 10, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.5)" },
+  ptVipRibbonText: { fontSize: 9, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 1.5, color: "#ffffff" },
+  ptVenueNameVip: { color: "#ffffff" },
+  ptQrFrameVip: { borderColor: "rgba(255,255,255,0.85)" },
+  ptNotchVip: { backgroundColor: "rgba(10,2,10,0.85)" },
+  ptPerfVip: { borderColor: "rgba(255,255,255,0.35)" },
+  ptCodeVip: { color: "#ffffff" },
+  ptPriceValueVip: { color: "#ffffff" },
+  ptBrandVip: { color: "rgba(255,255,255,0.6)" },
+  ptFieldLabelVip: { color: "rgba(255,255,255,0.55)" },
+  ptQrVenueVip: { color: "rgba(255,255,255,0.55)" },
+  ptPriceLabelVip: { color: "rgba(255,255,255,0.55)" },
 
   actionBar: { flexDirection: "row", gap: 10, padding: 14, borderTopWidth: 1, flexWrap: "wrap" },
   actionBtn: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, borderWidth: 1, flex: 1 },

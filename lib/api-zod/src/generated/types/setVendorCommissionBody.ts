@@ -26,6 +26,12 @@ export interface SetVendorCommissionBody {
      */
   tableBookingRate: number;
   /**
+     * Flat fee in INR per verified guest for VIP table booking commission
+     * @minimum 0
+     * @maximum 99999.99
+     */
+  vipTableBookingRate?: number;
+  /**
      * Percentage of event-booking revenue charged as platform commission (0–100)
      * @minimum 0
      * @maximum 100

@@ -14,6 +14,7 @@ export type FollowNotifyKind =
   | "free_drinks"
   | "ticket"
   | "cover_charge"
+  | "vip_table"
   | "food_drink"
   | "exclusive"
   | "promo";
@@ -63,6 +64,12 @@ const TEMPLATES: Record<FollowNotifyKind, Template[]> = {
     { title: "🍕 {name} just got tastier", body: "A fresh food & drink deal landed at {name}. Your taste buds say go." },
     { title: "🍻 Deal alert at {name}", body: "{name} added a new food & drink offer. Great excuse to go out, right?" },
     { title: "😋 {name} has a treat for you", body: "New discounts just dropped at {name}. Tap, book, feast." },
+  ],
+  // A VIP table package at a followed venue.
+  vip_table: [
+    { title: "👑 VIP tables just dropped at {name}", body: "{name} added a new VIP table package. Bottle service o'clock?" },
+    { title: "💎 {name} is going VIP", body: "A fresh VIP table package just landed at {name}. Tap to see what's included." },
+    { title: "🥂 Premium night at {name}", body: "{name} just unlocked a new VIP table booking. Treat yourself." },
   ],
   // An exclusive / special promotional deal at a followed venue (not tied to a
   // food or drink discount) — the "exclusive" vendor-offer category.
@@ -125,6 +132,11 @@ const DAILY_TEMPLATES: Record<FollowNotifyKind, Template[]> = {
     { title: "🍟 Round two at {name}?", body: "{name}'s deal is still good today. Make plans, make memories." },
     { title: "🥡 Dinner idea: {name}", body: "{name}'s food & drink offer is running today too. Just saying 😉" },
     { title: "🌮 {name} is still treating you", body: "Today's a great day for {name}'s deal. Tap to see it." },
+  ],
+  vip_table: [
+    { title: "👑 VIP tables still open at {name}", body: "{name}'s VIP table package is still available. Tap to book." },
+    { title: "💎 Still going VIP at {name}", body: "That VIP table package at {name} hasn't gone anywhere. Treat yourself tonight." },
+    { title: "🥂 {name}'s premium night continues", body: "VIP table booking is still live at {name}. Round up the crew." },
   ],
   exclusive: [
     { title: "💎 {name}'s exclusive deal is still on", body: "That exclusive offer at {name} hasn't expired. Claim it tonight." },

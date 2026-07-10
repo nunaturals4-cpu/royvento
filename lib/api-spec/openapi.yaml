@@ -897,7 +897,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [welcome, unlimited, ticket, custom, cover_charge]
+            enum: [welcome, unlimited, ticket, custom, cover_charge, vip_table]
       responses:
         "200":
           description: Vendors list
@@ -1199,7 +1199,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [welcome, unlimited, ticket, custom, cover_charge]
+            enum: [welcome, unlimited, ticket, custom, cover_charge, vip_table]
       responses:
         "200":
           description: Events list (Event[] when no page param; ListEventsPaginatedResponse when page param provided)
@@ -5444,7 +5444,7 @@ components:
           type: integer
         type:
           type: string
-          enum: [welcome, unlimited, ticket, custom, cover_charge]
+          enum: [welcome, unlimited, ticket, custom, cover_charge, vip_table]
         productName:
           type: string
         gender:
@@ -5486,7 +5486,7 @@ components:
       properties:
         type:
           type: string
-          enum: [welcome, unlimited, ticket, custom, cover_charge]
+          enum: [welcome, unlimited, ticket, custom, cover_charge, vip_table]
         productName:
           type: string
         gender:
@@ -5529,7 +5529,7 @@ components:
       properties:
         type:
           type: string
-          enum: [welcome, unlimited, ticket, custom, cover_charge]
+          enum: [welcome, unlimited, ticket, custom, cover_charge, vip_table]
         productName:
           type: string
         gender:
@@ -5576,6 +5576,9 @@ components:
         tableBookingRate:
           type: string
           description: Flat fee in INR per table booking (stored as decimal string)
+        vipTableBookingRate:
+          type: string
+          description: Flat fee in INR per VIP table booking (stored as decimal string)
         eventRate:
           type: string
           description: Percentage of event-booking revenue (stored as decimal string)
@@ -5605,6 +5608,11 @@ components:
           minimum: 0
           maximum: 99999.99
           description: Flat fee in INR per verified guest for table booking commission
+        vipTableBookingRate:
+          type: number
+          minimum: 0
+          maximum: 99999.99
+          description: Flat fee in INR per verified guest for VIP table booking commission
         eventRate:
           type: number
           minimum: 0
@@ -5629,7 +5637,7 @@ components:
           type: number
         bookingType:
           type: string
-          enum: [free_entry, ticket, table, event_booking, cover_charge]
+          enum: [free_entry, ticket, table, event_booking, cover_charge, vip_table]
         commissionRate:
           type: number
           description: Flat fee in INR per unit (per person, per ticket, or per table booking)

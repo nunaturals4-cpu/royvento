@@ -15,4 +15,5 @@ export const CommissionReportBookingLineBookingType = {
   table: 'table',
   event_booking: 'event_booking',
   cover_charge: 'cover_charge',
+  vip_table: 'vip_table',
 } as const;

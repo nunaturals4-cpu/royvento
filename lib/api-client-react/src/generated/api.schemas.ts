@@ -1960,6 +1960,7 @@ export const DrinkPlanType = {
   ticket: 'ticket',
   custom: 'custom',
   cover_charge: 'cover_charge',
+  vip_table: 'vip_table',
 } as const;
 
 export type DrinkPlanGender = typeof DrinkPlanGender[keyof typeof DrinkPlanGender];
@@ -1999,6 +2000,7 @@ export const DrinkPlanBodyType = {
   ticket: 'ticket',
   custom: 'custom',
   cover_charge: 'cover_charge',
+  vip_table: 'vip_table',
 } as const;
 
 export type DrinkPlanBodyGender = typeof DrinkPlanBodyGender[keyof typeof DrinkPlanBodyGender];
@@ -2040,6 +2042,7 @@ export const DrinkPlanSummaryType = {
   ticket: 'ticket',
   custom: 'custom',
   cover_charge: 'cover_charge',
+  vip_table: 'vip_table',
 } as const;
 
 export type DrinkPlanSummaryGender = typeof DrinkPlanSummaryGender[keyof typeof DrinkPlanSummaryGender];
@@ -2077,6 +2080,8 @@ export interface VendorCommission {
   ticketRate: string;
   /** Flat fee in INR per table booking (stored as decimal string) */
   tableBookingRate: string;
+  /** Flat fee in INR per VIP table booking (stored as decimal string) */
+  vipTableBookingRate?: string;
   /** Percentage of event-booking revenue (stored as decimal string) */
   eventRate?: string;
   /** Percentage of cover-charge package revenue (stored as decimal string) */
@@ -2104,6 +2109,12 @@ export interface SetVendorCommissionBody {
      */
   tableBookingRate: number;
   /**
+     * Flat fee in INR per verified guest for VIP table booking commission
+     * @minimum 0
+     * @maximum 99999.99
+     */
+  vipTableBookingRate?: number;
+  /**
      * Percentage of event-booking revenue charged as platform commission (0–100)
      * @minimum 0
      * @maximum 100
@@ -2128,6 +2139,7 @@ export const CommissionReportBookingLineBookingType = {
   table: 'table',
   event_booking: 'event_booking',
   cover_charge: 'cover_charge',
+  vip_table: 'vip_table',
 } as const;
 
 export interface CommissionReportBookingLine {
@@ -2646,6 +2658,7 @@ export const ListVendorsDrinkPlanType = {
   ticket: 'ticket',
   custom: 'custom',
   cover_charge: 'cover_charge',
+  vip_table: 'vip_table',
 } as const;
 
 export type ListEventsParams = {
@@ -2671,6 +2684,7 @@ export const ListEventsDrinkPlanType = {
   ticket: 'ticket',
   custom: 'custom',
   cover_charge: 'cover_charge',
+  vip_table: 'vip_table',
 } as const;
 
 export type ListMyVendorEventsParams = {

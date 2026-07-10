@@ -41,6 +41,7 @@ function dayOfYearIST(): number {
 // flavour the reminder (copy + deep-link section + queue priority).
 const KIND_RANK: Record<VenueUpdateKind, number> = {
   cover_charge: 3,
+  vip_table: 3,
   ticket: 2,
   free_drinks: 2,
   exclusive: 2,

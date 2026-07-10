@@ -56,6 +56,11 @@ export const OFFER_THEMES = {
     from: "#1F5A4C", to: "#0A1F1A", plateIcon: "#C9F5E4", accent: "#4FD1A5",
     glow: "rgba(79,209,165,0.30)", border: "rgba(79,209,165,0.50)",
   },
+  // 👑 VIP Table Booking — Royal violet-gold, distinct from Cover Charges
+  vipTable: {
+    from: "#3B1F5E", to: "#120A22", plateIcon: "#F0D9A8", accent: "#C89B48",
+    glow: "rgba(168,111,232,0.32)", border: "rgba(200,155,72,0.50)",
+  },
 } satisfies Record<string, OfferTheme>;
 
 export type OfferThemeKey = keyof typeof OFFER_THEMES;

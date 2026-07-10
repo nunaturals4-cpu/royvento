@@ -12,21 +12,26 @@ export type VenueUpdateKind =
   | "free_drinks"
   | "ticket"
   | "cover_charge"
+  | "vip_table"
   | "food_drink"
   | "exclusive";
 
-// Map a drink-plan `type` (welcome | unlimited | ticket | cover_charge) to the
-// notification kind. Free welcome/unlimited drinks both read as "free drinks".
+// Map a drink-plan `type` (welcome | unlimited | ticket | cover_charge |
+// vip_table) to the notification kind. Free welcome/unlimited drinks both
+// read as "free drinks".
 export function drinkPlanKind(type: string): VenueUpdateKind {
   if (type === "ticket") return "ticket";
   if (type === "cover_charge") return "cover_charge";
+  if (type === "vip_table") return "vip_table";
   return "free_drinks";
 }
 
 // Cover-charge changes are the most time-sensitive to a night out, so they jump
 // the queue ahead of a routine food discount when a user has several queued.
+// VIP table packages are equally time-sensitive.
 const PRIORITY: Record<VenueUpdateKind, number> = {
   cover_charge: 3,
+  vip_table: 3,
   ticket: 2,
   free_drinks: 2,
   exclusive: 2,

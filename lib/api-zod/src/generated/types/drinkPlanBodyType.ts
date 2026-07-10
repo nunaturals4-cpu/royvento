@@ -15,4 +15,5 @@ export const DrinkPlanBodyType = {
   ticket: 'ticket',
   custom: 'custom',
   cover_charge: 'cover_charge',
+  vip_table: 'vip_table',
 } as const;

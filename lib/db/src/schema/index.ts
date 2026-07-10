@@ -896,6 +896,8 @@ export const vendorCommissionsTable = pgTable(
     freeEntryRate: numeric("free_entry_rate", { precision: 8, scale: 2 }).notNull().default("0"),
     ticketRate: numeric("ticket_rate", { precision: 8, scale: 2 }).notNull().default("0"),
     tableBookingRate: numeric("table_booking_rate", { precision: 8, scale: 2 }).notNull().default("0"),
+    // VIP Table Booking commission — flat ₹ amount per verified guest, same shape as tableBookingRate.
+    vipTableBookingRate: numeric("vip_table_booking_rate", { precision: 8, scale: 2 }).notNull().default("0"),
     // Event booking commission as a percentage (0–100) of ticket revenue.
     eventRate: numeric("event_rate", { precision: 8, scale: 2 }).notNull().default("0"),
     // Cover-charge commission as a percentage (0–100) of the final package revenue.

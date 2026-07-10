@@ -204,7 +204,8 @@ export default function EventDetailScreen() {
   const [ticketWomen, setTicketWomen] = useState(0);
   const [ticketMen, setTicketMen] = useState(0);
   const [ticketCouple, setTicketCouple] = useState(0);
-  const [pubMode, setPubMode] = useState<"ticket" | "event">("ticket");
+  const [pubMode, setPubMode] = useState<"ticket" | "event" | "vip_table">("ticket");
+  const [vipPackageId, setVipPackageId] = useState("");
   const [occasion, setOccasion] = useState("farewell");
   const [expandedDrinkPlans, setExpandedDrinkPlans] = useState<Set<number>>(new Set());
   const [personName, setPersonName] = useState("");
@@ -315,6 +316,11 @@ export default function EventDetailScreen() {
   const { data: drinkPlans = [] } = useListVendorDrinkPlans(vendorId ?? 0, {
     query: { queryKey: getListVendorDrinkPlansQueryKey(vendorId ?? 0), enabled: isPub && !!vendorId },
   });
+  // VIP table packages: partner-created drink plans of type "vip_table".
+  // Only show the VIP Table Booking option when at least one exists.
+  const vipTablePlans = (drinkPlans as unknown as { id: number; type: string; productName?: string; price: number; peoplePerPackage?: number | null }[]).filter((p) => p.type === "vip_table");
+  const hasVipTablePackages = vipTablePlans.length > 0;
+  const selectedVipTablePlan = vipTablePlans.find((p) => String(p.id) === vipPackageId);
 
   const basePriceWomen = isPub ? parseFloat(String((event as unknown as { priceWomen?: unknown })?.priceWomen ?? 0)) : 0;
   const basePriceMen = isPub ? parseFloat(String((event as unknown as { priceMen?: unknown })?.priceMen ?? 0)) : 0;
@@ -359,14 +365,21 @@ export default function EventDetailScreen() {
       ticketWomen * (isTierFreeMobile("women") ? 0 : priceWomen)
       + ticketMen * (isTierFreeMobile("men") ? 0 : priceMen)
       + ticketCouple * (isTierFreeMobile("couple") ? 0 : priceCouple);
+  } else if (isPub && pubMode === "vip_table") {
+    // Flat package price — NOT multiplied by guests, mirrors web/backend.
+    subtotal = Number(selectedVipTablePlan?.price ?? 0) / 100;
   } else if (isPub && ferAllGendersFreeMobile) {
     subtotal = 0;
   } else {
     subtotal = basePrice * (parseInt(guests) || 1);
   }
   const _ticketsCountMobile = ticketWomen + ticketMen + ticketCouple;
+  // "Fully free" is ticket-mode specific for the priceWomen/Men/Couple-based
+  // isFreeEntryDay heuristic (those fields are irrelevant to table/VIP
+  // pricing) — other modes go purely off their own computed subtotal.
   const bookingIsFullyFreeMobile = isPub && (
-    isFreeEntryDay ||
+    (pubMode === "ticket" && isFreeEntryDay) ||
+    (pubMode !== "ticket" && (ferAllGendersFreeMobile || subtotal === 0)) ||
     (ferDayActiveMobile && pubMode === "ticket" && _ticketsCountMobile > 0 && subtotal === 0)
   );
 
@@ -440,10 +453,13 @@ export default function EventDetailScreen() {
     if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) {
       errs.ticketWomen = t("events.add_tickets_desc");
     }
-    if (isPub && pubMode === "event" && (!parseInt(guests) || parseInt(guests) < 10)) {
+    if (isPub && (pubMode === "event" || pubMode === "vip_table") && (!parseInt(guests) || parseInt(guests) < 10)) {
       errs.guests = t("events.min_guests_desc");
     }
-    if (isPub && (pubMode === "ticket" || pubMode === "event") && !arrivalTime.trim()) {
+    if (isPub && pubMode === "vip_table" && !vipPackageId) {
+      errs.vipPackageId = "Please select a VIP table package";
+    }
+    if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "vip_table") && !arrivalTime.trim()) {
       errs.arrivalTime = t("events.required_field");
     }
     if (isPub && !personName.trim()) errs.personName = t("events.required_field");
@@ -487,6 +503,9 @@ export default function EventDetailScreen() {
         payload.guests = parseInt(guests) || 10;
         payload.notes = occasion;
         payload.selectedPubEvent = "";
+        if (pubMode === "vip_table") {
+          payload.vipPackageId = vipPackageId ? Number(vipPackageId) : undefined;
+        }
       }
       payload.arrivalTime = arrivalTime.trim();
     } else {
@@ -1031,7 +1050,7 @@ export default function EventDetailScreen() {
                 <View style={styles.field}>
                   <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.booking_type")}</Text>
                   <View style={styles.modeRow}>
-                    {(["ticket", "event"] as const).map((m) => (
+                    {(["ticket", "event", ...(hasVipTablePackages ? ["vip_table" as const] : [])] as const).map((m) => (
                       <Pressable
                         key={m}
                         onPress={() => setPubMode(m)}
@@ -1041,12 +1060,12 @@ export default function EventDetailScreen() {
                         ]}
                       >
                         <Ionicons
-                          name={m === "ticket" ? "ticket-outline" : "people-outline"}
+                          name={m === "ticket" ? "ticket-outline" : m === "vip_table" ? "diamond-outline" : "people-outline"}
                           size={14}
                           color={pubMode === m ? colors.primary : colors.mutedForeground}
                         />
                         <Text style={[styles.modeBtnText, { color: pubMode === m ? colors.primary : colors.mutedForeground }]}>
-                          {m === "ticket" ? t("events.buy_tickets") : t("events.table_booking")}
+                          {m === "ticket" ? t("events.buy_tickets") : m === "vip_table" ? "VIP Table Booking" : t("events.table_booking")}
                         </Text>
                       </Pressable>
                     ))}
@@ -1084,8 +1103,46 @@ export default function EventDetailScreen() {
                   </View>
                 )}
 
-                {/* Occasion + guests — event mode */}
-                {pubMode === "event" && (
+                {/* VIP package picker — vip_table mode */}
+                {pubMode === "vip_table" && (
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Select VIP Package <Text style={{ color: "#f87171", fontSize: 11 }}>*</Text></Text>
+                    {fieldErrors.vipPackageId ? (
+                      <Text style={{ color: "#f87171", fontSize: 11, marginBottom: 6 }}>{fieldErrors.vipPackageId}</Text>
+                    ) : null}
+                    <View style={{ gap: 8 }}>
+                      {vipTablePlans.map((p) => {
+                        const plan = p as unknown as { id: number; productName?: string; price: number; peoplePerPackage?: number | null };
+                        const active = String(plan.id) === vipPackageId;
+                        return (
+                          <Pressable
+                            key={plan.id}
+                            onPress={() => { setVipPackageId(String(plan.id)); clearFieldError("vipPackageId"); }}
+                            style={{
+                              borderRadius: 12, borderWidth: 1, padding: 12,
+                              borderColor: active ? colors.primary : colors.border,
+                              backgroundColor: active ? colors.primary + "18" : colors.muted,
+                              flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8,
+                            }}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{plan.productName || "Package"}</Text>
+                              {(plan.peoplePerPackage ?? 0) > 0 && (
+                                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 }}>
+                                  For {plan.peoplePerPackage} people
+                                </Text>
+                              )}
+                            </View>
+                            <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: colors.foreground }}>₹{Number(plan.price / 100).toLocaleString("en-IN")}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
+                {/* Occasion + guests — event / VIP table modes */}
+                {(pubMode === "event" || pubMode === "vip_table") && (
                   <>
                     <View style={styles.field}>
                       <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.occasion_label")}</Text>
@@ -1120,7 +1177,7 @@ export default function EventDetailScreen() {
                   </>
                 )}
 
-                {(pubMode === "ticket" || pubMode === "event") && (
+                {(pubMode === "ticket" || pubMode === "event" || pubMode === "vip_table") && (
                   <View style={styles.field}>
                     <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.arrival_time")} <Text style={{ color: "#f87171", fontSize: 11 }}>*</Text></Text>
                     <TextInput

@@ -87,7 +87,7 @@ const CreateBookingBody = z.object({
   // Required.
   eventType: z.enum(EVENT_TYPES).default("other"),
   budgetRange: z.string().default(""),
-  pubMode: z.enum(["", "ticket", "event", "event_booking", "cover_charge"]).default(""),
+  pubMode: z.enum(["", "ticket", "event", "event_booking", "cover_charge", "vip_table"]).default(""),
   ticketWomen: z.number().int().nonnegative().default(0),
   ticketMen: z.number().int().nonnegative().default(0),
   ticketCouple: z.number().int().nonnegative().default(0),
@@ -96,6 +96,11 @@ const CreateBookingBody = z.object({
   // Cover-charge mode: which package (a drink_plans row of type "cover_charge")
   // the guest is buying. Quantity (number of packages) rides on `guests`.
   coverChargePlanId: z.number().int().positive().optional(),
+  // VIP Table Booking mode: which package (a drink_plans row of type
+  // "vip_table") the guest is booking. Unlike coverChargePlanId, `guests` here
+  // is party size (identical semantics to plain Table Booking), not package
+  // quantity — the package itself is a flat price for the table.
+  vipPackageId: z.number().int().positive().optional(),
   personName: z.string().transform((s) => s.trim()).optional().default(""),
   phone: z.string().transform((s) => s.trim()).optional().default(""),
   paymentMethod: z.enum(["cod", "online"]).default("online"),
@@ -116,6 +121,9 @@ const CreateBookingBody = z.object({
     }
     if (val.pubMode === "cover_charge" && val.guests <= 0) {
       issue("guests", "Select at least one package");
+    }
+    if (val.pubMode === "vip_table" && !val.vipPackageId) {
+      issue("vipPackageId", "Please select a VIP table package");
     }
     if (val.pubMode !== "event_booking" && !val.arrivalTime.trim()) {
       issue("arrivalTime", "Arrival time is required");
@@ -454,6 +462,28 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     coverChargePlan = { id: cp.id, productName: cp.productName, price: cp.price };
   }
 
+  // VIP Table Booking mode: load + validate the selected package (a drink_plans
+  // row of type "vip_table" owned by this venue). Price is a flat package
+  // price taken from the DB row (paise → ₹), not multiplied by guests — guests
+  // stays the party-size field, identical to plain Table Booking.
+  let vipTablePlan: { id: number; productName: string; price: number } | undefined;
+  if (parsed.data.pubMode === "vip_table") {
+    if (!parsed.data.vipPackageId) {
+      res.status(400).json({ error: "Please select a VIP table package" });
+      return;
+    }
+    const [vp] = await db
+      .select({ id: drinkPlansTable.id, productName: drinkPlansTable.productName, price: drinkPlansTable.price, vendorId: drinkPlansTable.vendorId, type: drinkPlansTable.type })
+      .from(drinkPlansTable)
+      .where(eq(drinkPlansTable.id, parsed.data.vipPackageId))
+      .limit(1);
+    if (!vp || vp.vendorId !== evt.vendorId || vp.type !== "vip_table") {
+      res.status(400).json({ error: "Selected VIP table package is not available at this venue." });
+      return;
+    }
+    vipTablePlan = { id: vp.id, productName: vp.productName, price: vp.price };
+  }
+
   // Lock the event commission percentage at booking time so later rate changes
   // never re-price historical bookings (see lib/commission.ts → resolveEventPct).
   let lockedEventPct: string | null = null;
@@ -530,6 +560,12 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     if (guestsCount === 0) guestsCount = 1;
     const pkgPrice = (coverChargePlan?.price ?? 0) / 100;
     totalPrice = pkgPrice * Math.max(1, guestsCount);
+  } else if (evt.type === "pub" && parsed.data.pubMode === "vip_table") {
+    // VIP Table Booking: flat package price (paise → ₹), NOT multiplied by
+    // guests — guests is party size, priced independently of the package.
+    // Free-entry rules and the standard cover do NOT apply to VIP packages.
+    if (guestsCount === 0) guestsCount = 1;
+    totalPrice = (vipTablePlan?.price ?? 0) / 100;
   } else {
     // Table / event-mode: no per-gender concept, so only treat as free when
     // every gender is listed. Otherwise charge the regular cover.
@@ -583,15 +619,17 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       const vc = vcRows[0];
       if (vc) {
         // Applicability check. Each pub booking mode maps to its own coupon
-        // target: ticket, cover_charge, event_booking (event tickets), and event
-        // (table reservations).
+        // target: ticket, cover_charge, event_booking (event tickets), event
+        // (table reservations), and vip_table (VIP table bookings).
         const bookingKind = parsed.data.pubMode === "ticket"
           ? "ticket"
           : parsed.data.pubMode === "cover_charge"
             ? "cover_charge"
             : parsed.data.pubMode === "event_booking"
               ? "event_booking"
-              : "event";
+              : parsed.data.pubMode === "vip_table"
+                ? "vip_table"
+                : "event";
         if (vc.applicableTo !== "both" && vc.applicableTo !== bookingKind) {
           const label = vc.applicableTo === "cover_charge"
             ? "cover charge"
@@ -599,7 +637,9 @@ router.post("/bookings", requireAuth(), async (req, res) => {
               ? "event"
               : vc.applicableTo === "event"
                 ? "table"
-                : vc.applicableTo;
+                : vc.applicableTo === "vip_table"
+                  ? "VIP table"
+                  : vc.applicableTo;
           res.status(400).json({ error: `This coupon is only valid for ${label} bookings.` });
           return;
         }
@@ -713,7 +753,9 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       ? announcementRow.title
       : parsed.data.pubMode === "cover_charge" && coverChargePlan
         ? coverChargePlan.productName
-        : (parsed.data.selectedPubEvent || ""),
+        : parsed.data.pubMode === "vip_table" && vipTablePlan
+          ? vipTablePlan.productName
+          : (parsed.data.selectedPubEvent || ""),
     announcementId: parsed.data.announcementId ?? null,
     eventCommissionPct: lockedEventPct,
     personName: parsed.data.personName || user.name,
@@ -974,8 +1016,8 @@ router.get("/partner/analytics", requireAuth(["vendor", "admin"]), async (req, r
     res.json({
       totalEarnings: 0, monthEarnings: 0, codRevenue: 0, onlineRevenue: 0,
       grossEarnings: 0, netEarnings: 0, totalCommission: 0, codCommission: 0, onlineCommission: 0,
-      commissionRates: { freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0", eventRate: "0" },
-      commissionSummary: { freeEntry: emptyTypeSummary, ticket: emptyTypeSummary, table: emptyTypeSummary, eventBooking: emptyTypeSummary },
+      commissionRates: { freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0", eventRate: "0", coverChargeRate: "0", vipTableBookingRate: "0" },
+      commissionSummary: { freeEntry: emptyTypeSummary, ticket: emptyTypeSummary, table: emptyTypeSummary, eventBooking: emptyTypeSummary, coverCharge: emptyTypeSummary, vipTable: emptyTypeSummary },
       perEvent: [], dailyRevenue: [], dailyCommission: [],
       totalWomen: 0, totalMen: 0, totalCouple: 0,
     });
@@ -1038,6 +1080,8 @@ router.get("/partner/analytics", requireAuth(["vendor", "admin"]), async (req, r
       ticket:       { count: 0, comm: 0, gross: 0, people: 0 },
       table:        { count: 0, comm: 0, gross: 0, people: 0 },
       eventBooking: { count: 0, comm: 0, gross: 0, people: 0 },
+      coverCharge:  { count: 0, comm: 0, gross: 0, people: 0 },
+      vipTable:     { count: 0, comm: 0, gross: 0, people: 0 },
     };
     const evt = commEventMap.get(b.eventId);
     const fer = (evt as { freeEntryRules?: { enabled?: boolean; days?: string[]; genders?: string[] } | null } | undefined)?.freeEntryRules ?? null;
@@ -1047,13 +1091,20 @@ router.get("/partner/analytics", requireAuth(["vendor", "admin"]), async (req, r
       { priceWomen: evt?.priceWomen, priceMen: evt?.priceMen, priceCouple: evt?.priceCouple },
       fer,
     );
+    // Each booking falls into exactly ONE bucket, matching admin's
+    // classifyBookingType 1:1 — cover_charge and vip_table each get their
+    // own bucket instead of silently merging into "table".
     const bucket = result.bookingType === "free_entry"
       ? "freeEntry"
       : result.bookingType === "ticket"
         ? "ticket"
         : result.bookingType === "event_booking"
           ? "eventBooking"
-          : "table";
+          : result.bookingType === "cover_charge"
+            ? "coverCharge"
+            : result.bookingType === "vip_table"
+              ? "vipTable"
+              : "table";
     out[bucket].count = 1;
     out[bucket].comm = result.amount;
     out[bucket].gross = grossRev;
@@ -1062,7 +1113,8 @@ router.get("/partner/analytics", requireAuth(["vendor", "admin"]), async (req, r
   }
 
   function commTotal(split: ReturnType<typeof calcCommSplit>) {
-    return split.freeEntry.comm + split.ticket.comm + split.table.comm + split.eventBooking.comm;
+    return split.freeEntry.comm + split.ticket.comm + split.table.comm + split.eventBooking.comm
+      + split.coverCharge.comm + split.vipTable.comm;
   }
 
   // Summary figures
@@ -1081,6 +1133,8 @@ router.get("/partner/analytics", requireAuth(["vendor", "admin"]), async (req, r
     ticket:       { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
     table:        { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
     eventBooking: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
+    coverCharge:  { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
+    vipTable:     { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
   };
 
   // Per-booking effective revenue: online → finalPrice; COD → actual cash
@@ -1166,7 +1220,7 @@ router.get("/partner/analytics", requireAuth(["vendor", "admin"]), async (req, r
     else pendingCommission += commissionAmount;
     if (isCod) codCommission += commissionAmount;
     else onlineCommission += commissionAmount;
-    for (const k of ["freeEntry", "ticket", "table", "eventBooking"] as const) {
+    for (const k of ["freeEntry", "ticket", "table", "eventBooking", "coverCharge", "vipTable"] as const) {
       commSummary[k].count += split[k].count;
       commSummary[k].grossRevenue += split[k].gross;
       commSummary[k].commissionAmount += rnd2(split[k].comm);
@@ -1298,12 +1352,16 @@ router.get("/partner/analytics", requireAuth(["vendor", "admin"]), async (req, r
       ticketRate: commRow?.ticketRate ?? "0",
       tableBookingRate: commRow?.tableBookingRate ?? "0",
       eventRate: commRow?.eventRate ?? "0",
+      coverChargeRate: commRow?.coverChargeRate ?? "0",
+      vipTableBookingRate: commRow?.vipTableBookingRate ?? "0",
     },
     commissionSummary: {
       freeEntry:    { count: commSummary.freeEntry.count,    grossRevenue: Math.round(commSummary.freeEntry.grossRevenue),    commissionAmount: rnd2(commSummary.freeEntry.commissionAmount),    netRevenue: Math.round(commSummary.freeEntry.netRevenue),    peopleCount: commSummary.freeEntry.peopleCount },
       ticket:       { count: commSummary.ticket.count,       grossRevenue: Math.round(commSummary.ticket.grossRevenue),       commissionAmount: rnd2(commSummary.ticket.commissionAmount),       netRevenue: Math.round(commSummary.ticket.netRevenue),       peopleCount: commSummary.ticket.peopleCount },
       table:        { count: commSummary.table.count,        grossRevenue: Math.round(commSummary.table.grossRevenue),        commissionAmount: rnd2(commSummary.table.commissionAmount),        netRevenue: Math.round(commSummary.table.netRevenue),        peopleCount: commSummary.table.peopleCount },
       eventBooking: { count: commSummary.eventBooking.count, grossRevenue: Math.round(commSummary.eventBooking.grossRevenue), commissionAmount: rnd2(commSummary.eventBooking.commissionAmount), netRevenue: Math.round(commSummary.eventBooking.netRevenue), peopleCount: commSummary.eventBooking.peopleCount },
+      coverCharge:  { count: commSummary.coverCharge.count,  grossRevenue: Math.round(commSummary.coverCharge.grossRevenue),  commissionAmount: rnd2(commSummary.coverCharge.commissionAmount),  netRevenue: Math.round(commSummary.coverCharge.netRevenue),  peopleCount: commSummary.coverCharge.peopleCount },
+      vipTable:     { count: commSummary.vipTable.count,     grossRevenue: Math.round(commSummary.vipTable.grossRevenue),     commissionAmount: rnd2(commSummary.vipTable.commissionAmount),     netRevenue: Math.round(commSummary.vipTable.netRevenue),     peopleCount: commSummary.vipTable.peopleCount },
     },
     perEvent: perEventArr,
     dailyRevenue,

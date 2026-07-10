@@ -673,6 +673,7 @@ async function applyPendingSchemaChanges() {
     await execSafe(sql`ALTER TABLE "vendor_commissions" ADD COLUMN IF NOT EXISTS "event_rate" numeric(8,2) NOT NULL DEFAULT '0'`);
     await execSafe(sql`ALTER TABLE "vendor_commissions" ADD COLUMN IF NOT EXISTS "event_commission_enabled" boolean NOT NULL DEFAULT true`);
     await execSafe(sql`ALTER TABLE "vendor_commissions" ADD COLUMN IF NOT EXISTS "cover_charge_rate" numeric(8,2) NOT NULL DEFAULT '0'`);
+    await execSafe(sql`ALTER TABLE "vendor_commissions" ADD COLUMN IF NOT EXISTS "vip_table_booking_rate" numeric(8,2) NOT NULL DEFAULT '0'`);
     await execSafe(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "price" numeric(10,2) NOT NULL DEFAULT '0'`);
     await execSafe(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "event_commission_pct" numeric(5,2)`);
     // ── Food & Drink discount offers (vendor_offers) ───────────────────────
