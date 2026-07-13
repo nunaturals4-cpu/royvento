@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
@@ -90,7 +91,7 @@ export default function OrganizerEventDetailScreen() {
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         <View style={styles.cover}>
           {event.coverImageUrl ? (
-            <Image source={{ uri: event.coverImageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            <Image source={{ uri: resolveImageUrl(event.coverImageUrl) }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.muted }]} />
           )}

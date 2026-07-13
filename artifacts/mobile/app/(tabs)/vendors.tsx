@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { customFetch, type Vendor } from "@workspace/api-client-react";
@@ -56,7 +57,7 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
     >
       <View style={styles.imageWrap}>
         {image ? (
-          <Image source={{ uri: image }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <Image source={{ uri: resolveImageUrl(image) }} style={StyleSheet.absoluteFill} contentFit="cover" />
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
             <Ionicons name="business-outline" size={32} color={colors.mutedForeground} />

@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -286,7 +287,7 @@ function OnboardingWizard({
           <Label c={c}>Take a live selfie (camera only — no gallery)</Label>
           <View style={{ width: 220, height: 220, alignSelf: "center", borderRadius: 18, overflow: "hidden", backgroundColor: c.muted, marginBottom: 12, borderColor: c.border, borderWidth: 1 }}>
             {selfieUri ? (
-              <Image source={{ uri: selfieUri }} style={{ width: "100%", height: "100%" }} />
+              <Image source={{ uri: resolveImageUrl(selfieUri) }} style={{ width: "100%", height: "100%" }} />
             ) : camOn ? (
               <CameraView ref={cameraRef} style={{ flex: 1 }} facing="front" />
             ) : (

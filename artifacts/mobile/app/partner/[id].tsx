@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -357,7 +358,7 @@ export default function PartnerDetailScreen() {
       <View style={{ height: 380, position: "relative", overflow: "hidden" }}>
         {(vendor.coverImageUrl || vendor.bannerImage) ? (
           <Image
-            source={{ uri: vendor.coverImageUrl || vendor.bannerImage }}
+            source={{ uri: resolveImageUrl(vendor.coverImageUrl || vendor.bannerImage) }}
             style={StyleSheet.absoluteFillObject}
             contentFit="cover"
           />
@@ -755,7 +756,7 @@ export default function PartnerDetailScreen() {
                   {(vendor.danceFloorPhotos ?? []).map((img, i) => (
                     <Image
                       key={i}
-                      source={{ uri: img }}
+                      source={{ uri: resolveImageUrl(img) }}
                       style={{ width: 140, height: 100, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
                       contentFit="cover"
                     />
@@ -775,7 +776,7 @@ export default function PartnerDetailScreen() {
                 {vendor.portfolioImages!.map((img, i) => (
                   <Image
                     key={i}
-                    source={{ uri: img }}
+                    source={{ uri: resolveImageUrl(img) }}
                     style={[styles.portfolioImg, { borderColor: colors.border }]}
                     contentFit="cover"
                   />
@@ -895,7 +896,7 @@ export default function PartnerDetailScreen() {
             <Ionicons name="close" size={22} color="#fff" />
           </TouchableOpacity>
           {lightboxImage ? (
-            <Image source={{ uri: lightboxImage }} style={{ width: "100%", height: "85%" }} contentFit="contain" />
+            <Image source={{ uri: resolveImageUrl(lightboxImage) }} style={{ width: "100%", height: "85%" }} contentFit="contain" />
           ) : null}
         </Pressable>
       </Modal>

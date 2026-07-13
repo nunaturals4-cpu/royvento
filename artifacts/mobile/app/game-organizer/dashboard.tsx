@@ -1,8 +1,11 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import * as Sharing from "expo-sharing";
 import { router, Stack } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -50,12 +53,22 @@ interface GamePackage {
   approvalStatus: string; rejectionReason: string; soldCount: number;
 }
 interface Analytics {
-  totals: { bookings: number; tickets: number; revenue: string; attended: number; attendanceRate: number };
-  perEvent?: { id: number; title: string; tickets: number; revenue: string; attended: number }[];
+  totals: { bookings: number; players: number; revenue: string; attended: number; attendanceRate: number; conversionRate: number; totalCustomers: number; repeatCustomers: number };
+  popularGames: { id: number; name: string; bookings: number; players: number; revenue: string }[];
+  popularPackages: { id: number; name: string; bookings: number; revenue: string }[];
+  peakHours: { hour: string; bookings: number }[];
 }
 interface BookingRow {
-  id: number; quantity: number; amount: string; checkedIn: boolean; attendee: string; phone: string; eventTitle: string; ticketType: string;
+  id: number; createdAt: string; bookingDate: string; time: string | null; durationHours: string | null;
+  persons: number; amount: string; checkedIn: boolean; attendee: string; phone: string; email: string;
+  itemName: string; gameName: string | null; packageName: string | null; bookingLocation?: string;
 }
+interface LeadView {
+  viewerUserId: number | null; viewerName: string; viewerEmail: string; phone: string;
+  visitCount: number; lastViewedAt: string | null; hasBooked: boolean;
+}
+interface LeadsPayload { totalViews: number; bookedCount: number; views: LeadView[]; }
+interface AdRequest { id: number; status: string; note: string; adminNote: string; createdAt: string; gameName: string; featured: boolean; }
 interface Coupon {
   id: number; code: string; discountType: string; discountValue: string; gameId: number | null;
   active: boolean; maxUses: number | null; usedCount: number; expiresAt: string | null;
@@ -76,7 +89,9 @@ const TABS: { key: string; label: string; icon: React.ComponentProps<typeof Ioni
   { key: "games", label: "Games", icon: "game-controller-outline" },
   { key: "packages", label: "Packages", icon: "cube-outline" },
   { key: "bookings", label: "Bookings", icon: "ticket-outline" },
+  { key: "leads", label: "Leads", icon: "eye-outline" },
   { key: "coupons", label: "Coupons", icon: "pricetag-outline" },
+  { key: "promote", label: "Promote", icon: "megaphone-outline" },
   { key: "managers", label: "Managers", icon: "people-outline" },
   { key: "earnings", label: "Earnings", icon: "cash-outline" },
   { key: "scanner", label: "Scanner", icon: "qr-code-outline" },
@@ -115,7 +130,9 @@ export default function GameOrganizerDashboardScreen() {
         {tab === "games" && <GamesTab colors={colors} insets={insets} />}
         {tab === "packages" && <PackagesTab colors={colors} insets={insets} />}
         {tab === "bookings" && <BookingsTab colors={colors} insets={insets} />}
+        {tab === "leads" && <LeadsTab colors={colors} insets={insets} />}
         {tab === "coupons" && <CouponsTab colors={colors} insets={insets} />}
+        {tab === "promote" && <PromoteTab colors={colors} insets={insets} />}
         {tab === "managers" && <ManagersTab colors={colors} insets={insets} />}
         {tab === "earnings" && <EarningsTab colors={colors} insets={insets} />}
         {tab === "scanner" && <ScannerTab colors={colors} insets={insets} />}
@@ -135,10 +152,17 @@ function OverviewTab({ colors, insets }: { colors: Pal; insets: { bottom: number
   const t = an?.totals;
   const cards = [
     { label: "Bookings", value: String(t?.bookings ?? 0), icon: "ticket-outline" as const },
-    { label: "Players", value: String(t?.tickets ?? 0), icon: "people-outline" as const },
+    { label: "Players", value: String(t?.players ?? 0), icon: "people-outline" as const },
     { label: "Revenue", value: inr(t?.revenue ?? 0), icon: "cash-outline" as const },
-    { label: "Attended", value: String(t?.attended ?? 0), icon: "checkmark-done-outline" as const },
+    { label: "Attendance", value: `${t?.attendanceRate ?? 0}%`, icon: "checkmark-done-outline" as const },
+    { label: "Conversion", value: `${t?.conversionRate ?? 0}%`, icon: "trending-up-outline" as const },
+    { label: "Customers", value: String(t?.totalCustomers ?? 0), icon: "person-outline" as const },
+    { label: "Repeat customers", value: String(t?.repeatCustomers ?? 0), icon: "repeat-outline" as const },
   ];
+  const popularGames = (an?.popularGames ?? []).filter((g) => g.bookings > 0).slice(0, 8);
+  const popularPackages = (an?.popularPackages ?? []).filter((p) => p.bookings > 0).slice(0, 8);
+  const peakHours = an?.peakHours ?? [];
+  const peakMax = Math.max(1, ...peakHours.map((h) => h.bookings));
   return (
     <ScrollView contentContainerStyle={[{ padding: 16 }, useBottomPad(insets)]}>
       <View style={styles.statGrid}>
@@ -150,6 +174,48 @@ function OverviewTab({ colors, insets }: { colors: Pal; insets: { bottom: number
           </View>
         ))}
       </View>
+
+      {popularGames.length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Most popular games</Text>
+          <View style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border, gap: 8 }]}>
+            {popularGames.map((g) => (
+              <View key={g.id} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_500Medium" }} numberOfLines={1}>{g.name}</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{g.bookings} bookings · {inr(g.revenue)}</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+
+      {popularPackages.length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Most popular packages</Text>
+          <View style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border, gap: 8 }]}>
+            {popularPackages.map((p) => (
+              <View key={p.id} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_500Medium" }} numberOfLines={1}>{p.name}</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{p.bookings} bookings · {inr(p.revenue)}</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+
+      {peakHours.length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Peak booking hours</Text>
+          <View style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "row", alignItems: "flex-end", gap: 4, height: 110 }]}>
+            {peakHours.map((h) => (
+              <View key={h.hour} style={{ flex: 1, alignItems: "center", gap: 4 }}>
+                <View style={{ width: "100%", borderRadius: 3, backgroundColor: colors.primary + "50", height: Math.max(2, (h.bookings / peakMax) * 70) }} />
+                <Text style={{ fontSize: 8, color: colors.mutedForeground }}>{h.hour}</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -174,7 +240,7 @@ function GamesTab({ colors, insets }: { colors: Pal; insets: { bottom: number } 
       {games.length === 0 ? <Text style={[styles.empty, { color: colors.mutedForeground }]}>No games yet.</Text> : games.map((g) => (
         <View key={g.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
-            {g.coverImageUrl ? <Image source={{ uri: g.coverImageUrl }} style={styles.thumb} contentFit="cover" /> : <View style={[styles.thumb, { backgroundColor: colors.muted }]} />}
+            {g.coverImageUrl ? <Image source={{ uri: resolveImageUrl(g.coverImageUrl) }} style={styles.thumb} contentFit="cover" /> : <View style={[styles.thumb, { backgroundColor: colors.muted }]} />}
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{g.name}</Text>
               <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{g.pricingModel === "hourly" ? `${inr(g.hourlyRate)}/hr` : `${inr(g.price)}/person`} · {g.category}</Text>
@@ -227,7 +293,7 @@ function GameEditor({ colors, insets, game, onDone }: { colors: Pal; insets: { b
     <ScrollView contentContainerStyle={[{ padding: 16 }, useBottomPad(insets)]}>
       <BackRow colors={colors} label={isEdit ? "Edit game" : "Add a game"} onBack={onDone} />
       <Pressable onPress={pickCover} style={[styles.coverPick, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-        {f.coverImageUrl ? <Image source={{ uri: f.coverImageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : (<><Ionicons name="image-outline" size={26} color={colors.mutedForeground} /><Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 4 }}>Add cover image</Text></>)}
+        {f.coverImageUrl ? <Image source={{ uri: resolveImageUrl(f.coverImageUrl) }} style={StyleSheet.absoluteFill} contentFit="cover" /> : (<><Ionicons name="image-outline" size={26} color={colors.mutedForeground} /><Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 4 }}>Add cover image</Text></>)}
       </Pressable>
       <Field colors={colors} label="Game name *"><Inp colors={colors} value={f.name} onChangeText={(v) => upd("name", v)} placeholder="e.g. VR Arena" /></Field>
       <Field colors={colors} label="Category"><Chips colors={colors} options={GAME_CATEGORIES} value={f.category} onChange={(v) => upd("category", v)} /></Field>
@@ -318,18 +384,48 @@ function PackageEditor({ colors, insets, pkg, onDone }: { colors: Pal; insets: {
 function BookingsTab({ colors, insets }: { colors: Pal; insets: { bottom: number } }) {
   const [rows, setRows] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   useEffect(() => { customFetch<BookingRow[]>("/api/game-organizer/bookings").then(setRows).catch(() => setRows([])).finally(() => setLoading(false)); }, []);
+
+  async function exportCsv() {
+    if (rows.length === 0) return;
+    setExporting(true);
+    try {
+      const header = ["Booking", "Item", "Attendee", "Phone", "Email", "Persons", "Amount", "Date", "Time", "Location", "CheckedIn"];
+      const lines = rows.map((r) => [r.id, r.itemName || r.gameName || r.packageName || "", r.attendee, r.phone, r.email, r.persons, r.amount, r.bookingDate, r.time ?? "", r.bookingLocation ?? "", r.checkedIn ? "yes" : "no"]
+        .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","));
+      const csv = [header.join(","), ...lines].join("\n");
+      const path = `${FileSystem.documentDirectory}royvento-leads.csv`;
+      await FileSystem.writeAsStringAsync(path, csv, { encoding: "utf8" });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(path, { mimeType: "text/csv", dialogTitle: "Export bookings & leads" });
+      }
+    } catch {
+      Alert.alert("Export failed", "Could not export bookings to CSV.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (loading) return <Centered colors={colors} />;
   return (
     <ScrollView contentContainerStyle={[{ padding: 16 }, useBottomPad(insets)]}>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 0 }]}>Booking report</Text>
+        <SmallBtn colors={colors} icon="download-outline" label={exporting ? "Exporting…" : "CSV"} onPress={exportCsv} />
+      </View>
       {rows.length === 0 ? <Text style={[styles.empty, { color: colors.mutedForeground }]}>No bookings yet.</Text> : rows.map((b) => (
         <View key={b.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{b.attendee || "Guest"}</Text>
             <View style={[styles.checkPill, { backgroundColor: b.checkedIn ? "#16a34a22" : colors.muted }]}><Text style={{ color: b.checkedIn ? "#4ade80" : colors.mutedForeground, fontSize: 10, fontFamily: "Inter_600SemiBold" }}>{b.checkedIn ? "Checked in" : "Not arrived"}</Text></View>
           </View>
-          <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{b.eventTitle} · {b.ticketType} ×{b.quantity} · {inr(b.amount)}</Text>
-          {!!b.phone && <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{b.phone}</Text>}
+          <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>
+            {b.itemName || b.gameName || b.packageName || "—"}{b.durationHours ? ` · ${Number(b.durationHours)}h` : ""} · {b.persons} {b.persons === 1 ? "person" : "persons"} · {inr(b.amount)}
+          </Text>
+          <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{b.bookingDate}{b.time ? ` · ${b.time}` : ""}</Text>
+          {(!!b.phone || !!b.email) && <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{[b.phone, b.email].filter(Boolean).join(" · ")}</Text>}
+          {!!b.bookingLocation && <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{b.bookingLocation}</Text>}
         </View>
       ))}
     </ScrollView>
@@ -368,6 +464,118 @@ function CouponsTab({ colors, insets }: { colors: Pal; insets: { bottom: number 
           </View>
           <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{c.discountType === "fixed" ? inr(c.discountValue) : `${c.discountValue}%`} off · used {c.usedCount}{c.maxUses ? `/${c.maxUses}` : ""}</Text>
           <View style={styles.rowActions}><SmallBtn colors={colors} icon="trash-outline" label="Delete" danger onPress={() => remove(c)} /></View>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+// ─── Leads (profile views + already-booked) ──────────────────────────────────
+function LeadsTab({ colors, insets }: { colors: Pal; insets: { bottom: number } }) {
+  const [data, setData] = useState<LeadsPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    customFetch<LeadsPayload>("/api/game-organizer/leads").then(setData).catch(() => setData(null)).finally(() => setLoading(false));
+  }, []);
+  if (loading) return <Centered colors={colors} />;
+  return (
+    <ScrollView contentContainerStyle={[{ padding: 16 }, useBottomPad(insets)]}>
+      <Text style={{ color: colors.mutedForeground, fontSize: 13, marginBottom: 12 }}>People who viewed your page, and who's already booked.</Text>
+      <View style={styles.statGrid}>
+        <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border, flex: 1 }]}>
+          <Ionicons name="eye-outline" size={20} color={colors.primary} />
+          <Text style={[styles.statValue, { color: colors.foreground }]}>{data?.totalViews ?? 0}</Text>
+          <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Profile views</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border, flex: 1 }]}>
+          <Ionicons name="trending-up-outline" size={20} color="#4ade80" />
+          <Text style={[styles.statValue, { color: "#4ade80" }]}>{data?.bookedCount ?? 0}</Text>
+          <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Already booked</Text>
+        </View>
+      </View>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent visitors</Text>
+      {!data || data.views.length === 0 ? (
+        <Text style={[styles.empty, { color: colors.mutedForeground }]}>No one has viewed your page yet.</Text>
+      ) : data.views.map((v, i) => (
+        <View key={i} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={[styles.rowTitle, { color: colors.foreground, fontStyle: v.viewerUserId ? "normal" : "italic" }]} numberOfLines={1}>{v.viewerName}</Text>
+            {v.hasBooked && <View style={[styles.checkPill, { backgroundColor: "#16a34a22" }]}><Text style={{ color: "#4ade80", fontSize: 10, fontFamily: "Inter_600SemiBold" }}>Booked</Text></View>}
+          </View>
+          <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>
+            {[v.viewerEmail, v.phone].filter(Boolean).join(" · ") || "—"} · {v.visitCount} visit{v.visitCount === 1 ? "" : "s"}
+            {v.lastViewedAt ? ` · last ${new Date(v.lastViewedAt).toLocaleDateString()}` : ""}
+          </Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+// ─── Promote / Ads (request to feature a game in the featured slider) ────────
+function PromoteTab({ colors, insets }: { colors: Pal; insets: { bottom: number } }) {
+  const [games, setGames] = useState<Game[]>([]);
+  const [rows, setRows] = useState<AdRequest[]>([]);
+  const [gameId, setGameId] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(() => { customFetch<AdRequest[]>("/api/game-organizer/ads").then(setRows).catch(() => setRows([])); }, []);
+  useEffect(() => {
+    customFetch<Game[]>("/api/game-organizer/games").then((all) => setGames(all.filter((g) => g.approvalStatus === "approved"))).catch(() => setGames([]));
+    load();
+  }, [load]);
+
+  async function submit() {
+    if (!gameId) { Alert.alert("Pick a game"); return; }
+    setSaving(true);
+    try {
+      await customFetch("/api/game-organizer/ads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ gameId: Number(gameId), note }) });
+      setGameId(null); setNote(""); load();
+    } catch (e) {
+      Alert.alert("Request failed", (e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ScrollView contentContainerStyle={[{ padding: 16 }, useBottomPad(insets)]}>
+      <Text style={{ color: colors.mutedForeground, fontSize: 13, marginBottom: 12 }}>Request to feature a game in the Royvento featured slider. Admin reviews each request.</Text>
+      <View style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Field colors={colors} label="Game">
+          {games.length === 0 ? (
+            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No approved games yet.</Text>
+          ) : (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              {games.map((g) => {
+                const active = gameId === String(g.id);
+                return (
+                  <Pressable key={g.id} onPress={() => setGameId(String(g.id))} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary + "22" : "transparent" }}>
+                    <Text style={{ color: active ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }} numberOfLines={1}>{g.name}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </Field>
+        <Field colors={colors} label="Note (optional)">
+          <Inp colors={colors} value={note} onChangeText={setNote} placeholder="Why should this be featured?" multiline />
+        </Field>
+        <PrimaryBtn colors={colors} label={saving ? "Requesting…" : "Request promotion"} onPress={submit} disabled={saving} />
+      </View>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Your requests</Text>
+      {rows.length === 0 ? (
+        <Text style={[styles.empty, { color: colors.mutedForeground }]}>No promotion requests yet.</Text>
+      ) : rows.map((r) => (
+        <View key={r.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={[styles.rowTitle, { color: colors.foreground, flex: 1 }]} numberOfLines={1}>{r.gameName}</Text>
+            {r.featured && <View style={[styles.checkPill, { backgroundColor: "#f59e0b22", marginLeft: 6 }]}><Text style={{ color: "#fbbf24", fontSize: 10, fontFamily: "Inter_600SemiBold" }}>Featured</Text></View>}
+          </View>
+          <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>
+            {new Date(r.createdAt).toLocaleDateString()} · <Text style={{ textTransform: "capitalize" }}>{r.status}</Text>{r.adminNote ? ` · ${r.adminNote}` : ""}
+          </Text>
         </View>
       ))}
     </ScrollView>

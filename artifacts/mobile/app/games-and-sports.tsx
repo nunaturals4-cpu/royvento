@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
@@ -87,7 +88,7 @@ export default function GamesAndSportsScreen() {
         {/* Hero */}
         <View style={styles.hero}>
           <Image
-            source={{ uri: "https://images.unsplash.com/photo-1551958219-acbc608c6377?w=1200&q=80" }}
+            source={{ uri: resolveImageUrl("https://images.unsplash.com/photo-1551958219-acbc608c6377?w=1200&q=80") }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
           />
@@ -167,7 +168,7 @@ export default function GamesAndSportsScreen() {
               >
                 <View style={styles.cardImage}>
                   {g.coverImageUrl ? (
-                    <Image source={{ uri: g.coverImageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                    <Image source={{ uri: resolveImageUrl(g.coverImageUrl) }} style={StyleSheet.absoluteFill} contentFit="cover" />
                   ) : (
                     <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: colors.muted }]}>
                       <Ionicons name="game-controller-outline" size={30} color={colors.mutedForeground} />

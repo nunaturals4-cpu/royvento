@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import {
   customFetch,
@@ -14,10 +15,11 @@ import {
 } from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -127,6 +129,46 @@ interface AdminAnnouncement {
   vendorId: number;
   vendorName: string;
   createdAt: string;
+}
+
+interface PendingAnnouncement {
+  id: number;
+  title: string;
+  body: string;
+  announceDate: string;
+  announceTime: string;
+  imageUrl: string | null;
+  price: string;
+  genre: string;
+  eventType: string;
+  vendorId: number;
+  vendorName: string;
+  createdAt: string;
+}
+
+// Mirrors artifacts/royvento/src/lib/navItems.ts — key is the stable identifier
+// persisted in site_settings → hidden_nav_links; never rename once shipped.
+const MOBILE_NAV_ITEMS: { key: string; label: string }[] = [
+  { key: "home", label: "Home" },
+  { key: "tonight-plans", label: "Tonight Plans" },
+  { key: "pubs", label: "Pubs & Clubs" },
+  { key: "events", label: "Events" },
+  { key: "games", label: "Games & Sports" },
+  { key: "pub-offers", label: "Happy Hours" },
+  { key: "solo-connect", label: "Solo Connect" },
+  { key: "private-parties", label: "Create & Join Private Parties" },
+];
+
+interface SliderOrganizerEvent {
+  id: number;
+  title: string;
+  slug: string;
+  category: string;
+  imageUrl: string | null;
+  approvalStatus: string;
+  isFeaturedSlider: boolean;
+  startDate: string | null;
+  organizerName: string;
 }
 
 interface AdminVendorFull {
@@ -442,12 +484,26 @@ interface CommissionRates {
   freeEntryRate: string;
   ticketRate: string;
   tableBookingRate: string;
+  vipTableBookingRate: string;
+  eventRate: string;
+  coverChargeRate: string;
+  eventCommissionEnabled: boolean;
 }
+
+const DEFAULT_COMMISSION_RATES: CommissionRates = {
+  freeEntryRate: "0",
+  ticketRate: "0",
+  tableBookingRate: "0",
+  vipTableBookingRate: "0",
+  eventRate: "0",
+  coverChargeRate: "0",
+  eventCommissionEnabled: true,
+};
 
 interface CommissionReportBookingLine {
   id: number;
   finalPrice: number;
-  bookingType: "free_entry" | "ticket" | "table";
+  bookingType: "free_entry" | "ticket" | "table" | "event_booking" | "cover_charge" | "vip_table";
   commissionRate: number;
   unitCount: number;
   commissionAmount: number;
@@ -458,7 +514,7 @@ interface CommissionReportVendorRow {
   vendorId: number;
   businessName: string;
   city: string;
-  appliedRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string };
+  appliedRates: CommissionRates;
   totalBookings: number;
   totalRevenue: number;
   totalCommission: number;
@@ -471,6 +527,16 @@ interface CommissionReportVendorRow {
   tableCount: number;
   tableRevenue: number;
   tableCommission: number;
+  eventBookingCount: number;
+  eventBookingRevenue: number;
+  eventBookingCommission: number;
+  coverChargeCount: number;
+  coverChargeRevenue: number;
+  coverChargeCommission: number;
+  vipTableCount: number;
+  vipTableRevenue: number;
+  vipTableCommission: number;
+  vipTablePeople: number;
   bookings: CommissionReportBookingLine[];
 }
 
@@ -510,7 +576,7 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
               rateMap[v.id] = r;
               errorMap[v.id] = false;
             } catch {
-              rateMap[v.id] = { freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0" };
+              rateMap[v.id] = { ...DEFAULT_COMMISSION_RATES };
               errorMap[v.id] = true;
             }
           }),
@@ -554,6 +620,10 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
           freeEntryRate: Number(draft.freeEntryRate),
           ticketRate: Number(draft.ticketRate),
           tableBookingRate: Number(draft.tableBookingRate),
+          vipTableBookingRate: Number(draft.vipTableBookingRate),
+          eventRate: Number(draft.eventRate),
+          coverChargeRate: Number(draft.coverChargeRate),
+          eventCommissionEnabled: draft.eventCommissionEnabled !== false,
         }),
       });
       setRates((prev) => ({ ...prev, [vendorId]: updated }));
@@ -568,23 +638,31 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
     }
   }
 
-  function setDraft(vendorId: number, field: keyof CommissionRates, value: string) {
-    setDrafts((prev) => ({ ...prev, [vendorId]: { ...(prev[vendorId] ?? { freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0" }), [field]: value } }));
+  function setDraft(vendorId: number, field: keyof CommissionRates, value: string | boolean) {
+    setDrafts((prev) => ({ ...prev, [vendorId]: { ...(prev[vendorId] ?? { ...DEFAULT_COMMISSION_RATES }), [field]: value } }));
   }
 
   const isDirty = (vendorId: number) => {
     const d = drafts[vendorId];
     const r = rates[vendorId];
     if (!d || !r) return false;
-    return d.freeEntryRate !== r.freeEntryRate || d.ticketRate !== r.ticketRate || d.tableBookingRate !== r.tableBookingRate;
+    return (
+      d.freeEntryRate !== r.freeEntryRate ||
+      d.ticketRate !== r.ticketRate ||
+      d.tableBookingRate !== r.tableBookingRate ||
+      d.vipTableBookingRate !== (r.vipTableBookingRate ?? "0") ||
+      d.eventRate !== (r.eventRate ?? "0") ||
+      d.coverChargeRate !== (r.coverChargeRate ?? "0") ||
+      (d.eventCommissionEnabled !== false) !== (r.eventCommissionEnabled !== false)
+    );
   };
 
   const fmt = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
   const fmtPct = (n: number) => `${n.toFixed(1)}%`;
-  const bookingTypeLabel = (t: "free_entry" | "ticket" | "table") =>
-    t === "free_entry" ? "Free Entry" : t === "ticket" ? "Ticket" : "Table";
-  const bookingTypeColor = (t: "free_entry" | "ticket" | "table") =>
-    t === "free_entry" ? "#22c55e" : t === "ticket" ? colors.primary : "#f59e0b";
+  const bookingTypeLabel = (t: "free_entry" | "ticket" | "table" | "event_booking" | "cover_charge" | "vip_table") =>
+    t === "free_entry" ? "Free Entry" : t === "ticket" ? "Ticket" : t === "table" ? "Table" : t === "event_booking" ? "Event" : t === "cover_charge" ? "Cover Charge" : "VIP Table";
+  const bookingTypeColor = (t: "free_entry" | "ticket" | "table" | "event_booking" | "cover_charge" | "vip_table") =>
+    t === "free_entry" ? "#22c55e" : t === "ticket" ? colors.primary : t === "table" ? "#f59e0b" : t === "event_booking" ? "#8b5cf6" : t === "cover_charge" ? "#0ea5e9" : "#e11d48";
 
   if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
 
@@ -601,7 +679,7 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
         </View>
       )}
       {vendors.map((v) => {
-        const draft = drafts[v.id] ?? { freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0" };
+        const draft = drafts[v.id] ?? { ...DEFAULT_COMMISSION_RATES };
         const dirty = isDirty(v.id);
         const isSaving = saving[v.id] ?? false;
         const hasRateError = rateErrors[v.id] ?? false;
@@ -633,19 +711,26 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
                 </TouchableOpacity>
               )}
             </View>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              {(["freeEntryRate", "ticketRate", "tableBookingRate"] as const).map((field) => {
-                const fieldLabel = field === "ticketRate" ? "% of revenue" : "₹/person";
-                const fieldTitle = field === "freeEntryRate" ? "Free Entry" : field === "ticketRate" ? "Ticket" : "Table";
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+              {(["freeEntryRate", "ticketRate", "tableBookingRate", "vipTableBookingRate", "eventRate", "coverChargeRate"] as const).map((field) => {
+                const fieldLabel = field === "ticketRate" || field === "eventRate" || field === "coverChargeRate" ? "% of revenue" : "₹/person";
+                const fieldTitle =
+                  field === "freeEntryRate" ? "Free Entry" :
+                  field === "ticketRate" ? "Ticket" :
+                  field === "tableBookingRate" ? "Table" :
+                  field === "vipTableBookingRate" ? "VIP Table" :
+                  field === "eventRate" ? "Event" : "Cover Charge";
+                const disabled = field === "eventRate" && draft.eventCommissionEnabled === false;
                 return (
-                  <View key={field} style={{ flex: 1, gap: 4 }}>
+                  <View key={field} style={{ width: "31%", gap: 4, opacity: disabled ? 0.4 : 1 }}>
                     <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{fieldTitle}</Text>
                     <Text style={{ fontSize: 9, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{fieldLabel}</Text>
                     <View style={{ borderWidth: 1, borderRadius: 8, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: colors.background }}>
                       <TextInput
-                        value={draft[field]}
+                        value={draft[field] as string}
                         onChangeText={(t) => setDraft(v.id, field, t.replace(/[^0-9.]/g, ""))}
                         keyboardType="decimal-pad"
+                        editable={!disabled}
                         style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14 }}
                         placeholder="0"
                         placeholderTextColor={colors.mutedForeground}
@@ -654,6 +739,14 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
                   </View>
                 );
               })}
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }}>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>Event commission enabled</Text>
+              <Switch
+                value={draft.eventCommissionEnabled !== false}
+                onValueChange={(val) => setDraft(v.id, "eventCommissionEnabled", val)}
+                trackColor={{ true: colors.primary, false: colors.border }}
+              />
             </View>
           </View>
         );
@@ -776,6 +869,21 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
                     <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: "#f59e0b" }}>Table: {row.tableCount} · {fmt(row.tableCommission)}</Text>
                   </View>
                 )}
+                {(row.vipTableCount ?? 0) > 0 && (
+                  <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: "#e11d4820" }}>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: "#e11d48" }}>VIP Table: {row.vipTableCount} · {fmt(row.vipTableCommission)}</Text>
+                  </View>
+                )}
+                {(row.eventBookingCount ?? 0) > 0 && (
+                  <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: "#8b5cf620" }}>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: "#8b5cf6" }}>Event: {row.eventBookingCount} · {fmt(row.eventBookingCommission)}</Text>
+                  </View>
+                )}
+                {(row.coverChargeCount ?? 0) > 0 && (
+                  <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: "#0ea5e920" }}>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: "#0ea5e9" }}>Cover Charge: {row.coverChargeCount} · {fmt(row.coverChargeCommission)}</Text>
+                  </View>
+                )}
               </View>
             </TouchableOpacity>
 
@@ -785,10 +893,16 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
                 {/* Applied fees row */}
                 <View style={{ flexDirection: "row", gap: 8, padding: 12, backgroundColor: colors.muted + "60" }}>
                   <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground, marginRight: 4 }}>Fees:</Text>
-                  {(["freeEntryRate", "ticketRate", "tableBookingRate"] as const).map((field) => {
-                    const label = field === "freeEntryRate" ? "Free Entry" : field === "ticketRate" ? "Ticket" : "Table";
-                    const isPercent = field === "ticketRate";
-                    const val = row.appliedRates[field];
+                  {(["freeEntryRate", "ticketRate", "tableBookingRate", "vipTableBookingRate", "eventRate", "coverChargeRate"] as const).map((field) => {
+                    if (field === "eventRate" && row.appliedRates.eventCommissionEnabled === false) return null;
+                    const label =
+                      field === "freeEntryRate" ? "Free Entry" :
+                      field === "ticketRate" ? "Ticket" :
+                      field === "tableBookingRate" ? "Table" :
+                      field === "vipTableBookingRate" ? "VIP Table" :
+                      field === "eventRate" ? "Event" : "Cover Charge";
+                    const isPercent = field === "ticketRate" || field === "eventRate" || field === "coverChargeRate";
+                    const val = row.appliedRates[field] ?? "0";
                     return (
                       <View key={field} style={{ borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
                         <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.foreground }}>
@@ -1390,19 +1504,155 @@ export default function AdminPanelScreen() {
       .finally(() => setAnnouncementLoading(false));
   }, []);
 
+  const [pendingAnnouncements, setPendingAnnouncements] = useState<PendingAnnouncement[]>([]);
+  const [pendingAnnouncementLoading, setPendingAnnouncementLoading] = useState(false);
+  const [rejectingAnnouncementId, setRejectingAnnouncementId] = useState<number | null>(null);
+  const [announcementRejectReason, setAnnouncementRejectReason] = useState("");
+
+  const fetchPendingAnnouncements = useCallback(() => {
+    setPendingAnnouncementLoading(true);
+    customFetch<PendingAnnouncement[]>("/api/admin/announcements/pending")
+      .then(setPendingAnnouncements)
+      .catch(() => {})
+      .finally(() => setPendingAnnouncementLoading(false));
+  }, []);
+
+  async function approveAnnouncement(id: number) {
+    try {
+      await customFetch(`/api/admin/announcements/${id}/approve`, { method: "PATCH" });
+      fetchPendingAnnouncements();
+      fetchAnnouncements();
+    } catch {
+      Alert.alert("Error", "Failed to approve announcement.");
+    }
+  }
+
+  async function rejectAnnouncement(id: number, reason: string) {
+    try {
+      await customFetch(`/api/admin/announcements/${id}/reject`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rejectionReason: reason.trim() }),
+      });
+      setRejectingAnnouncementId(null);
+      setAnnouncementRejectReason("");
+      fetchPendingAnnouncements();
+    } catch {
+      Alert.alert("Error", "Failed to reject announcement.");
+    }
+  }
+
+  // ─── SITE NAV VISIBILITY ────────────────────────────────────────────────────
+  const [hiddenNavLinks, setHiddenNavLinks] = useState<string[] | null>(null);
+  const [savingNavKey, setSavingNavKey] = useState<string | null>(null);
+
+  const fetchNavVisibility = useCallback(() => {
+    customFetch<{ hiddenNavLinks: string[] }>("/api/site-settings")
+      .then((s) => setHiddenNavLinks(s.hiddenNavLinks ?? []))
+      .catch(() => setHiddenNavLinks([]));
+  }, []);
+
+  async function toggleNavItem(item: { key: string; label: string }) {
+    if (hiddenNavLinks === null) return;
+    const isHidden = hiddenNavLinks.includes(item.key);
+    const next = isHidden ? hiddenNavLinks.filter((k) => k !== item.key) : [...hiddenNavLinks, item.key];
+    setSavingNavKey(item.key);
+    setHiddenNavLinks(next);
+    try {
+      const updated = await customFetch<{ hiddenNavLinks: string[] }>("/api/admin/site-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hiddenNavLinks: next }),
+      });
+      setHiddenNavLinks(updated.hiddenNavLinks ?? next);
+    } catch {
+      setHiddenNavLinks(hiddenNavLinks);
+      Alert.alert("Error", "Failed to update navigation visibility.");
+    } finally {
+      setSavingNavKey(null);
+    }
+  }
+
+  const [organizerEventSlider, setOrganizerEventSlider] = useState<SliderOrganizerEvent[]>([]);
+  const [organizerEventSliderLoading, setOrganizerEventSliderLoading] = useState(false);
+  const [togglingOrganizerEventSlider, setTogglingOrganizerEventSlider] = useState<number | null>(null);
+
+  const fetchOrganizerEventSlider = useCallback(() => {
+    setOrganizerEventSliderLoading(true);
+    customFetch<SliderOrganizerEvent[]>("/api/admin/organizer-events")
+      .then(setOrganizerEventSlider)
+      .catch(() => {})
+      .finally(() => setOrganizerEventSliderLoading(false));
+  }, []);
+
+  async function toggleOrganizerEventSlider(item: SliderOrganizerEvent) {
+    setTogglingOrganizerEventSlider(item.id);
+    try {
+      const updated = await customFetch<SliderOrganizerEvent>(`/api/admin/organizer-events/${item.id}/slider`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFeaturedSlider: !item.isFeaturedSlider }),
+      });
+      setOrganizerEventSlider((prev) => prev.map((a) => (a.id === item.id ? { ...a, isFeaturedSlider: updated.isFeaturedSlider } : a)));
+    } catch {
+      Alert.alert("Error", "Failed to update organizer event.");
+    } finally {
+      setTogglingOrganizerEventSlider(null);
+    }
+  }
+
   // ─── REPORTS ────────────────────────────────────────────────────────────────
   const [checkinData, setCheckinData] = useState<AdminCheckinResponse | null>(null);
   const [checkinLoading, setCheckinLoading] = useState(false);
   const [vendorsFull, setVendorsFull] = useState<AdminVendorFull[]>([]);
   const [vendorsFullLoading, setVendorsFullLoading] = useState(false);
 
+  const [reportVendorId, setReportVendorId] = useState<string>("all");
+  const [reportDateInput, setReportDateInput] = useState("");
+  const [reportDate, setReportDate] = useState("");
+  const [reportStatusFilter, setReportStatusFilter] = useState<"all" | "checkedIn" | "notArrived">("all");
+  const [reportPage, setReportPage] = useState(1);
+  const [reportSortKey, setReportSortKey] = useState<keyof AdminCheckinRow>("bookingDate");
+  const [reportSortDir, setReportSortDir] = useState<"asc" | "desc">("desc");
+  const reportRequestSeq = useRef(0);
+
+  // Debounce free-text date typing so we don't fire a request per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => { setReportDate(reportDateInput); setReportPage(1); }, 400);
+    return () => clearTimeout(t);
+  }, [reportDateInput]);
+
   const fetchCheckinReport = useCallback(() => {
     setCheckinLoading(true);
-    customFetch<AdminCheckinResponse>("/api/admin/checkin-report")
-      .then(setCheckinData)
+    const seq = ++reportRequestSeq.current;
+    const params = new URLSearchParams();
+    if (reportVendorId !== "all") params.set("vendorId", reportVendorId);
+    if (reportDate) params.set("date", reportDate);
+    if (reportStatusFilter !== "all") params.set("status", reportStatusFilter);
+    params.set("page", String(reportPage));
+    customFetch<AdminCheckinResponse>(`/api/admin/checkin-report?${params.toString()}`)
+      .then((data) => { if (seq === reportRequestSeq.current) setCheckinData(data); })
       .catch(() => {})
-      .finally(() => setCheckinLoading(false));
-  }, []);
+      .finally(() => { if (seq === reportRequestSeq.current) setCheckinLoading(false); });
+  }, [reportVendorId, reportDate, reportStatusFilter, reportPage]);
+
+  useEffect(() => {
+    if (activeTab === "reports") fetchCheckinReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, reportVendorId, reportDate, reportStatusFilter, reportPage]);
+
+  function handleReportSort(key: keyof AdminCheckinRow) {
+    if (reportSortKey === key) setReportSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setReportSortKey(key); setReportSortDir("asc"); }
+  }
+
+  function resetReportFilters() {
+    setReportVendorId("all");
+    setReportDateInput("");
+    setReportDate("");
+    setReportStatusFilter("all");
+    setReportPage(1);
+  }
 
   const fetchVendorsFull = useCallback(() => {
     setVendorsFullLoading(true);
@@ -1446,8 +1696,8 @@ export default function AdminPanelScreen() {
     if (activeTab === "subscriptions") fetchSubscriptions();
     if (activeTab === "coupons") fetchCoupons();
     if (activeTab === "content") { fetchAds(); fetchBlogs(); }
-    if (activeTab === "announcements") fetchAnnouncements();
-    if (activeTab === "reports") { fetchCheckinReport(); fetchVendorsFull(); }
+    if (activeTab === "announcements") { fetchAnnouncements(); fetchPendingAnnouncements(); fetchOrganizerEventSlider(); fetchNavVisibility(); }
+    if (activeTab === "reports") fetchVendorsFull();
   }, [activeTab]);
 
   // ─── VENDOR ACTIONS ─────────────────────────────────────────────────────────
@@ -2497,8 +2747,111 @@ export default function AdminPanelScreen() {
     const others = announcements.filter((a) => !a.isFeaturedSlider);
 
     return (
-      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={announcementLoading} onRefresh={fetchAnnouncements} tintColor={colors.primary} />}>
-        {announcementLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
+      <ScrollView
+        contentContainerStyle={[styles.list, { paddingBottom: 120 }]}
+        refreshControl={<RefreshControl refreshing={announcementLoading || pendingAnnouncementLoading} onRefresh={() => { fetchAnnouncements(); fetchPendingAnnouncements(); }} tintColor={colors.primary} />}
+      >
+        {(announcementLoading || pendingAnnouncementLoading) && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
+
+        {/* SITE NAVIGATION VISIBILITY */}
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>SITE NAVIGATION VISIBILITY</Text>
+        {hiddenNavLinks === null ? (
+          <ActivityIndicator color={colors.primary} style={{ marginBottom: 8 }} />
+        ) : (
+          <View style={{ gap: 8, marginBottom: 16 }}>
+            {MOBILE_NAV_ITEMS.map((item) => {
+              const isHidden = hiddenNavLinks.includes(item.key);
+              return (
+                <View
+                  key={item.key}
+                  style={[styles.itemCard, { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderColor: isHidden ? colors.border : "#f59e0b40", marginBottom: 0 }]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemTitle, { color: colors.foreground }]}>{item.label}</Text>
+                    {isHidden ? <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: "#f59e0b" }}>Hidden from public site</Text> : null}
+                  </View>
+                  {savingNavKey === item.key ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Switch
+                      value={!isHidden}
+                      onValueChange={() => toggleNavItem(item)}
+                      trackColor={{ true: "#f59e0b", false: colors.border }}
+                    />
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* PENDING APPROVAL QUEUE */}
+        {pendingAnnouncements.length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: "#f59e0b" }]}>PENDING APPROVAL ({pendingAnnouncements.length})</Text>
+            {pendingAnnouncements.map((a) => (
+              <View key={a.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: "#f59e0b40", flexDirection: "column", gap: 8 }]}>
+                <View style={{ flexDirection: "row", gap: 10 }}>
+                  {a.imageUrl ? (
+                    <Image source={{ uri: resolveImageUrl(a.imageUrl) }} style={{ width: 56, height: 56, borderRadius: 10 }} />
+                  ) : (
+                    <View style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }}>
+                      <Ionicons name="megaphone-outline" size={20} color={colors.mutedForeground} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>{a.title}</Text>
+                    <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{a.vendorName}</Text>
+                    <View style={{ flexDirection: "row", gap: 8, marginTop: 2 }}>
+                      {a.announceDate ? <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{a.announceDate}{a.announceTime ? ` · ${a.announceTime}` : ""}</Text> : null}
+                      {a.price && Number(a.price) > 0 ? <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>₹{Number(a.price).toLocaleString("en-IN")}</Text> : null}
+                    </View>
+                  </View>
+                </View>
+                {a.body ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }} numberOfLines={2}>{a.body}</Text> : null}
+
+                {rejectingAnnouncementId === a.id ? (
+                  <View style={[styles.rejectBox, { backgroundColor: colors.background, borderColor: "#ef444440", marginTop: 0 }]}>
+                    <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 8 }}>Rejection Reason (optional)</Text>
+                    <TextInput
+                      value={announcementRejectReason}
+                      onChangeText={setAnnouncementRejectReason}
+                      placeholder="E.g. Inappropriate content, missing details..."
+                      placeholderTextColor={colors.mutedForeground}
+                      style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted }]}
+                      multiline
+                    />
+                    <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                      <TouchableOpacity style={[styles.actionBtnWide, { backgroundColor: "#ef444420", borderColor: "#ef4444" }]} onPress={() => rejectAnnouncement(a.id, announcementRejectReason)}>
+                        <Text style={{ color: "#ef4444", fontSize: 13, fontFamily: "Inter_600SemiBold" }}>Confirm Rejection</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.actionBtnWide, { backgroundColor: colors.muted, borderColor: colors.border }]} onPress={() => { setRejectingAnnouncementId(null); setAnnouncementRejectReason(""); }}>
+                        <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_500Medium" }}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.actionBtnWide, { backgroundColor: "#22c55e20", borderColor: "#22c55e", flex: 1, justifyContent: "center" }]}
+                      onPress={() => approveAnnouncement(a.id)}
+                    >
+                      <Ionicons name="checkmark" size={14} color="#22c55e" />
+                      <Text style={{ color: "#22c55e", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Approve</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtnWide, { backgroundColor: "#ef444420", borderColor: "#ef4444", flex: 1, justifyContent: "center" }]}
+                      onPress={() => { setRejectingAnnouncementId(a.id); setAnnouncementRejectReason(""); }}
+                    >
+                      <Ionicons name="close" size={14} color="#ef4444" />
+                      <Text style={{ color: "#ef4444", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Reject</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            ))}
+          </>
+        )}
 
         {/* CREATE ANNOUNCEMENT FORM */}
         <TouchableOpacity
@@ -2635,6 +2988,43 @@ export default function AdminPanelScreen() {
             </View>
           </View>
         ))}
+
+        {/* ORGANIZER EVENTS IN SLIDER */}
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>
+          ORGANIZER EVENTS IN SLIDER {organizerEventSlider.length > 0 ? `(${organizerEventSlider.length})` : ""}
+        </Text>
+        {organizerEventSliderLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 8 }} />}
+        {!organizerEventSliderLoading && organizerEventSlider.length === 0 && (
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", marginTop: 8 }}>No approved organizer events yet</Text>
+        )}
+        {organizerEventSlider.map((a) => (
+          <View key={a.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: a.isFeaturedSlider ? "#f59e0b40" : colors.border, flexDirection: "row", alignItems: "center", gap: 10 }]}>
+            {a.imageUrl ? (
+              <Image source={{ uri: resolveImageUrl(a.imageUrl) }} style={{ width: 48, height: 48, borderRadius: 10 }} />
+            ) : (
+              <View style={{ width: 48, height: 48, borderRadius: 10, backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="calendar-outline" size={18} color={colors.mutedForeground} />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>{a.title}</Text>
+              <Text style={[styles.itemSub, { color: colors.mutedForeground }]} numberOfLines={1}>{a.organizerName}{a.category ? ` · ${a.category}` : ""}{a.startDate ? ` · ${a.startDate}` : ""}</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.actionBtnWide, { backgroundColor: a.isFeaturedSlider ? "#f59e0b" : colors.muted, borderColor: a.isFeaturedSlider ? "#f59e0b" : colors.border }]}
+              disabled={togglingOrganizerEventSlider === a.id}
+              onPress={() => toggleOrganizerEventSlider(a)}
+            >
+              {togglingOrganizerEventSlider === a.id ? (
+                <ActivityIndicator size="small" color={a.isFeaturedSlider ? "#000" : colors.foreground} />
+              ) : (
+                <Text style={{ color: a.isFeaturedSlider ? "#000" : colors.foreground, fontSize: 11, fontFamily: "Inter_600SemiBold" }}>
+                  {a.isFeaturedSlider ? "In Slider" : "Add to Slider"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        ))}
       </ScrollView>
     );
   }
@@ -2642,7 +3032,18 @@ export default function AdminPanelScreen() {
   // ─── RENDER REPORTS ──────────────────────────────────────────────────────────
   function renderReports() {
     const stats = checkinData?.stats ?? { total: 0, checkedIn: 0, notArrived: 0 };
-    const rows = checkinData?.rows ?? [];
+    const rawRows = checkinData?.rows ?? [];
+    const totalPages = checkinData?.totalPages ?? 0;
+    const hasReportFilters = reportVendorId !== "all" || !!reportDateInput || reportStatusFilter !== "all";
+    const rows = [...rawRows].sort((a, b) => {
+      let av: string | number = (a[reportSortKey] as unknown as string | number) ?? "";
+      let bv: string | number = (b[reportSortKey] as unknown as string | number) ?? "";
+      if (typeof av === "boolean") av = av ? 1 : 0;
+      if (typeof bv === "boolean") bv = bv ? 1 : 0;
+      if (av < bv) return reportSortDir === "asc" ? -1 : 1;
+      if (av > bv) return reportSortDir === "asc" ? 1 : -1;
+      return 0;
+    });
     const overallRate = stats.total > 0 ? ((stats.checkedIn / stats.total) * 100).toFixed(1) : "0";
 
     // Group attendance rows by event for per-event breakdown
@@ -2678,8 +3079,60 @@ export default function AdminPanelScreen() {
       >
         {checkinLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
 
+        {/* ATTENDANCE FILTERS */}
+        <View style={{ gap: 10 }}>
+          <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>FILTERS</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {[{ id: "all", label: "All partners" }, ...vendorsFull.map((v) => ({ id: String(v.id), label: v.businessName }))].map((opt) => {
+              const active = reportVendorId === opt.id;
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  onPress={() => { setReportVendorId(opt.id); setReportPage(1); }}
+                  style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary + "22" : colors.card }}
+                >
+                  <Text style={{ color: active ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }} numberOfLines={1}>{opt.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            <View style={{ flex: 1, borderWidth: 1, borderRadius: 10, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: colors.card }}>
+              <TextInput
+                value={reportDateInput}
+                onChangeText={setReportDateInput}
+                placeholder="Booking date YYYY-MM-DD"
+                placeholderTextColor={colors.mutedForeground}
+                style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 13 }}
+                keyboardType="numbers-and-punctuation"
+              />
+            </View>
+            {hasReportFilters && (
+              <TouchableOpacity onPress={resetReportFilters} style={{ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Clear</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            {(["all", "checkedIn", "notArrived"] as const).map((s) => {
+              const active = reportStatusFilter === s;
+              return (
+                <TouchableOpacity
+                  key={s}
+                  onPress={() => { setReportStatusFilter(s); setReportPage(1); }}
+                  style={{ flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary : colors.card }}
+                >
+                  <Text style={{ color: active ? colors.primaryForeground : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>
+                    {s === "all" ? "All" : s === "checkedIn" ? "Checked In" : "Not Arrived"}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         {/* CHECK-IN SUMMARY KPIS */}
-        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>CHECK-IN OVERVIEW</Text>
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 4 }]}>CHECK-IN OVERVIEW</Text>
         <View style={styles.kpiGrid}>
           {[
             { label: "Total Tickets", value: stats.total, icon: "ticket-outline" as const, color: "#3b82f6" },
@@ -2727,13 +3180,28 @@ export default function AdminPanelScreen() {
         {/* RECENT ATTENDANCE LIST */}
         {rows.length > 0 && (
           <>
-            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>RECENT ATTENDANCE ({rows.length})</Text>
-            {rows.slice(0, 15).map((r) => (
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>ALL CONFIRMED GUESTS ({checkinData?.total ?? rows.length})</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
+              {([["bookingDate", "Date"], ["userName", "Guest"], ["vendorName", "Partner"], ["guests", "Party"], ["checkedIn", "Status"]] as const).map(([key, label]) => {
+                const active = reportSortKey === key;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    onPress={() => handleReportSort(key)}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary + "22" : colors.card }}
+                  >
+                    <Text style={{ color: active ? colors.primary : colors.mutedForeground, fontSize: 11, fontFamily: "Inter_500Medium" }}>{label}</Text>
+                    {active && <Ionicons name={reportSortDir === "asc" ? "arrow-up" : "arrow-down"} size={11} color={colors.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            {rows.map((r) => (
               <View key={r.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: r.checkedIn ? "#22c55e30" : colors.border }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>{r.userName || r.userEmail}</Text>
-                  <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{r.eventTitle}</Text>
-                  <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{r.bookingDate}</Text>
+                  <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{r.vendorName} · {r.eventTitle}</Text>
+                  <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{r.bookingDate}{r.checkedInAt ? ` · in ${new Date(r.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : ""}</Text>
                 </View>
                 <View style={[styles.roleBadge, { backgroundColor: r.checkedIn ? "#22c55e20" : colors.muted, borderColor: r.checkedIn ? "#22c55e" : colors.border }]}>
                   <Text style={{ color: r.checkedIn ? "#22c55e" : colors.mutedForeground, fontSize: 10, fontFamily: "Inter_600SemiBold" }}>
@@ -2742,6 +3210,25 @@ export default function AdminPanelScreen() {
                 </View>
               </View>
             ))}
+            {totalPages > 1 && (
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                <TouchableOpacity
+                  disabled={reportPage <= 1}
+                  onPress={() => setReportPage((p) => p - 1)}
+                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, opacity: reportPage <= 1 ? 0.4 : 1 }}
+                >
+                  <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>← Prev</Text>
+                </TouchableOpacity>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular" }}>Page {reportPage} of {totalPages}</Text>
+                <TouchableOpacity
+                  disabled={reportPage >= totalPages}
+                  onPress={() => setReportPage((p) => p + 1)}
+                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, opacity: reportPage >= totalPages ? 0.4 : 1 }}
+                >
+                  <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Next →</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </>
         )}
 

@@ -2,6 +2,7 @@
 // Mirrors the /api/create-your-party contract (see api-server createYourParty.ts).
 
 import { customFetch, getBaseUrl } from "@workspace/api-client-react";
+export { resolveImageUrl } from "@/lib/resolveImageUrl";
 
 export interface PublicParty {
   id: number;
@@ -52,14 +53,6 @@ export interface PartyBookingResult {
   razorpayOrderId?: string;
   razorpayKeyId?: string;
   amountPaise?: number;
-}
-
-/** Resolve a stored (possibly relative) upload path to an absolute image URL. */
-export function resolveImageUrl(url: string | null | undefined): string | undefined {
-  if (!url) return undefined;
-  if (/^https?:\/\//i.test(url)) return url;
-  const base = getBaseUrl() ?? "";
-  return url.startsWith("/") ? `${base}${url}` : `${base}/${url}`;
 }
 
 /**

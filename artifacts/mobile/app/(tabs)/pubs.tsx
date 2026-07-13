@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useListEvents } from "@workspace/api-client-react";
-import React, { useState } from "react";
+import { customFetch, type ListEventsPaginatedResponse } from "@workspace/api-client-react";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -53,15 +54,29 @@ export default function PubsScreen() {
     if (!val) setDrinkPlanType("");
   }
 
-  const eventsQuery = useListEvents({
-    type: "pub",
-    city: city !== "All Cities" ? city : undefined,
-    minPrice: priceRange.min !== undefined ? String(priceRange.min) : undefined,
-    maxPrice: priceRange.max !== undefined ? String(priceRange.max) : undefined,
-    drinkPlanType: drinkPlanType || undefined,
+  const PAGE_SIZE = 20;
+  const baseParams = useMemo(() => {
+    const p: Record<string, string> = { type: "pub", limit: String(PAGE_SIZE) };
+    if (city !== "All Cities") p["city"] = city;
+    if (priceRange.min !== undefined) p["minPrice"] = String(priceRange.min);
+    if (priceRange.max !== undefined) p["maxPrice"] = String(priceRange.max);
+    if (drinkPlanType) p["drinkPlanType"] = drinkPlanType;
+    return p;
+  }, [city, priceRange.min, priceRange.max, drinkPlanType]);
+
+  const eventsQuery = useInfiniteQuery<ListEventsPaginatedResponse>({
+    queryKey: ["pubs-infinite", baseParams],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => {
+      const qs = Object.entries({ ...baseParams, page: String(pageParam) })
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+        .join("&");
+      return customFetch<ListEventsPaginatedResponse>(`/api/events?${qs}`);
+    },
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),
   });
 
-  const events = (eventsQuery.data ?? []).filter((e) => {
+  const events = (eventsQuery.data?.pages.flatMap((p) => p.data) ?? []).filter((e) => {
     const matchSearch =
       !search.trim() ||
       e.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -75,6 +90,12 @@ export default function PubsScreen() {
       (e as { vendorCrowdLevel?: string | null }).vendorCrowdLevel === crowdLevel;
     return matchSearch && matchFreeEntry && matchDrinkDeal && matchCrowd;
   });
+
+  function handleEndReached() {
+    if (eventsQuery.hasNextPage && !eventsQuery.isFetchingNextPage) {
+      eventsQuery.fetchNextPage();
+    }
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -313,7 +334,21 @@ export default function PubsScreen() {
             gap: 14,
             paddingBottom: Platform.OS === "web" ? 80 : 120,
           }}
-          ListFooterComponent={<MobileFooter />}
+          removeClippedSubviews
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          updateCellsBatchingPeriod={50}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            <>
+              {eventsQuery.isFetchingNextPage ? (
+                <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
+              ) : null}
+              <MobileFooter />
+            </>
+          }
           refreshControl={
             <RefreshControl
               refreshing={eventsQuery.isRefetching}

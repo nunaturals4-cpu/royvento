@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
@@ -88,7 +89,7 @@ export default function OrganizerProfileScreen() {
       style={[styles.eventCard, { backgroundColor: colors.card, borderColor: colors.border }]}
     >
       {e.coverImageUrl ? (
-        <Image source={{ uri: e.coverImageUrl }} style={styles.eventImage} contentFit="cover" />
+        <Image source={{ uri: resolveImageUrl(e.coverImageUrl) }} style={styles.eventImage} contentFit="cover" />
       ) : (
         <View style={[styles.eventImage, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
           <Ionicons name="musical-notes-outline" size={24} color={colors.mutedForeground} />
@@ -117,7 +118,7 @@ export default function OrganizerProfileScreen() {
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         <View style={styles.cover}>
           {organizer.coverImageUrl ? (
-            <Image source={{ uri: organizer.coverImageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            <Image source={{ uri: resolveImageUrl(organizer.coverImageUrl) }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.muted }]} />
           )}
@@ -129,7 +130,7 @@ export default function OrganizerProfileScreen() {
 
         <View style={styles.identity}>
           {organizer.logoUrl ? (
-            <Image source={{ uri: organizer.logoUrl }} style={[styles.logo, { borderColor: colors.border }]} contentFit="cover" />
+            <Image source={{ uri: resolveImageUrl(organizer.logoUrl) }} style={[styles.logo, { borderColor: colors.border }]} contentFit="cover" />
           ) : (
             <View style={[styles.logo, { borderColor: colors.border, backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
               <Ionicons name="business" size={28} color={colors.primary} />

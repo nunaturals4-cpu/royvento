@@ -292,6 +292,11 @@ export default function ExploreScreen() {
           scrollEnabled
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.4}
+          removeClippedSubviews
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          updateCellsBatchingPeriod={50}
           ListFooterComponent={
             <>
               {isFetchingNextPage ? (

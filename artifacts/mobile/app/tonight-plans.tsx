@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -28,7 +29,7 @@ export default function TonightPlansScreen() {
         {/* Hero */}
         <View style={styles.hero}>
           <Image
-            source={{ uri: "https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=1200&q=80" }}
+            source={{ uri: resolveImageUrl("https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=1200&q=80") }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
           />

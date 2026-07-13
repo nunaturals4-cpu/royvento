@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import {
   customFetch,
@@ -24,6 +25,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { CoverChargeSection, FreeDrinkSection, splitVendorsByPlanType, TicketSection, VipTableBookingSection } from "@/components/DrinkDealSections";
 import { EmptyState } from "@/components/EmptyState";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
@@ -124,7 +126,7 @@ function AnnouncementSlider({ announcements }: { announcements: RecentAnnounceme
             {item.imageUrl ? (
               <View style={styles.slideImageWrap}>
                 <Image
-                  source={{ uri: item.imageUrl }}
+                  source={{ uri: resolveImageUrl(item.imageUrl) }}
                   style={[StyleSheet.absoluteFillObject, { opacity: 0.18 }]}
                   resizeMode="cover"
                 />
@@ -341,8 +343,7 @@ export default function DealsScreen() {
 
   const [annGenreFilter, setAnnGenreFilter] = useState("");
   const [annEventTypeFilter, setAnnEventTypeFilter] = useState("");
-  const [dealTypeFilter, setDealTypeFilter] = useState("");
-  const [dealGenderFilter, setDealGenderFilter] = useState("");
+  const [dealGenderFilter, setDealGenderFilter] = useState<"" | "female" | "other">("");
 
   const {
     data: drinkOffers = [],
@@ -383,16 +384,8 @@ export default function DealsScreen() {
     return true;
   });
 
-  const filteredDeals = (drinkOffers as VendorDrinkOffer[]).filter((offer) => {
-    if (!dealTypeFilter && !dealGenderFilter) return true;
-    return (offer.plans ?? []).some((p) => {
-      const typeMatch = !dealTypeFilter || p.type === dealTypeFilter;
-      const genderMatch =
-        !dealGenderFilter ||
-        (dealGenderFilter === "female" ? p.gender === "female" : p.gender !== "female");
-      return typeMatch && genderMatch;
-    });
-  });
+  const { freeVendors, ticketVendors, coverChargeVendors, vipTableVendors } = splitVendorsByPlanType(drinkOffers as VendorDrinkOffer[], dealGenderFilter);
+  const totalDeals = freeVendors.length + ticketVendors.length + coverChargeVendors.length + vipTableVendors.length;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -445,10 +438,10 @@ export default function DealsScreen() {
               <Text style={[styles.dealsSectionTitle, { color: colors.foreground }]}>
                 {t("events.drink_deals")}
               </Text>
-              {filteredDeals.length > 0 && (
+              {totalDeals > 0 && (
                 <View style={[styles.countBadge, { backgroundColor: colors.primary + "18" }]}>
                   <Text style={[styles.countText, { color: colors.primary }]}>
-                    {filteredDeals.length}
+                    {totalDeals}
                   </Text>
                 </View>
               )}
@@ -463,44 +456,8 @@ export default function DealsScreen() {
               </Pressable>
             </View>
 
-            {/* Deal Type filter chips */}
-            <View style={{ gap: 8, marginBottom: 14 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Ionicons name="pricetag-outline" size={13} color={colors.mutedForeground} />
-                <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>
-                  Deal Type
-                </Text>
-              </View>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 6, paddingBottom: 2 }}
-              >
-                {(["", ...DEAL_TYPES] as string[]).map((dt) => (
-                  <Pressable
-                    key={dt || "all"}
-                    onPress={() => setDealTypeFilter(dt === dealTypeFilter ? "" : dt)}
-                    style={{
-                      paddingHorizontal: 12,
-                      paddingVertical: 5,
-                      borderRadius: 20,
-                      borderWidth: 1,
-                      borderColor: dealTypeFilter === dt ? colors.primary : colors.border,
-                      backgroundColor: dealTypeFilter === dt ? colors.primary + "18" : colors.card,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        fontFamily: "Inter_500Medium",
-                        color: dealTypeFilter === dt ? colors.primary : colors.mutedForeground,
-                      }}
-                    >
-                      {dt ? (DEAL_TYPE_LABELS[dt] ?? dt) : "All"}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
+            {/* Guest-type filter */}
+            <View style={{ gap: 8, marginBottom: 6, paddingHorizontal: 20 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                 <Ionicons name="people-outline" size={13} color={colors.mutedForeground} />
                 <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>
@@ -512,11 +469,13 @@ export default function DealsScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ gap: 6, paddingBottom: 2 }}
               >
-                {[
-                  { key: "", label: "Everyone" },
-                  { key: "female", label: "Ladies" },
-                  { key: "other", label: "Mixed / All" },
-                ].map((opt) => (
+                {(
+                  [
+                    { key: "", label: "Everyone" },
+                    { key: "female", label: "Ladies" },
+                    { key: "other", label: "Mixed / All" },
+                  ] as const
+                ).map((opt) => (
                   <Pressable
                     key={opt.key || "all"}
                     onPress={() => setDealGenderFilter(opt.key === dealGenderFilter ? "" : opt.key)}
@@ -545,21 +504,19 @@ export default function DealsScreen() {
               </ScrollView>
             </View>
 
-            {filteredDeals.length === 0 ? (
+            {totalDeals === 0 ? (
               <EmptyState
                 icon="wine-outline"
                 title={t("deals.no_deals")}
                 subtitle={t("deals.no_deals_sub")}
               />
             ) : (
-              <FlatList
-                data={filteredDeals}
-                keyExtractor={(item) => String(item.vendorId)}
-                scrollEnabled={false}
-                contentContainerStyle={styles.dealsList}
-                renderItem={({ item }) => <DrinkDealCard item={item} />}
-                ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
-              />
+              <View style={{ marginTop: 8 }}>
+                <FreeDrinkSection vendors={freeVendors} />
+                <TicketSection vendors={ticketVendors} />
+                <CoverChargeSection vendors={coverChargeVendors} />
+                <VipTableBookingSection vendors={vipTableVendors} />
+              </View>
             )}
           </View>
 
@@ -677,7 +634,7 @@ export default function DealsScreen() {
                       {item.imageUrl ? (
                         <View style={styles.announcementImageWrapper}>
                           <Image
-                            source={{ uri: item.imageUrl }}
+                            source={{ uri: resolveImageUrl(item.imageUrl) }}
                             style={StyleSheet.absoluteFillObject}
                             resizeMode="cover"
                           />
@@ -818,7 +775,6 @@ const styles = StyleSheet.create({
   },
 
   dealsSection: {
-    paddingHorizontal: 20,
     paddingBottom: 8,
   },
   dealsSectionHeader: {
@@ -826,6 +782,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     marginBottom: 14,
+    paddingHorizontal: 20,
   },
   dealsSectionTitle: {
     fontSize: 16,

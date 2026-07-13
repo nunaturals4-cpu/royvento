@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { useUpdateReview, useDeleteReview } from "@workspace/api-client-react";
 import type { Review } from "@workspace/api-client-react";
@@ -153,7 +154,7 @@ export function ReviewItem({ review, isOwner, onChanged, onImagePress }: ReviewI
                   onPress={() => onImagePress?.(url)}
                   style={{ width: 64, height: 64, borderRadius: 8, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}
                 >
-                  <Image source={{ uri: url }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+                  <Image source={{ uri: resolveImageUrl(url) }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
                 </Pressable>
               ))}
             </View>

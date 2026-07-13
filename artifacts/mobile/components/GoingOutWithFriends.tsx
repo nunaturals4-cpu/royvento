@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { Image } from "expo-image";
@@ -116,7 +117,7 @@ function GroupCard({ item, size }: { item: GroupItem; size: number }) {
     >
       <View style={styles.imageWrap}>
         {item.imageUrl ? (
-          <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <Image source={{ uri: resolveImageUrl(item.imageUrl) }} style={StyleSheet.absoluteFill} contentFit="cover" />
         ) : (
           <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: colors.muted }]}>
             <Ionicons name="people" size={28} color={colors.primary + "55"} />
@@ -305,7 +306,7 @@ export function GoingOutWithFriends() {
               >
                 <View style={[styles.imageWrap, { height: 110 }]}>
                   {p.imageUrl ? (
-                    <Image source={{ uri: p.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                    <Image source={{ uri: resolveImageUrl(p.imageUrl) }} style={StyleSheet.absoluteFill} contentFit="cover" />
                   ) : null}
                   <LinearGradient colors={["transparent", "rgba(0,0,0,0.8)"]} style={StyleSheet.absoluteFill} />
                   <Text style={styles.pkgVenue} numberOfLines={1}>{p.venueName}</Text>

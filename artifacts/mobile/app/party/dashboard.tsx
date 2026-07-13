@@ -2,9 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { customFetch } from "@workspace/api-client-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import React, { useState } from "react";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   RefreshControl,
@@ -67,6 +69,9 @@ export default function PartyDashboardScreen() {
 
   const [code, setCode] = useState("");
   const [scanMsg, setScanMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const lastScanRef = useRef<{ code: string; t: number }>({ code: "", t: 0 });
 
   const { data, isLoading, isRefetching, refetch } = useQuery<DashboardPayload>({
     queryKey: ["party-dashboard", id],
@@ -81,15 +86,35 @@ export default function PartyDashboardScreen() {
         body: JSON.stringify({ code: c }),
         headers: { "Content-Type": "application/json" },
       }),
-    onSuccess: (res) => {
-      setScanMsg({ ok: true, text: `Checked in: ${res.name ?? code}` });
+    onSuccess: (res, variables) => {
+      setScanMsg({ ok: true, text: `Checked in: ${res.name ?? variables}` });
       setCode("");
       qc.invalidateQueries({ queryKey: ["party-dashboard", id] });
     },
-    onError: (e: any) => {
-      setScanMsg({ ok: false, text: e?.data?.error ?? e?.message ?? "Invalid ticket." });
+    onError: (e: any, variables) => {
+      setScanMsg({ ok: false, text: e?.data?.error ?? e?.message ?? `Invalid ticket: ${variables}` });
     },
   });
+
+  async function startCameraScan() {
+    if (!permission?.granted) {
+      const r = await requestPermission();
+      if (!r.granted) { Alert.alert("Camera permission needed", "Enable camera access to scan QR tickets."); return; }
+    }
+    setScanMsg(null);
+    setCameraOn(true);
+  }
+
+  function handleCameraScan(raw: string) {
+    const scannedCode = raw.trim().toUpperCase();
+    if (!scannedCode) return;
+    const now = Date.now();
+    // Debounce repeat reads of the same code for 3s (the camera keeps scanning every frame).
+    if (lastScanRef.current.code === scannedCode && now - lastScanRef.current.t < 3000) return;
+    lastScanRef.current = { code: scannedCode, t: now };
+    if (scan.isPending) return;
+    scan.mutate(scannedCode);
+  }
 
   const setStatus = useMutation({
     mutationFn: (status: "published" | "sales_stopped" | "cancelled") =>
@@ -164,6 +189,31 @@ export default function PartyDashboardScreen() {
         {/* Check in by code */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Check in at the door</Text>
+
+          {cameraOn ? (
+            <View style={{ height: 260, borderRadius: 16, overflow: "hidden", marginTop: 10 }}>
+              <CameraView
+                style={StyleSheet.absoluteFill}
+                barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+                onBarcodeScanned={({ data }) => handleCameraScan(data)}
+              />
+              <TouchableOpacity
+                onPress={() => setCameraOn(false)}
+                style={{ position: "absolute", top: 10, right: 10, backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 20, padding: 8 }}
+              >
+                <Ionicons name="close" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={startCameraScan}
+              style={[styles.linkBtn, { backgroundColor: colors.primary, marginTop: 10 }]}
+            >
+              <Ionicons name="qr-code-outline" size={16} color={colors.primaryForeground} />
+              <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Scan QR ticket</Text>
+            </TouchableOpacity>
+          )}
+
           <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
             <TextInput
               value={code}

@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
@@ -107,7 +108,7 @@ export default function EventsScreen() {
                 onPress={() => setEventTypeFilter((prev) => (prev === c.label ? "" : c.label))}
                 style={[styles.tile, { borderColor: active ? colors.primary : colors.border }]}
               >
-                <Image source={{ uri: c.img }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                <Image source={{ uri: resolveImageUrl(c.img) }} style={StyleSheet.absoluteFill} contentFit="cover" />
                 <LinearGradient colors={["rgba(0,0,0,0.15)", "rgba(0,0,0,0.85)"]} style={StyleSheet.absoluteFill} />
                 {count > 0 && (
                   <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
@@ -145,7 +146,7 @@ export default function EventsScreen() {
                 >
                   <View style={styles.eventImage}>
                     {(e.coverImageUrl || e.bannerUrl) ? (
-                      <Image source={{ uri: e.coverImageUrl || e.bannerUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                      <Image source={{ uri: resolveImageUrl(e.coverImageUrl || e.bannerUrl) }} style={StyleSheet.absoluteFill} contentFit="cover" />
                     ) : (
                       <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: colors.muted }]}>
                         <Ionicons name="sparkles" size={26} color={colors.primary + "55"} />
@@ -198,7 +199,7 @@ export default function EventsScreen() {
                 style={[styles.annCard, { backgroundColor: colors.card, borderColor: colors.border }]}
               >
                 {a.imageUrl ? (
-                  <Image source={{ uri: a.imageUrl }} style={styles.annImage} contentFit="cover" />
+                  <Image source={{ uri: resolveImageUrl(a.imageUrl) }} style={styles.annImage} contentFit="cover" />
                 ) : null}
                 <View style={{ flex: 1, padding: 12, gap: 3 }}>
                   <View style={styles.metaItem}>

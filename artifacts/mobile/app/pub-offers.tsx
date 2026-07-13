@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -21,6 +22,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { CoverChargeSection, FreeDrinkSection, splitVendorsByPlanType, TicketSection, VipTableBookingSection } from "@/components/DrinkDealSections";
 import { EmptyState } from "@/components/EmptyState";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
@@ -133,7 +135,7 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
               }}
             >
               {heroImage ? (
-                <Image source={{ uri: heroImage }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                <Image source={{ uri: resolveImageUrl(heroImage) }} style={StyleSheet.absoluteFill} contentFit="cover" />
               ) : null}
               <LinearGradient
                 colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.85)"]}
@@ -341,7 +343,7 @@ function AnnouncementCard({ item }: { item: Announcement }) {
     >
       <View style={styles.annImageWrap}>
         {heroImage ? (
-          <Image source={{ uri: heroImage }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <Image source={{ uri: resolveImageUrl(heroImage) }} style={StyleSheet.absoluteFill} contentFit="cover" />
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
             <Ionicons name="megaphone-outline" size={32} color="rgba(245,158,11,0.4)" />
@@ -423,21 +425,12 @@ export default function PubOffersScreen() {
     queryFn: () => customFetch<Announcement[]>("/api/announcements/recent"),
   });
 
-  const [dealTypeFilter, setDealTypeFilter] = useState("");
-  const [dealGenderFilter, setDealGenderFilter] = useState("");
+  const [dealGenderFilter, setDealGenderFilter] = useState<"" | "female" | "other">("");
   const [annGenreFilter, setAnnGenreFilter] = useState("");
   const [annEventTypeFilter, setAnnEventTypeFilter] = useState("");
 
-  const filteredDeals = (drinkOffers as VendorDrinkOffer[]).filter((offer) => {
-    if (!dealTypeFilter && !dealGenderFilter) return true;
-    return offer.plans.some((p) => {
-      const typeMatch = !dealTypeFilter || p.type === dealTypeFilter;
-      const genderMatch =
-        !dealGenderFilter ||
-        (dealGenderFilter === "female" ? p.gender === "female" : p.gender !== "female");
-      return typeMatch && genderMatch;
-    });
-  });
+  const { freeVendors, ticketVendors, coverChargeVendors, vipTableVendors } = splitVendorsByPlanType(drinkOffers as VendorDrinkOffer[], dealGenderFilter);
+  const totalDeals = freeVendors.length + ticketVendors.length + coverChargeVendors.length + vipTableVendors.length;
 
   const filteredAnnouncements = announcements.filter((a) => {
     if (annGenreFilter && a.genre !== annGenreFilter) return false;
@@ -510,32 +503,8 @@ export default function PubOffersScreen() {
                 </Pressable>
               </View>
 
-              {/* Filters: deal type */}
-              <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Deal type</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.chipRow}
-              >
-                <FilterChip
-                  label="All"
-                  active={dealTypeFilter === ""}
-                  onPress={() => setDealTypeFilter("")}
-                  accent="primary"
-                />
-                {(["welcome", "unlimited", "ticket", "custom"] as const).map((dt) => (
-                  <FilterChip
-                    key={dt}
-                    label={DEAL_TYPE_LABELS[dt]!}
-                    active={dealTypeFilter === dt}
-                    onPress={() => setDealTypeFilter(dealTypeFilter === dt ? "" : dt)}
-                    accent="primary"
-                  />
-                ))}
-              </ScrollView>
-
               {/* Filters: for whom */}
-              <Text style={[styles.filterLabel, { color: colors.mutedForeground, marginTop: 4 }]}>For</Text>
+              <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>For</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -561,17 +530,15 @@ export default function PubOffersScreen() {
                 />
               </ScrollView>
 
-              {filteredDeals.length === 0 ? (
+              {totalDeals === 0 ? (
                 <Text style={[styles.noMatchText, { color: colors.mutedForeground }]}>No deals match these filters.</Text>
               ) : (
-                <FlatList
-                  data={filteredDeals}
-                  keyExtractor={(item) => String(item.vendorId)}
-                  scrollEnabled={false}
-                  contentContainerStyle={styles.dealsList}
-                  renderItem={({ item }) => <DrinkDealCard item={item} />}
-                  ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
-                />
+                <View style={{ marginHorizontal: -20, marginTop: 8 }}>
+                  <FreeDrinkSection vendors={freeVendors} />
+                  <TicketSection vendors={ticketVendors} />
+                  <CoverChargeSection vendors={coverChargeVendors} />
+                  <VipTableBookingSection vendors={vipTableVendors} />
+                </View>
               )}
             </View>
           ) : null}

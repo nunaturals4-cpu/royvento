@@ -29,8 +29,8 @@ const TABS: Tab[] = [
     labelKey: "nav.pubs",
     icon: "beer-outline",
     iconFocused: "beer",
-    route: "/(tabs)/explore",
-    matchPaths: ["/(tabs)/explore", "/explore"],
+    route: "/(tabs)/pubs",
+    matchPaths: ["/(tabs)/pubs", "/pubs", "/(tabs)/explore", "/explore"],
   },
   {
     labelKey: "nav.deals",

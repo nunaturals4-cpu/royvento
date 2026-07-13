@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -38,7 +39,7 @@ export function PopularCategories() {
       <View style={styles.grid}>
         {CATEGORIES.map((c) => (
           <Pressable key={c.label} onPress={c.go} style={[styles.tile, { borderColor: colors.border }]}>
-            <Image source={{ uri: c.img }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            <Image source={{ uri: resolveImageUrl(c.img) }} style={StyleSheet.absoluteFill} contentFit="cover" />
             <LinearGradient colors={["rgba(0,0,0,0.15)", "rgba(0,0,0,0.85)"]} style={StyleSheet.absoluteFill} />
             <View style={[styles.tileIcon, { backgroundColor: colors.primary + "33", borderColor: colors.primary + "66" }]}>
               <Ionicons name={c.icon} size={16} color={colors.primary} />

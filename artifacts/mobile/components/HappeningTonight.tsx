@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { Image } from "expo-image";
@@ -15,6 +16,9 @@ import {
 } from "react-native";
 import { useSelectedCity } from "@/context/CityContext";
 import { useColors } from "@/hooks/useColors";
+import { GuestTypeBadge } from "@/components/GuestTypeBadge";
+import { NightlifeOfferCard } from "@/components/NightlifeOfferCard";
+import { OFFER_THEMES } from "@/components/offerThemes";
 
 // ── Happening Tonight (mobile) ───────────────────────────────────────────────
 // Mirror of the web `HappeningTonight` component. Real-time discovery feed from
@@ -24,7 +28,7 @@ import { useColors } from "@/hooks/useColors";
 interface TonightItem {
   key: string;
   id: number;
-  kind: "pub" | "dj" | "event" | "game" | "happyhour";
+  kind: "pub" | "dj" | "event" | "game" | "happyhour" | "offer";
   title: string;
   subtitle: string;
   city: string;
@@ -34,6 +38,10 @@ interface TonightItem {
   startTime: string;
   endTime: string;
   bucket: "now" | "soon" | null;
+  /** For "offer" items: the vendor_offers category (food/drink/exclusive). */
+  category?: string;
+  /** Guest type ("all"/"female"/"male") — drives the Everyone/Ladies/Men badge. */
+  gender?: string;
   dealLabel: string;
   rating: number;
   todayBookings: number;
@@ -46,28 +54,49 @@ interface TonightResponse {
   startingSoon: TonightItem[];
   lastMinuteDeals: TonightItem[];
   tonightNearYou: TonightItem[];
+  day: string;
+  isToday: boolean;
   counts: { now: number; soon: number; deals: number; total: number };
 }
 
 const FILTERS: { key: string; label: string }[] = [
   { key: "all", label: "All Tonight" },
-  { key: "date", label: "💕 Date Night" },
   { key: "now", label: "🔥 Happening Now" },
   { key: "soon", label: "⚡ Starting Soon" },
-  { key: "happy", label: "🍻 Happy Hours" },
-  { key: "dj", label: "🎧 DJ Nights" },
-  { key: "games", label: "🎮 Games Tonight" },
-  { key: "live", label: "🎤 Live Events" },
+  { key: "event", label: "🎤 Events" },
 ];
+
+// "Happy Hours" / "Food & Drink Offers" / "Exclusive Offer" share one dropdown
+// instead of three always-visible chips — selecting an option here just sets
+// the same `activeFilter` state a chip tap would.
+const OFFER_TYPE_OPTIONS: { key: string; label: string }[] = [
+  { key: "happy", label: "🍻 Happy Hours" },
+  { key: "offers", label: "🍽️ Food & Drink Offers" },
+  { key: "exclusive", label: "✨ Exclusive Offer" },
+];
+const DAY_OPTIONS: { key: string; label: string }[] = [
+  { key: "mon", label: "Monday" },
+  { key: "tue", label: "Tuesday" },
+  { key: "wed", label: "Wednesday" },
+  { key: "thu", label: "Thursday" },
+  { key: "fri", label: "Friday" },
+  { key: "sat", label: "Saturday" },
+  { key: "sun", label: "Sunday" },
+];
+const DAY_KEYS_SUN_FIRST = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+function todayDayKey(): string {
+  return DAY_KEYS_SUN_FIRST[new Date().getDay()] ?? "sun";
+}
 
 /** Convert a web href (e.g. "/pubs/kolkata/foo" or "/events/12") into an
  *  expo-router navigation. We only need the leading id/segment for detail. */
-function navigateFromHref(href: string) {
+function navigateFromHref(href: string, opts?: { book?: boolean }) {
   if (!href) return;
+  const bookQs = opts?.book ? "?book=1" : "";
   // Event detail: /events/:id or slugged /events/:city/:slug — push by id when numeric.
   const eventMatch = href.match(/\/events\/(\d+)/);
   if (eventMatch) {
-    router.push(`/event/${eventMatch[1]}` as never);
+    router.push(`/event/${eventMatch[1]}${bookQs}` as never);
     return;
   }
   const gameMatch = href.match(/\/game-organizers\/([^/]+)/);
@@ -80,65 +109,106 @@ function navigateFromHref(href: string) {
     router.push(`/organizer-events/${orgMatch[1]}` as never);
     return;
   }
+  if (href === "/pub-offers") {
+    router.push("/pub-offers" as never);
+    return;
+  }
   // Default: pubs land on explore.
   router.push("/(tabs)/explore" as never);
 }
 
-function TonightCard({ item }: { item: TonightItem }) {
-  const colors = useColors();
+function TonightStatusBadge({ item, contextLabel }: { item: TonightItem; contextLabel: string }) {
   const live = item.bucket === "now";
-  const loc = item.city ? `${item.city}${item.state ? ", " + item.state : ""}` : "";
+  if (live) {
+    return (
+      <View style={[styles.statusBadge, { backgroundColor: "#dc2626" }]}>
+        <View style={styles.liveDot} />
+        <Text style={[styles.statusText, { color: "#fff" }]}>Live Now</Text>
+      </View>
+    );
+  }
+  if (item.bucket === "soon") {
+    return (
+      <View style={[styles.statusBadge, { backgroundColor: "rgba(245,194,64,0.95)" }]}>
+        <Ionicons name="flash" size={10} color="#000" />
+        <Text style={[styles.statusText, { color: "#000" }]}>{item.startTime || "Soon"}</Text>
+      </View>
+    );
+  }
+  // Neutral fallback so every card reserves the same badge-row height. Shows
+  // "Tonight" when browsing today, or the selected day's name otherwise — a
+  // non-today query never carries a "now"/"soon" bucket (see push()), so this
+  // is the only badge every non-today card gets.
   return (
-    <Pressable
-      onPress={() => navigateFromHref(item.href)}
-      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-    >
-      <View style={styles.imageWrap}>
-        {item.imageUrl ? (
-          <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: colors.muted }]}>
-            <Ionicons name="flame" size={28} color={colors.primary + "55"} />
-          </View>
-        )}
-        <LinearGradient colors={["transparent", "rgba(0,0,0,0.7)"]} style={styles.gradient} />
-        {live ? (
-          <View style={[styles.statusBadge, { backgroundColor: colors.primary }]}>
-            <View style={styles.liveDot} />
-            <Text style={[styles.statusText, { color: colors.primaryForeground }]}>Live Now</Text>
-          </View>
-        ) : item.bucket === "soon" ? (
-          <View style={[styles.statusBadge, { backgroundColor: "rgba(245,194,64,0.95)" }]}>
-            <Ionicons name="flash" size={10} color="#000" />
-            <Text style={[styles.statusText, { color: "#000" }]}>{item.startTime || "Soon"}</Text>
-          </View>
-        ) : null}
-      </View>
-      <View style={styles.body}>
-        <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>{item.title}</Text>
-        {!!item.subtitle && (
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]} numberOfLines={1}>{item.subtitle}</Text>
-        )}
-        {!!item.dealLabel && (
-          <View style={styles.dealPill}>
-            <Ionicons name="ticket-outline" size={11} color="#fcd34d" />
-            <Text style={styles.dealText} numberOfLines={2}>{item.dealLabel}</Text>
-          </View>
-        )}
-        <View style={[styles.footer, { borderTopColor: colors.border }]}>
-          <View style={styles.footerLeft}>
-            <Ionicons name="location-outline" size={12} color={colors.primary} />
-            <Text style={[styles.footerText, { color: colors.mutedForeground }]} numberOfLines={1}>{loc || "Tonight"}</Text>
-          </View>
-          {item.rating > 0 && (
-            <View style={styles.footerLeft}>
-              <Ionicons name="star" size={11} color="#f59e0b" />
-              <Text style={[styles.footerText, { color: "#f59e0b" }]}>{item.rating.toFixed(1)}</Text>
+    <View style={[styles.statusBadge, { backgroundColor: "rgba(255,255,255,0.1)" }]}>
+      <Ionicons name="sparkles" size={10} color="rgba(255,255,255,0.7)" />
+      <Text style={[styles.statusText, { color: "rgba(255,255,255,0.7)" }]}>{contextLabel}</Text>
+    </View>
+  );
+}
+
+function TonightCard({ item, contextLabel }: { item: TonightItem; contextLabel: string }) {
+  const colors = useColors();
+  const loc = item.city ? `${item.city}${item.state ? ", " + item.state : ""}` : "";
+  const bookOnPress = item.kind === "game" ? undefined : () => navigateFromHref(item.href, { book: true });
+
+  // Offer & happy-hour items use the premium VIP offer card (matching the
+  // Happy Hour page cards); every other kind keeps its photo card.
+  if (item.kind === "happyhour" || item.kind === "offer") {
+    const isExclusive = item.category === "exclusive";
+    const theme = item.kind === "happyhour" ? OFFER_THEMES.free : isExclusive ? OFFER_THEMES.exclusive : OFFER_THEMES.food;
+    const timeLabel = item.startTime ? `${item.startTime}${item.endTime ? ` – ${item.endTime}` : ""}` : contextLabel;
+    return (
+      <View style={styles.tonightTile}>
+        <NightlifeOfferCard
+          hideImage
+          theme={theme}
+          onPress={() => navigateFromHref(item.href)}
+          onBook={bookOnPress}
+          title={item.subtitle}
+          venueName={item.title}
+          offerLabel={item.dealLabel?.trim() || (item.kind === "happyhour" ? "Happy Hour" : isExclusive ? "Exclusive Offer" : "Special Offer")}
+          offerEyebrow={item.kind === "happyhour" ? "Enjoy" : isExclusive ? "Exclusive" : "Deal"}
+          offerIcon={isExclusive ? "sparkles" : "wine-outline"}
+          location={loc || contextLabel}
+          statusBadge={
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              <TonightStatusBadge item={item} contextLabel={contextLabel} />
+              <GuestTypeBadge gender={item.gender} />
             </View>
-          )}
-        </View>
+          }
+        >
+          <View style={styles.row}>
+            <Ionicons name="time-outline" size={12} color={theme.accent} />
+            <Text style={styles.timeText} numberOfLines={1}>{timeLabel}</Text>
+          </View>
+        </NightlifeOfferCard>
       </View>
-    </Pressable>
+    );
+  }
+
+  return (
+    <View style={styles.tonightTile}>
+      <NightlifeOfferCard
+        onPress={() => navigateFromHref(item.href)}
+        onBook={bookOnPress}
+        imageUrl={item.imageUrl}
+        imageHeight={120}
+        title={item.title}
+        venueName={item.subtitle}
+        offerLabel={item.dealLabel && item.dealLabel !== item.title ? item.dealLabel : undefined}
+        offerIcon="wine-outline"
+        location={loc || contextLabel}
+        statusBadge={<TonightStatusBadge item={item} contextLabel={contextLabel} />}
+      >
+        {item.rating > 0 && (
+          <View style={styles.row}>
+            <Ionicons name="star" size={12} color="#f59e0b" />
+            <Text style={[styles.timeText, { color: "#f59e0b" }]}>{item.rating.toFixed(1)}</Text>
+          </View>
+        )}
+      </NightlifeOfferCard>
+    </View>
   );
 }
 
@@ -146,16 +216,29 @@ export function HappeningTonight() {
   const colors = useColors();
   const { selectedCity } = useSelectedCity();
   const [activeFilter, setActiveFilter] = useState("all");
+  const [selectedDay, setSelectedDay] = useState(todayDayKey());
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  const [offerPickerOpen, setOfferPickerOpen] = useState(false);
   const [pick, setPick] = useState<TonightItem | null>(null);
 
   const { data } = useQuery({
-    queryKey: ["happening-tonight", selectedCity],
+    queryKey: ["happening-tonight", selectedCity, selectedDay],
     queryFn: () => {
-      const qs = selectedCity ? `?city=${encodeURIComponent(selectedCity)}` : "";
-      return customFetch<TonightResponse>(`/api/happening-tonight${qs}`);
+      const params = new URLSearchParams();
+      if (selectedCity) params.set("city", selectedCity);
+      params.set("day", selectedDay);
+      return customFetch<TonightResponse>(`/api/happening-tonight?${params.toString()}`);
     },
     staleTime: 60_000,
   });
+
+  const isToday = selectedDay === todayDayKey();
+  const selectedDayLabel = DAY_OPTIONS.find((d) => d.key === selectedDay)?.label ?? "Today";
+  const selectedOfferLabel = OFFER_TYPE_OPTIONS.find((o) => o.key === activeFilter)?.label;
+  // Card badges/fallbacks say "Tonight" when browsing today, or the picked
+  // day's name otherwise (a non-today query never carries a live now/soon
+  // bucket, so cards must not still claim to be "Tonight").
+  const contextLabel = isToday ? "Tonight" : selectedDayLabel;
 
   const allItems = useMemo(() => {
     if (!data) return [] as TonightItem[];
@@ -170,10 +253,16 @@ export function HappeningTonight() {
   }, [data]);
 
   const filtered = useMemo(() => {
-    if (activeFilter === "all") return allItems;
-    if (activeFilter === "date") {
-      return allItems.filter((i) => ["pub", "happyhour", "dj", "event"].includes(i.kind));
-    }
+    // "All Tonight": a pub/club/bar venue card only qualifies when an offer is
+    // actually shown on the card (a deal label). The venue's own offer and
+    // happy-hour cards always carry a label, so they still surface; bare venue
+    // cards with nothing on them are hidden. Other experiences are unaffected.
+    if (activeFilter === "all") return allItems.filter((i) => i.kind !== "pub" || !!i.dealLabel);
+    // Events: organiser live events (tagged "live") + any event-kind item.
+    if (activeFilter === "event") return allItems.filter((i) => i.kind === "event" || i.filters.includes("live"));
+    // Starting Soon: offers/events that begin within the next few hours and
+    // have not started yet — the backend "soon" bucket drops items once live.
+    if (activeFilter === "soon") return allItems.filter((i) => i.bucket === "soon");
     return allItems.filter((i) => i.filters.includes(activeFilter));
   }, [allItems, activeFilter]);
 
@@ -192,9 +281,11 @@ export function HappeningTonight() {
           <Text style={[styles.eyebrow, { color: colors.primary }]}>REAL-TIME DISCOVERY</Text>
           <Text style={[styles.heading, { color: colors.foreground }]}>🔥 Happening Tonight</Text>
           <Text style={[styles.headerSub, { color: colors.mutedForeground }]} numberOfLines={1}>
-            {data.counts.now > 0
-              ? `${data.counts.now} live now · ${data.counts.soon} starting soon${selectedCity ? ` near ${selectedCity}` : ""}`
-              : `${allItems.length} experiences tonight${selectedCity ? ` near ${selectedCity}` : ""}`}
+            {isToday
+              ? data.counts.now > 0
+                ? `${data.counts.now} live now · ${data.counts.soon} starting soon${selectedCity ? ` near ${selectedCity}` : ""}`
+                : `${allItems.length} experiences tonight${selectedCity ? ` near ${selectedCity}` : ""}`
+              : `${allItems.length} deals on ${selectedDayLabel}${selectedCity ? ` near ${selectedCity}` : ""}`}
           </Text>
         </View>
       </View>
@@ -226,6 +317,88 @@ export function HappeningTonight() {
         }}
       />
 
+      {/* Day filter + Offers dropdowns */}
+      <View style={styles.dropdownRow}>
+        <Pressable
+          onPress={() => setDayPickerOpen(true)}
+          style={[styles.dropdownTrigger, { borderColor: isToday ? colors.border : colors.primary, backgroundColor: isToday ? colors.muted : colors.primary + "18" }]}
+        >
+          <Ionicons name="calendar-outline" size={13} color={isToday ? colors.mutedForeground : colors.primary} />
+          <Text style={[styles.dropdownText, { color: isToday ? colors.mutedForeground : colors.primary }]} numberOfLines={1}>
+            {isToday ? "Day: Today" : selectedDayLabel}
+          </Text>
+          <Ionicons name="chevron-down" size={13} color={isToday ? colors.mutedForeground : colors.primary} />
+        </Pressable>
+
+        <Pressable
+          onPress={() => setOfferPickerOpen(true)}
+          style={[styles.dropdownTrigger, { borderColor: selectedOfferLabel ? colors.primary : colors.border, backgroundColor: selectedOfferLabel ? colors.primary + "18" : colors.muted }]}
+        >
+          <Ionicons name="wine-outline" size={13} color={selectedOfferLabel ? colors.primary : colors.mutedForeground} />
+          <Text style={[styles.dropdownText, { color: selectedOfferLabel ? colors.primary : colors.mutedForeground }]} numberOfLines={1}>
+            {selectedOfferLabel ?? "Offers"}
+          </Text>
+          <Ionicons name="chevron-down" size={13} color={selectedOfferLabel ? colors.primary : colors.mutedForeground} />
+        </Pressable>
+      </View>
+
+      {/* Day picker modal */}
+      <Modal visible={dayPickerOpen} animationType="fade" transparent onRequestClose={() => setDayPickerOpen(false)}>
+        <Pressable style={styles.pickerOverlay} onPress={() => setDayPickerOpen(false)}>
+          <Pressable style={[styles.pickerCard, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => {}}>
+            <Text style={[styles.pickerTitle, { color: colors.foreground }]}>Browse by day</Text>
+            {DAY_OPTIONS.map((d) => {
+              const active = selectedDay === d.key;
+              return (
+                <Pressable
+                  key={d.key}
+                  onPress={() => { setSelectedDay(d.key); setDayPickerOpen(false); }}
+                  style={[styles.pickerOption, { borderColor: colors.border }]}
+                >
+                  <Text style={[styles.pickerOptionText, { color: active ? colors.primary : colors.foreground, fontFamily: active ? "Inter_700Bold" : "Inter_400Regular" }]}>
+                    {d.label}{d.key === todayDayKey() ? " (Today)" : ""}
+                  </Text>
+                  {active && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+                </Pressable>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Offers picker modal */}
+      <Modal visible={offerPickerOpen} animationType="fade" transparent onRequestClose={() => setOfferPickerOpen(false)}>
+        <Pressable style={styles.pickerOverlay} onPress={() => setOfferPickerOpen(false)}>
+          <Pressable style={[styles.pickerCard, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => {}}>
+            <Text style={[styles.pickerTitle, { color: colors.foreground }]}>Offer type</Text>
+            <Pressable
+              onPress={() => { setActiveFilter("all"); setOfferPickerOpen(false); }}
+              style={[styles.pickerOption, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.pickerOptionText, { color: !selectedOfferLabel ? colors.primary : colors.foreground, fontFamily: !selectedOfferLabel ? "Inter_700Bold" : "Inter_400Regular" }]}>
+                All Offers
+              </Text>
+              {!selectedOfferLabel && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+            </Pressable>
+            {OFFER_TYPE_OPTIONS.map((o) => {
+              const active = activeFilter === o.key;
+              return (
+                <Pressable
+                  key={o.key}
+                  onPress={() => { setActiveFilter(o.key); setOfferPickerOpen(false); }}
+                  style={[styles.pickerOption, { borderColor: colors.border }]}
+                >
+                  <Text style={[styles.pickerOptionText, { color: active ? colors.primary : colors.foreground, fontFamily: active ? "Inter_700Bold" : "Inter_400Regular" }]}>
+                    {o.label}
+                  </Text>
+                  {active && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+                </Pressable>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {filtered.length > 0 ? (
         <FlatList
           horizontal
@@ -233,7 +406,7 @@ export function HappeningTonight() {
           keyExtractor={(it) => it.key}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.cardRow}
-          renderItem={({ item }) => <TonightCard item={item} />}
+          renderItem={({ item }) => <TonightCard item={item} contextLabel={contextLabel} />}
         />
       ) : (
         <View style={[styles.empty, { borderColor: colors.border }]}>
@@ -247,7 +420,7 @@ export function HappeningTonight() {
           <Pressable style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.primary + "55" }]} onPress={() => {}}>
             <View style={styles.modalImage}>
               {pick?.imageUrl ? (
-                <Image source={{ uri: pick.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                <Image source={{ uri: resolveImageUrl(pick.imageUrl) }} style={StyleSheet.absoluteFill} contentFit="cover" />
               ) : (
                 <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: colors.muted }]}>
                   <Ionicons name="sparkles" size={36} color={colors.primary + "66"} />
@@ -308,19 +481,21 @@ const styles = StyleSheet.create({
   chipRow: { paddingHorizontal: 20, paddingVertical: 12, gap: 8 },
   chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
   chipText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  dropdownRow: { flexDirection: "row", gap: 8, paddingHorizontal: 20, marginBottom: 4 },
+  dropdownTrigger: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
+  dropdownText: { flex: 1, fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  pickerOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", padding: 24 },
+  pickerCard: { width: "100%", maxWidth: 360, borderRadius: 20, borderWidth: 1, padding: 8 },
+  pickerTitle: { fontSize: 13, fontFamily: "Inter_700Bold", padding: 12, paddingBottom: 6 },
+  pickerOption: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 13, borderTopWidth: StyleSheet.hairlineWidth },
+  pickerOptionText: { fontSize: 14 },
   cardRow: { paddingLeft: 20, paddingRight: 8, gap: 12 },
-  card: { width: 240, borderRadius: 16, borderWidth: 1, overflow: "hidden" },
-  imageWrap: { height: 130, position: "relative" },
-  gradient: { position: "absolute", left: 0, right: 0, bottom: 0, height: 60 },
-  statusBadge: { position: "absolute", top: 8, left: 8, flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
+  tonightTile: { width: 300 },
+  row: { flexDirection: "row", alignItems: "center", gap: 5 },
+  timeText: { fontSize: 11, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.55)" },
+  statusBadge: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" },
   statusText: { fontSize: 9, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5 },
-  body: { padding: 12, gap: 5 },
-  title: { fontSize: 15, fontFamily: "Inter_700Bold" },
-  subtitle: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  dealPill: { flexDirection: "row", alignItems: "flex-start", gap: 5, borderRadius: 8, borderWidth: 1, borderColor: "rgba(245,158,11,0.25)", backgroundColor: "rgba(245,158,11,0.1)", paddingHorizontal: 8, paddingVertical: 5 },
-  dealText: { flex: 1, fontSize: 10, fontFamily: "Inter_500Medium", color: "#fcd34d", lineHeight: 14 },
-  footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderTopWidth: 1, paddingTop: 8, marginTop: 2 },
   footerLeft: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
   footerText: { fontSize: 11, fontFamily: "Inter_500Medium" },
   empty: { marginHorizontal: 20, marginTop: 8, borderRadius: 16, borderWidth: 1, padding: 24, alignItems: "center" },

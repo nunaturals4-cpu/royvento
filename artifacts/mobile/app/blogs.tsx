@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
@@ -155,7 +156,7 @@ export default function BlogsScreen() {
             >
               {item.imageUrl ? (
                 <Image
-                  source={{ uri: item.imageUrl }}
+                  source={{ uri: resolveImageUrl(item.imageUrl) }}
                   style={styles.imagePlaceholder}
                   contentFit="cover"
                 />

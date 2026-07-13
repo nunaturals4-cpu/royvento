@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Flame, Zap, GlassWater, Utensils, Mic2,
+  Flame, Zap, GlassWater, Utensils, Mic2, Calendar,
   MapPin, Clock, Sparkles, ArrowRight, X,
 } from "lucide-react";
 import { apiGet } from "@/lib/api";
@@ -11,6 +11,7 @@ import { CarouselRow } from "@/components/CarouselRow";
 import { NightlifeOfferCard } from "@/components/NightlifeOfferCard";
 import { GuestTypeBadge } from "@/components/GuestTypeBadge";
 import { OFFER_THEMES } from "@/components/offerThemes";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // ── Happening Tonight ───────────────────────────────────────────────────────
 // Real-time discovery: "It's 7 PM — what can I do in the next few hours?"
@@ -47,6 +48,8 @@ interface TonightResponse {
   startingSoon: TonightItem[];
   lastMinuteDeals: TonightItem[];
   tonightNearYou: TonightItem[];
+  day: string;
+  isToday: boolean;
   counts: { now: number; soon: number; deals: number; total: number };
 }
 
@@ -55,12 +58,32 @@ const FILTERS: { key: string; label: string; icon: React.ReactNode }[] = [
   { key: "now",   label: "🔥 Happening Now", icon: <Flame className="h-3.5 w-3.5" /> },
   { key: "soon",  label: "⚡ Starting Soon",  icon: <Zap className="h-3.5 w-3.5" /> },
   { key: "event",  label: "🎤 Events",               icon: <Mic2 className="h-3.5 w-3.5" /> },
-  { key: "happy",  label: "🍻 Happy Hours",          icon: <GlassWater className="h-3.5 w-3.5" /> },
-  { key: "offers", label: "🍽️ Food & Drink Offers",  icon: <Utensils className="h-3.5 w-3.5" /> },
-  { key: "exclusive", label: "✨ Exclusive Offer",   icon: <Sparkles className="h-3.5 w-3.5" /> },
 ];
 
-function TonightCard({ item }: { item: TonightItem }) {
+// "Happy Hours" / "Food & Drink Offers" / "Exclusive Offer" share one dropdown
+// instead of three always-visible chips — picking an option here just sets the
+// same `activeFilter` state a chip tap would.
+const OFFER_TYPE_OPTIONS: { key: string; label: string; icon: React.ReactNode }[] = [
+  { key: "happy",     label: "🍻 Happy Hours",         icon: <GlassWater className="h-3.5 w-3.5" /> },
+  { key: "offers",    label: "🍽️ Food & Drink Offers", icon: <Utensils className="h-3.5 w-3.5" /> },
+  { key: "exclusive", label: "✨ Exclusive Offer",      icon: <Sparkles className="h-3.5 w-3.5" /> },
+];
+
+const DAY_OPTIONS: { key: string; label: string }[] = [
+  { key: "mon", label: "Monday" },
+  { key: "tue", label: "Tuesday" },
+  { key: "wed", label: "Wednesday" },
+  { key: "thu", label: "Thursday" },
+  { key: "fri", label: "Friday" },
+  { key: "sat", label: "Saturday" },
+  { key: "sun", label: "Sunday" },
+];
+const DAY_KEYS_SUN_FIRST = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+function todayDayKey(): string {
+  return DAY_KEYS_SUN_FIRST[new Date().getDay()] ?? "sun";
+}
+
+function TonightCard({ item, contextLabel }: { item: TonightItem; contextLabel: string }) {
   const live = item.bucket === "now";
   const loc = item.city ? `${item.city}${item.state ? ", " + item.state : ""}` : "";
   const statusBadge = live ? (
@@ -74,8 +97,11 @@ function TonightCard({ item }: { item: TonightItem }) {
   ) : (
     // Neutral fallback so every card reserves the same badge-row height — keeps
     // all cards in the carousel a uniform size even when an item isn't live/soon.
+    // Shows "Tonight" when browsing today, or the picked day's name otherwise —
+    // a non-today query never carries a "now"/"soon" bucket (see push() on the
+    // backend), so this is the only badge every non-today card gets.
     <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/70">
-      <Sparkles className="h-3 w-3" /> Tonight
+      <Sparkles className="h-3 w-3" /> {contextLabel}
     </span>
   );
   // Show the deal in the gold pill, but don't repeat it when it equals the title.
@@ -96,7 +122,7 @@ function TonightCard({ item }: { item: TonightItem }) {
       : isExclusive ? OFFER_THEMES.exclusive : OFFER_THEMES.food;
     const timeLabel = item.startTime
       ? `${item.startTime}${item.endTime ? ` – ${item.endTime}` : ""}`
-      : "Tonight";
+      : contextLabel;
     // Guest type must always show alongside the live/soon urgency badge on
     // every offer/happy-hour card here, matching the Happy Hour page cards.
     const combinedBadge = (
@@ -117,7 +143,7 @@ function TonightCard({ item }: { item: TonightItem }) {
           offerLabel={item.dealLabel?.trim() || (item.kind === "happyhour" ? "Happy Hour" : isExclusive ? "Exclusive Offer" : "Special Offer")}
           offerEyebrow={item.kind === "happyhour" ? "Enjoy" : isExclusive ? "Exclusive" : "Deal"}
           offerIcon={isExclusive ? <Sparkles className="h-5 w-5" /> : <GlassWater className="h-5 w-5" />}
-          location={loc || "Tonight"}
+          location={loc || contextLabel}
           statusBadge={combinedBadge}
         >
           <div className="flex items-center gap-1.5 text-[11px] text-white/55">
@@ -155,16 +181,27 @@ function TonightCard({ item }: { item: TonightItem }) {
 export function HappeningTonight() {
   const { selectedCity } = useSelectedCity();
   const [activeFilter, setActiveFilter] = useState("all");
+  const [selectedDay, setSelectedDay] = useState(todayDayKey());
   const [pick, setPick] = useState<TonightItem | null>(null);
 
   const { data } = useQuery({
-    queryKey: ["happening-tonight", selectedCity],
+    queryKey: ["happening-tonight", selectedCity, selectedDay],
     queryFn: () => {
-      const qs = selectedCity ? `?city=${encodeURIComponent(selectedCity)}` : "";
-      return apiGet<TonightResponse>(`/api/happening-tonight${qs}`);
+      const params = new URLSearchParams();
+      if (selectedCity) params.set("city", selectedCity);
+      params.set("day", selectedDay);
+      return apiGet<TonightResponse>(`/api/happening-tonight?${params.toString()}`);
     },
     staleTime: 60_000,
   });
+
+  const isToday = selectedDay === todayDayKey();
+  const selectedDayLabel = DAY_OPTIONS.find((d) => d.key === selectedDay)?.label ?? "Today";
+  const selectedOfferOption = OFFER_TYPE_OPTIONS.find((o) => o.key === activeFilter);
+  // Card badges/fallbacks say "Tonight" when browsing today, or the picked
+  // day's name otherwise (a non-today query never carries a live now/soon
+  // bucket, so cards must not still claim to be "Tonight").
+  const contextLabel = isToday ? "Tonight" : selectedDayLabel;
 
   // Flat, de-duplicated, score-ordered list for the filter grid.
   const allItems = useMemo(() => {
@@ -223,9 +260,11 @@ export function HappeningTonight() {
               🔥 Happening Tonight
             </h2>
             <p className="text-sm text-white/55 mt-2">
-              {data.counts.now > 0
-                ? `${data.counts.now} live now · ${data.counts.soon} starting soon${selectedCity ? ` near ${selectedCity}` : ""}`
-                : `${allItems.length} experiences for tonight${selectedCity ? ` near ${selectedCity}` : ""}`}
+              {isToday
+                ? data.counts.now > 0
+                  ? `${data.counts.now} live now · ${data.counts.soon} starting soon${selectedCity ? ` near ${selectedCity}` : ""}`
+                  : `${allItems.length} experiences for tonight${selectedCity ? ` near ${selectedCity}` : ""}`
+                : `${allItems.length} deals on ${selectedDayLabel}${selectedCity ? ` near ${selectedCity}` : ""}`}
             </p>
           </div>
 
@@ -240,24 +279,66 @@ export function HappeningTonight() {
         </div>
 
         {/* Quick filters */}
-        <div className="flex gap-2 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-none">
-          {FILTERS.map((f) => {
-            const active = activeFilter === f.key;
-            return (
-              <button
-                key={f.key}
-                onClick={() => setActiveFilter(f.key)}
-                className={`whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors border ${
-                  active
-                    ? "bg-primary text-primary-foreground border-primary red-glow"
-                    : "bg-white/5 text-white/70 border-white/10 hover:border-primary/40 hover:text-white"
-                }`}
-              >
-                {f.icon}
-                {f.label}
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap items-center gap-2 pb-3 -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="flex gap-2 overflow-x-auto scrollbar-none">
+            {FILTERS.map((f) => {
+              const active = activeFilter === f.key;
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => setActiveFilter(f.key)}
+                  className={`whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors border ${
+                    active
+                      ? "bg-primary text-primary-foreground border-primary red-glow"
+                      : "bg-white/5 text-white/70 border-white/10 hover:border-primary/40 hover:text-white"
+                  }`}
+                >
+                  {f.icon}
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Day filter */}
+          <Select value={selectedDay} onValueChange={setSelectedDay}>
+            <SelectTrigger
+              className={`h-auto w-auto shrink-0 gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium ${
+                isToday ? "bg-white/5 text-white/70 border-white/10" : "bg-primary/15 text-primary border-primary/40"
+              }`}
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              <SelectValue>{isToday ? "Day: Today" : selectedDayLabel}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {DAY_OPTIONS.map((d) => (
+                <SelectItem key={d.key} value={d.key}>
+                  {d.label}{d.key === todayDayKey() ? " (Today)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Happy Hours / Food & Drink Offers / Exclusive Offer — one dropdown */}
+          <Select
+            value={activeFilter && OFFER_TYPE_OPTIONS.some((o) => o.key === activeFilter) ? activeFilter : "__none__"}
+            onValueChange={(v) => setActiveFilter(v === "__none__" ? "all" : v)}
+          >
+            <SelectTrigger
+              className={`h-auto w-auto shrink-0 gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium ${
+                selectedOfferOption ? "bg-primary/15 text-primary border-primary/40" : "bg-white/5 text-white/70 border-white/10"
+              }`}
+            >
+              {selectedOfferOption?.icon ?? <GlassWater className="h-3.5 w-3.5" />}
+              <SelectValue>{selectedOfferOption?.label ?? "Offers"}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">All Offers</SelectItem>
+              {OFFER_TYPE_OPTIONS.map((o) => (
+                <SelectItem key={o.key} value={o.key}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Cards */}
@@ -268,7 +349,7 @@ export function HappeningTonight() {
           // empty space (the prod-vs-local mismatch, since local's tonight data
           // is all VIP cards). Each card now keeps its natural, compact height.
           <CarouselRow className="mt-4" itemClassName="self-start">
-            {filtered.map((it) => <TonightCard key={it.key} item={it} />)}
+            {filtered.map((it) => <TonightCard key={it.key} item={it} contextLabel={contextLabel} />)}
           </CarouselRow>
         ) : (
           <div className="mt-6 rounded-2xl border border-white/8 bg-white/3 p-8 text-center">

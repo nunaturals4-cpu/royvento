@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
@@ -107,7 +108,7 @@ export default function GameOrganizerProfileScreen() {
         {/* Cover */}
         <View style={styles.cover}>
           {organizer.coverImageUrl ? (
-            <Image source={{ uri: organizer.coverImageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            <Image source={{ uri: resolveImageUrl(organizer.coverImageUrl) }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.muted }]} />
           )}
@@ -120,7 +121,7 @@ export default function GameOrganizerProfileScreen() {
         {/* Identity */}
         <View style={styles.identity}>
           {organizer.logoUrl ? (
-            <Image source={{ uri: organizer.logoUrl }} style={[styles.logo, { borderColor: colors.border }]} contentFit="cover" />
+            <Image source={{ uri: resolveImageUrl(organizer.logoUrl) }} style={[styles.logo, { borderColor: colors.border }]} contentFit="cover" />
           ) : (
             <View style={[styles.logo, { borderColor: colors.border, backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
               <Ionicons name="game-controller" size={28} color={colors.primary} />
@@ -163,7 +164,7 @@ export default function GameOrganizerProfileScreen() {
             {games.map((g) => (
               <View key={g.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 {g.coverImageUrl ? (
-                  <Image source={{ uri: g.coverImageUrl }} style={styles.itemImage} contentFit="cover" />
+                  <Image source={{ uri: resolveImageUrl(g.coverImageUrl) }} style={styles.itemImage} contentFit="cover" />
                 ) : (
                   <View style={[styles.itemImage, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
                     <Ionicons name="game-controller-outline" size={24} color={colors.mutedForeground} />
@@ -189,7 +190,7 @@ export default function GameOrganizerProfileScreen() {
             {packages.map((p) => (
               <View key={p.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 {p.coverImageUrl ? (
-                  <Image source={{ uri: p.coverImageUrl }} style={styles.itemImage} contentFit="cover" />
+                  <Image source={{ uri: resolveImageUrl(p.coverImageUrl) }} style={styles.itemImage} contentFit="cover" />
                 ) : (
                   <View style={[styles.itemImage, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
                     <Ionicons name="cube-outline" size={24} color={colors.mutedForeground} />

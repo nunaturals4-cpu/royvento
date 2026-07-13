@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -134,7 +135,7 @@ export function HomeHero({
           onMomentumScrollEnd={onScroll}
           renderItem={({ item }) => (
             <View style={{ width, height: HERO_H }}>
-              <Image source={{ uri: item.img }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              <Image source={{ uri: resolveImageUrl(item.img) }} style={StyleSheet.absoluteFill} contentFit="cover" />
               <LinearGradient
                 colors={["rgba(0,0,0,0.25)", "rgba(0,0,0,0.65)", "rgba(0,0,0,0.95)"]}
                 style={StyleSheet.absoluteFill}

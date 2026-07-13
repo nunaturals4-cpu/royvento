@@ -1,8 +1,11 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import * as Sharing from "expo-sharing";
 import { router, Stack } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -51,11 +54,19 @@ interface TicketTier {
 interface Analytics {
   totals: { bookings: number; tickets: number; revenue: string; attended: number; attendanceRate: number };
   perEvent: { id: number; title: string; bookings: number; tickets: number; revenue: string; attended: number }[];
+  byTicketType: { ticketType: string; tickets: number; revenue: string }[];
 }
 interface BookingRow {
   id: number; createdAt: string; bookingDate: string; quantity: number; amount: string;
-  checkedIn: boolean; attendee: string; phone: string; eventTitle: string; ticketType: string;
+  checkedIn: boolean; attendee: string; phone: string; email: string; eventTitle: string; ticketType: string;
+  bookingLocation?: string;
 }
+interface LeadView {
+  viewerUserId: number | null; viewerName: string; viewerEmail: string; phone: string;
+  visitCount: number; lastViewedAt: string; hasBooked: boolean;
+}
+interface LeadsPayload { totalViews: number; bookedCount: number; views: LeadView[]; }
+interface AdRequest { id: number; status: string; note: string; adminNote: string; createdAt: string; eventTitle: string; featured: boolean; }
 interface Coupon {
   id: number; code: string; discountType: string; discountValue: string; eventId: number | null;
   active: boolean; maxUses: number | null; usedCount: number; expiresAt: string | null;
@@ -87,7 +98,9 @@ const TABS: { key: string; label: string; icon: React.ComponentProps<typeof Ioni
   { key: "overview", label: "Overview", icon: "stats-chart-outline" },
   { key: "events", label: "Events", icon: "calendar-outline" },
   { key: "bookings", label: "Bookings", icon: "ticket-outline" },
+  { key: "leads", label: "Leads", icon: "eye-outline" },
   { key: "coupons", label: "Coupons", icon: "pricetag-outline" },
+  { key: "promote", label: "Promote", icon: "megaphone-outline" },
   { key: "managers", label: "Managers", icon: "people-outline" },
   { key: "earnings", label: "Earnings", icon: "cash-outline" },
   { key: "scanner", label: "Scanner", icon: "qr-code-outline" },
@@ -134,7 +147,9 @@ export default function OrganizerDashboardScreen() {
         {tab === "overview" && <OverviewTab colors={colors} insets={insets} />}
         {tab === "events" && <EventsTab colors={colors} insets={insets} />}
         {tab === "bookings" && <BookingsTab colors={colors} insets={insets} />}
+        {tab === "leads" && <LeadsTab colors={colors} insets={insets} />}
         {tab === "coupons" && <CouponsTab colors={colors} insets={insets} />}
+        {tab === "promote" && <PromoteTab colors={colors} insets={insets} />}
         {tab === "managers" && <ManagersTab colors={colors} insets={insets} />}
         {tab === "earnings" && <EarningsTab colors={colors} insets={insets} />}
         {tab === "scanner" && <ScannerTab colors={colors} insets={insets} />}
@@ -162,6 +177,7 @@ function OverviewTab({ colors, insets }: { colors: Pal; insets: { bottom: number
     { label: "Tickets sold", value: String(t?.tickets ?? 0), icon: "people-outline" as const },
     { label: "Revenue", value: inr(t?.revenue ?? 0), icon: "cash-outline" as const },
     { label: "Attended", value: String(t?.attended ?? 0), icon: "checkmark-done-outline" as const },
+    { label: "Attendance", value: `${t?.attendanceRate ?? 0}%`, icon: "stats-chart-outline" as const },
   ];
   return (
     <ScrollView contentContainerStyle={[{ padding: 16 }, useBottomPad(insets)]}>
@@ -174,6 +190,19 @@ function OverviewTab({ colors, insets }: { colors: Pal; insets: { bottom: number
           </View>
         ))}
       </View>
+      {(an?.byTicketType ?? []).length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Popular ticket types</Text>
+          <View style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border, gap: 8 }]}>
+            {an!.byTicketType.map((tt) => (
+              <View key={tt.ticketType} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_500Medium" }}>{tt.ticketType}</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{tt.tickets} sold · {inr(tt.revenue)}</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
       {(an?.perEvent ?? []).length > 0 && (
         <>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Per event</Text>
@@ -224,7 +253,7 @@ function EventsTab({ colors, insets }: { colors: Pal; insets: { bottom: number }
       ) : events.map((e) => (
         <View key={e.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            {e.coverImageUrl ? <Image source={{ uri: e.coverImageUrl }} style={styles.thumb} contentFit="cover" /> : <View style={[styles.thumb, { backgroundColor: colors.muted }]} />}
+            {e.coverImageUrl ? <Image source={{ uri: resolveImageUrl(e.coverImageUrl) }} style={styles.thumb} contentFit="cover" /> : <View style={[styles.thumb, { backgroundColor: colors.muted }]} />}
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{e.title}</Text>
               <StatusPill colors={colors} status={e.approvalStatus} />
@@ -281,7 +310,7 @@ function EventEditor({ colors, insets, event, onDone }: { colors: Pal; insets: {
     <ScrollView contentContainerStyle={[{ padding: 16 }, useBottomPad(insets)]}>
       <BackRow colors={colors} label={isEdit ? "Edit event" : "Create event"} onBack={onDone} />
       <Pressable onPress={pickCover} style={[styles.coverPick, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-        {f.coverImageUrl ? <Image source={{ uri: f.coverImageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : (
+        {f.coverImageUrl ? <Image source={{ uri: resolveImageUrl(f.coverImageUrl) }} style={StyleSheet.absoluteFill} contentFit="cover" /> : (
           <><Ionicons name="image-outline" size={26} color={colors.mutedForeground} /><Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 4 }}>Add cover image</Text></>
         )}
       </Pressable>
@@ -380,14 +409,60 @@ function TicketsEditor({ colors, insets, event, onBack }: { colors: Pal; insets:
 // ─── Bookings ─────────────────────────────────────────────────────────────────
 function BookingsTab({ colors, insets }: { colors: Pal; insets: { bottom: number } }) {
   const [rows, setRows] = useState<BookingRow[]>([]);
+  const [events, setEvents] = useState<OrganizerEvent[]>([]);
+  const [eventFilter, setEventFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+
   useEffect(() => {
-    customFetch<BookingRow[]>("/api/organizer/bookings").then(setRows).catch(() => setRows([])).finally(() => setLoading(false));
+    customFetch<OrganizerEvent[]>("/api/organizer/events").then(setEvents).catch(() => setEvents([]));
   }, []);
-  if (loading) return <Centered colors={colors} />;
+
+  useEffect(() => {
+    setLoading(true);
+    const q = eventFilter === "all" ? "" : `?eventId=${eventFilter}`;
+    customFetch<BookingRow[]>(`/api/organizer/bookings${q}`).then(setRows).catch(() => setRows([])).finally(() => setLoading(false));
+  }, [eventFilter]);
+
+  async function exportCsv() {
+    if (rows.length === 0) return;
+    setExporting(true);
+    try {
+      const header = ["Booking", "Event", "Ticket", "Attendee", "Phone", "Email", "Qty", "Amount", "Date", "Location", "CheckedIn"];
+      const lines = rows.map((r) => [r.id, r.eventTitle, r.ticketType, r.attendee, r.phone, r.email, r.quantity, r.amount, r.bookingDate, r.bookingLocation ?? "", r.checkedIn ? "yes" : "no"]
+        .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","));
+      const csv = [header.join(","), ...lines].join("\n");
+      const path = `${FileSystem.documentDirectory}royvento-leads.csv`;
+      await FileSystem.writeAsStringAsync(path, csv, { encoding: "utf8" });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(path, { mimeType: "text/csv", dialogTitle: "Export bookings & leads" });
+      }
+    } catch {
+      Alert.alert("Export failed", "Could not export bookings to CSV.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <ScrollView contentContainerStyle={[{ padding: 16 }, useBottomPad(insets)]}>
-      {rows.length === 0 ? <Text style={[styles.empty, { color: colors.mutedForeground }]}>No bookings yet.</Text> : rows.map((b) => (
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 0 }]}>Bookings & leads</Text>
+        <SmallBtn colors={colors} icon="download-outline" label={exporting ? "Exporting…" : "CSV"} onPress={exportCsv} />
+      </View>
+      {events.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }} contentContainerStyle={{ gap: 6 }}>
+          {[{ id: "all", title: "All events" }, ...events.map((e) => ({ id: String(e.id), title: e.title }))].map((opt) => {
+            const active = eventFilter === opt.id;
+            return (
+              <Pressable key={opt.id} onPress={() => setEventFilter(opt.id)} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary + "22" : "transparent" }}>
+                <Text style={{ color: active ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }} numberOfLines={1}>{opt.title}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+      {loading ? <Centered colors={colors} /> : rows.length === 0 ? <Text style={[styles.empty, { color: colors.mutedForeground }]}>No bookings yet.</Text> : rows.map((b) => (
         <View key={b.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{b.attendee || "Guest"}</Text>
@@ -396,7 +471,8 @@ function BookingsTab({ colors, insets }: { colors: Pal; insets: { bottom: number
             </View>
           </View>
           <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{b.eventTitle} · {b.ticketType} ×{b.quantity} · {inr(b.amount)}</Text>
-          {!!b.phone && <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{b.phone}</Text>}
+          {(!!b.phone || !!b.email) && <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{[b.phone, b.email].filter(Boolean).join(" · ")}</Text>}
+          {!!b.bookingLocation && <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{b.bookingLocation}</Text>}
         </View>
       ))}
     </ScrollView>
@@ -441,6 +517,118 @@ function CouponsTab({ colors, insets }: { colors: Pal; insets: { bottom: number 
           </View>
           <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{c.discountType === "fixed" ? inr(c.discountValue) : `${c.discountValue}%`} off · used {c.usedCount}{c.maxUses ? `/${c.maxUses}` : ""}</Text>
           <View style={styles.rowActions}><SmallBtn colors={colors} icon="trash-outline" label="Delete" danger onPress={() => remove(c)} /></View>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+// ─── Leads (profile views + already-booked) ──────────────────────────────────
+function LeadsTab({ colors, insets }: { colors: Pal; insets: { bottom: number } }) {
+  const [data, setData] = useState<LeadsPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    customFetch<LeadsPayload>("/api/organizer/leads").then(setData).catch(() => setData(null)).finally(() => setLoading(false));
+  }, []);
+  if (loading) return <Centered colors={colors} />;
+  return (
+    <ScrollView contentContainerStyle={[{ padding: 16 }, useBottomPad(insets)]}>
+      <Text style={{ color: colors.mutedForeground, fontSize: 13, marginBottom: 12 }}>People who viewed your organizer page, and who's already booked.</Text>
+      <View style={styles.statGrid}>
+        <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border, flex: 1 }]}>
+          <Ionicons name="eye-outline" size={20} color={colors.primary} />
+          <Text style={[styles.statValue, { color: colors.foreground }]}>{data?.totalViews ?? 0}</Text>
+          <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Profile views</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border, flex: 1 }]}>
+          <Ionicons name="trending-up-outline" size={20} color="#4ade80" />
+          <Text style={[styles.statValue, { color: "#4ade80" }]}>{data?.bookedCount ?? 0}</Text>
+          <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Already booked</Text>
+        </View>
+      </View>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent visitors</Text>
+      {!data || data.views.length === 0 ? (
+        <Text style={[styles.empty, { color: colors.mutedForeground }]}>No one has viewed your page yet.</Text>
+      ) : data.views.map((v, i) => (
+        <View key={i} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={[styles.rowTitle, { color: colors.foreground, fontStyle: v.viewerUserId ? "normal" : "italic" }]} numberOfLines={1}>{v.viewerName}</Text>
+            {v.hasBooked && <View style={[styles.checkPill, { backgroundColor: "#16a34a22" }]}><Text style={{ color: "#4ade80", fontSize: 10, fontFamily: "Inter_600SemiBold" }}>Booked</Text></View>}
+          </View>
+          <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>
+            {[v.viewerEmail, v.phone].filter(Boolean).join(" · ") || "—"} · {v.visitCount} visit{v.visitCount === 1 ? "" : "s"}
+            {v.lastViewedAt ? ` · last ${new Date(v.lastViewedAt).toLocaleDateString()}` : ""}
+          </Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+// ─── Promote (request to feature an event in the Events-page hero slider) ────
+function PromoteTab({ colors, insets }: { colors: Pal; insets: { bottom: number } }) {
+  const [events, setEvents] = useState<OrganizerEvent[]>([]);
+  const [rows, setRows] = useState<AdRequest[]>([]);
+  const [eventId, setEventId] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(() => { customFetch<AdRequest[]>("/api/organizer/ads").then(setRows).catch(() => setRows([])); }, []);
+  useEffect(() => {
+    customFetch<OrganizerEvent[]>("/api/organizer/events").then((all) => setEvents(all.filter((e) => e.approvalStatus === "approved"))).catch(() => setEvents([]));
+    load();
+  }, [load]);
+
+  async function submit() {
+    if (!eventId) { Alert.alert("Pick an event"); return; }
+    setSaving(true);
+    try {
+      await customFetch("/api/organizer/ads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ organizerEventId: Number(eventId), note }) });
+      setEventId(null); setNote(""); load();
+    } catch (e) {
+      Alert.alert("Request failed", (e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ScrollView contentContainerStyle={[{ padding: 16 }, useBottomPad(insets)]}>
+      <Text style={{ color: colors.mutedForeground, fontSize: 13, marginBottom: 12 }}>Request to feature an event in the Royvento Events hero slider. Admin reviews each request.</Text>
+      <View style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Field colors={colors} label="Event">
+          {events.length === 0 ? (
+            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No approved events yet.</Text>
+          ) : (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              {events.map((e) => {
+                const active = eventId === String(e.id);
+                return (
+                  <Pressable key={e.id} onPress={() => setEventId(String(e.id))} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary + "22" : "transparent" }}>
+                    <Text style={{ color: active ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }} numberOfLines={1}>{e.title}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </Field>
+        <Field colors={colors} label="Note (optional)">
+          <Inp colors={colors} value={note} onChangeText={setNote} placeholder="Why should this be featured?" multiline />
+        </Field>
+        <PrimaryBtn colors={colors} label={saving ? "Requesting…" : "Request promotion"} onPress={submit} disabled={saving} />
+      </View>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Your requests</Text>
+      {rows.length === 0 ? (
+        <Text style={[styles.empty, { color: colors.mutedForeground }]}>No promotion requests yet.</Text>
+      ) : rows.map((r) => (
+        <View key={r.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={[styles.rowTitle, { color: colors.foreground, flex: 1 }]} numberOfLines={1}>{r.eventTitle}</Text>
+            {r.featured && <View style={[styles.checkPill, { backgroundColor: "#f59e0b22", marginLeft: 6 }]}><Text style={{ color: "#fbbf24", fontSize: 10, fontFamily: "Inter_600SemiBold" }}>Featured</Text></View>}
+          </View>
+          <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>
+            {new Date(r.createdAt).toLocaleDateString()} · <Text style={{ textTransform: "capitalize" }}>{r.status}</Text>{r.adminNote ? ` · ${r.adminNote}` : ""}
+          </Text>
         </View>
       ))}
     </ScrollView>

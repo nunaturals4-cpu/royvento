@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import {
   customFetch,
@@ -24,6 +25,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CityPickerSheet } from "@/components/CityPickerSheet";
+import { CoverChargeSection, FreeDrinkSection, splitVendorsByPlanType, TicketSection, VipTableBookingSection } from "@/components/DrinkDealSections";
 import { EventCard } from "@/components/EventCard";
 import { GoingOutWithFriends } from "@/components/GoingOutWithFriends";
 import { HappeningTonight } from "@/components/HappeningTonight";
@@ -303,114 +305,18 @@ export default function HomeScreen() {
       <GoingOutWithFriends />
 
       {/* Drink Deals */}
-      {drinkOffers.length > 0 && (
-        <Section title={t("events.drink_deals")} icon="wine-outline" onSeeAll={() => router.push({ pathname: "/(tabs)/explore", params: { type: "pub" } })}>
-          <FlatList
-            horizontal
-            data={drinkOffers as VendorDrinkOffer[]}
-            keyExtractor={(item) => String(item.vendorId)}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.row}
-            renderItem={({ item }) => (
-              <Pressable
-                style={[styles.drinkCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => {
-                  if (item.pubEventId) {
-                    router.push(`/event/${item.pubEventId}` as never);
-                  } else {
-                    router.push(`/partner/${item.vendorId}` as never);
-                  }
-                }}
-              >
-                <View style={[styles.drinkCardHeader, { borderBottomColor: colors.border }]}>
-                  <View style={[styles.drinkIconBox, { backgroundColor: colors.primary + "22" }]}>
-                    <Ionicons name="wine-outline" size={16} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[styles.drinkCardVenueName, { color: colors.foreground }]} numberOfLines={2}>
-                      {item.vendorName}
-                    </Text>
-                    <Text style={{ fontSize: 9, fontFamily: "Inter_500Medium", color: colors.mutedForeground, textTransform: "uppercase", letterSpacing: 0.8, marginTop: 1 }}>
-                      Drink Deals
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.drinkCardBody}>
-                  {(item.plans ?? []).slice(0, 3).map((plan: DrinkPlanSummary, i: number) => {
-                    const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
-                    const showTime = plan.timeFrom && plan.timeTo;
-                    return (
-                      <View key={i} style={styles.drinkPlanRow}>
-                        <View
-                          style={[
-                            styles.drinkTypeBadge,
-                            {
-                              backgroundColor: DEAL_TYPE_BG[plan.type] ?? "rgba(255,255,255,0.08)",
-                              borderColor: DEAL_TYPE_BORDER[plan.type] ?? "rgba(255,255,255,0.12)",
-                            },
-                          ]}
-                        >
-                          <Text style={[styles.drinkTypeBadgeText, { color: DEAL_TYPE_COLOR[plan.type] ?? "rgba(255,255,255,0.5)" }]}>
-                            {DEAL_TYPE_LABELS[plan.type] ?? plan.type}
-                          </Text>
-                        </View>
-                        <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text style={[styles.drinkPlanText, { color: colors.mutedForeground }]} numberOfLines={1}>
-                            {getPlanLabel(plan)}
-                          </Text>
-                          {(showDays || showTime) && (
-                            <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap", marginTop: 3 }}>
-                              {showDays && plan.days!.map((d) => (
-                                <View key={d} style={{ backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" }}>
-                                  <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#fff" }}>{d.slice(0, 3)}</Text>
-                                </View>
-                              ))}
-                              {showTime && (
-                                <View style={{ backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", flexDirection: "row", alignItems: "center", gap: 4 }}>
-                                  <Ionicons name="time-outline" size={10} color="#fff" />
-                                  <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#fff" }}>
-                                    {plan.timeFrom}–{plan.timeTo}
-                                  </Text>
-                                </View>
-                              )}
-                            </View>
-                          )}
-                          {!!plan.description && (
-                            <Text style={[styles.drinkPlanDetail, { color: "rgba(255,255,255,0.25)", fontStyle: "italic" }]} numberOfLines={1}>
-                              {plan.description}
-                            </Text>
-                          )}
-                        </View>
-                        <View
-                          style={[
-                            styles.drinkGenderPill,
-                            { backgroundColor: plan.gender === "female" ? "rgba(244,63,94,0.15)" : "rgba(220,38,38,0.12)" },
-                          ]}
-                        >
-                          <Text style={[styles.drinkGenderText, { color: plan.gender === "female" ? "#e11d48" : "#dc2626" }]}>
-                            {plan.gender === "female" ? "Ladies" : "All"}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })}
-                  {(item.plans?.length ?? 0) > 3 && (
-                    <Text style={[styles.drinkMoreText, { color: colors.mutedForeground }]}>
-                      +{(item.plans?.length ?? 0) - 3} more
-                    </Text>
-                  )}
-                  <View style={[styles.drinkCta, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "33" }]}>
-                    <Text style={[styles.drinkCtaText, { color: colors.primary }]}>
-                      {item.pubEventId ? t("events.book_now_btn") : "View venue"}
-                    </Text>
-                    <Ionicons name="arrow-forward" size={14} color={colors.primary} />
-                  </View>
-                </View>
-              </Pressable>
-            )}
-          />
-        </Section>
-      )}
+      {drinkOffers.length > 0 && (() => {
+        const { freeVendors, ticketVendors, coverChargeVendors, vipTableVendors } = splitVendorsByPlanType(drinkOffers as VendorDrinkOffer[]);
+        if (freeVendors.length === 0 && ticketVendors.length === 0 && coverChargeVendors.length === 0 && vipTableVendors.length === 0) return null;
+        return (
+          <Section title={t("events.drink_deals")} icon="wine-outline" onSeeAll={() => router.push("/pub-offers" as never)}>
+            <FreeDrinkSection vendors={freeVendors} />
+            <TicketSection vendors={ticketVendors} />
+            <CoverChargeSection vendors={coverChargeVendors} />
+            <VipTableBookingSection vendors={vipTableVendors} />
+          </Section>
+        );
+      })()}
 
       {/* Featured Events */}
       {(featured.data?.length ?? 0) > 0 && (
@@ -460,7 +366,7 @@ export default function HomeScreen() {
               >
                 {item.imageUrl ? (
                   <View style={styles.announcementImageWrapper}>
-                    <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                    <Image source={{ uri: resolveImageUrl(item.imageUrl) }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
                     <LinearGradient
                       colors={["transparent", "rgba(0,0,0,0.78)"]}
                       style={StyleSheet.absoluteFillObject}

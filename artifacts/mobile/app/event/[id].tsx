@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -545,7 +546,7 @@ export default function EventDetailScreen() {
         {/* Hero image */}
         <View style={styles.imageContainer}>
           {event.imageUrl ? (
-            <Image source={{ uri: event.imageUrl }} style={styles.heroImage} contentFit="cover" />
+            <Image source={{ uri: resolveImageUrl(event.imageUrl) }} style={styles.heroImage} contentFit="cover" />
           ) : (
             <View style={[styles.heroImage, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
               <Ionicons name="musical-notes" size={48} color={colors.mutedForeground} />
@@ -577,7 +578,7 @@ export default function EventDetailScreen() {
             {(event.galleryImages ?? []).map((img, i) => (
               <Image
                 key={i}
-                source={{ uri: img }}
+                source={{ uri: resolveImageUrl(img) }}
                 style={[styles.galleryStripImg, { borderColor: colors.border }]}
                 contentFit="cover"
               />
@@ -1458,7 +1459,7 @@ export default function EventDetailScreen() {
                     style={[styles.similarPubCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                   >
                     {pub.imageUrl ? (
-                      <Image source={{ uri: pub.imageUrl }} style={styles.similarPubImage} contentFit="cover" />
+                      <Image source={{ uri: resolveImageUrl(pub.imageUrl) }} style={styles.similarPubImage} contentFit="cover" />
                     ) : (
                       <View style={[styles.similarPubImage, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
                         <Ionicons name="wine-outline" size={24} color={colors.mutedForeground} />
@@ -1640,7 +1641,7 @@ export default function EventDetailScreen() {
             <Ionicons name="close" size={22} color="#fff" />
           </TouchableOpacity>
           {lightboxImage ? (
-            <Image source={{ uri: lightboxImage }} style={{ width: "100%", height: "85%" }} contentFit="contain" />
+            <Image source={{ uri: resolveImageUrl(lightboxImage) }} style={{ width: "100%", height: "85%" }} contentFit="contain" />
           ) : null}
         </Pressable>
       </Modal>

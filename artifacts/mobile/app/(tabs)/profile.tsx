@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { customFetch, useUpdateMe } from "@workspace/api-client-react";
@@ -370,7 +371,7 @@ export default function ProfileScreen() {
           >
             {user.profileImage ? (
               <Image
-                source={{ uri: user.profileImage }}
+                source={{ uri: resolveImageUrl(user.profileImage) }}
                 style={[styles.avatar, { backgroundColor: colors.muted, borderWidth: 3, borderColor: colors.primary + "40" }]}
                 contentFit="cover"
               />
@@ -715,7 +716,7 @@ export default function ProfileScreen() {
           { icon: "notifications-outline" as const, label: "Notifications", onPress: () => router.push("/notifications"), badge: unreadCount },
           { icon: "ticket-outline" as const, label: t("bookings.title"), onPress: () => router.push("/(tabs)/bookings"), badge: 0 },
           { icon: "heart-outline" as const, label: t("profile.wishlist"), onPress: () => router.push("/(tabs)/wishlist"), badge: 0 },
-          { icon: "beer-outline" as const, label: t("nav.pubs"), onPress: () => router.push("/(tabs)/explore"), badge: 0 },
+          { icon: "beer-outline" as const, label: t("nav.pubs"), onPress: () => router.push("/(tabs)/pubs"), badge: 0 },
           { icon: "pricetags-outline" as const, label: t("nav.deals"), onPress: () => router.push("/(tabs)/deals"), badge: 0 },
           { icon: "newspaper-outline" as const, label: t("profile.blog_stories"), onPress: () => router.push("/blogs"), badge: 0 },
           { icon: "calculator-outline" as const, label: "Split Expense", onPress: () => router.push("/split-expense" as any), badge: 0 },
@@ -789,7 +790,7 @@ export default function ProfileScreen() {
                 <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("profile.profile_photo")}</Text>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 8 }}>
                   {editProfileImage ? (
-                    <Image source={{ uri: editProfileImage }} style={styles.photoPreview} contentFit="cover" />
+                    <Image source={{ uri: resolveImageUrl(editProfileImage) }} style={styles.photoPreview} contentFit="cover" />
                   ) : (
                     <View style={[styles.photoPreview, { backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }]}>
                       <Text style={{ fontSize: 22, fontFamily: "Inter_700Bold", color: colors.primaryForeground }}>

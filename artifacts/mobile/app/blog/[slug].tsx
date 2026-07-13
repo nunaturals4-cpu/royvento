@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
@@ -20,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
+import { openRichTextLink, richHtmlDomVisitors, RICH_HTML_IGNORED_TAGS } from "@/lib/sanitizeRichHtml";
 
 interface Blog {
   id: number;
@@ -173,7 +175,7 @@ export default function BlogDetailScreen() {
       {blog.imageUrl ? (
         <View style={{ width, height: heroHeight }}>
           <Image
-            source={{ uri: blog.imageUrl }}
+            source={{ uri: resolveImageUrl(blog.imageUrl) }}
             style={{ width, height: heroHeight }}
             contentFit="cover"
           />
@@ -256,6 +258,9 @@ export default function BlogDetailScreen() {
           }}
           systemFonts={SYSTEM_FONTS}
           enableExperimentalMarginCollapsing
+          ignoredDomTags={RICH_HTML_IGNORED_TAGS}
+          domVisitors={richHtmlDomVisitors}
+          renderersProps={{ a: { onPress: (_e, href) => openRichTextLink(href) } }}
         />
       </View>
 

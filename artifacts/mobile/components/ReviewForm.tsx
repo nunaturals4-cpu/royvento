@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import {
   getGetReviewEligibilityQueryKey,
@@ -269,7 +270,7 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                 {images.map((url, i) => (
                   <View key={i} style={{ width: 64, height: 64, borderRadius: 8, overflow: "hidden", borderWidth: 1, borderColor: colors.border, position: "relative" }}>
-                    <Image source={{ uri: url }} style={{ width: "100%", height: "100%" }} />
+                    <Image source={{ uri: resolveImageUrl(url) }} style={{ width: "100%", height: "100%" }} />
                     <TouchableOpacity
                       disabled={formDisabled}
                       onPress={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}

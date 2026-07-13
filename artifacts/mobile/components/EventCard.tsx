@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/context/LanguageContext";
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 
 const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -106,7 +107,7 @@ export function EventCard({
       <View style={[styles.imageWrap, compact && styles.imageWrapCompact]}>
         {imageUrl ? (
           <Image
-            source={{ uri: imageUrl }}
+            source={{ uri: resolveImageUrl(imageUrl) }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
           />

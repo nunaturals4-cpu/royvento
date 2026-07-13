@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch, useListMyBookings, getListMyBookingsQueryKey } from "@workspace/api-client-react";
 import { Image } from "expo-image";
@@ -431,7 +432,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                 {/* Event Image Banner */}
                 {b.eventImage ? (
                   <Image
-                    source={{ uri: b.eventImage }}
+                    source={{ uri: resolveImageUrl(b.eventImage) }}
                     style={styles.eventBanner}
                     contentFit="cover"
                   />

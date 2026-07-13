@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/resolveImageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -959,12 +960,16 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
 }
 
 // ─── Coupons Tab (mirrors web CouponsPanel) ──────────────────────────────────
+type CouponApplicableTo = "ticket" | "event" | "both" | "event_booking" | "cover_charge" | "vip_table";
+type CouponAudience = "all" | "followers" | "non_followers";
+
 interface VendorCoupon {
   id: number;
   code: string;
   discountType: "percent" | "fixed";
   discountValue: string;
-  applicableTo: "ticket" | "event" | "both";
+  applicableTo: CouponApplicableTo;
+  audience: CouponAudience;
   active: boolean;
   maxUses: number | null;
   usedCount: number;
@@ -975,12 +980,14 @@ interface CouponFormState {
   code: string;
   discountType: "percent" | "fixed";
   discountValue: string;
-  applicableTo: "ticket" | "event" | "both";
+  applicableTo: CouponApplicableTo;
+  audience: CouponAudience;
   active: boolean;
   maxUses: string;
   expiresAt: string;
 }
-const BLANK_COUPON: CouponFormState = { code: "", discountType: "percent", discountValue: "10", applicableTo: "both", active: true, maxUses: "", expiresAt: "" };
+const BLANK_COUPON: CouponFormState = { code: "", discountType: "percent", discountValue: "10", applicableTo: "both", audience: "all", active: true, maxUses: "", expiresAt: "" };
+const AUDIENCE_LABELS: Record<CouponAudience, string> = { all: "Everyone", followers: "Followers only", non_followers: "Non-followers only" };
 
 function CouponsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
   const qc = useQueryClient();
@@ -1001,6 +1008,7 @@ function CouponsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
       discountType: c.discountType,
       discountValue: String(c.discountValue),
       applicableTo: c.applicableTo,
+      audience: c.audience ?? "all",
       active: c.active,
       maxUses: c.maxUses != null ? String(c.maxUses) : "",
       expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : "",
@@ -1028,9 +1036,11 @@ function CouponsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
         discountType: form.discountType,
         discountValue: Number(form.discountValue),
         applicableTo: form.applicableTo,
+        audience: form.audience,
         active: form.active,
         maxUses: form.maxUses ? Number(form.maxUses) : null,
-        expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
+        // Follower / non-follower coupons are non-expiring by design.
+        expiresAt: form.audience === "all" && form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
       };
       if (!editing) payload.code = form.code.trim().toUpperCase() || undefined;
       if (editing) {
@@ -1082,7 +1092,7 @@ function CouponsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
     } catch { Alert.alert("Failed to update"); }
   }
 
-  const APPLIES_LABEL: Record<string, string> = { both: "All bookings", ticket: "Tickets only", event: "Events/Tables only" };
+  const APPLIES_LABEL: Record<string, string> = { both: "All bookings", ticket: "Tickets only", event: "Events/Tables only", event_booking: "Event booking only", cover_charge: "Cover charges only", vip_table: "VIP Table Booking only" };
 
   if (isLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
 
@@ -1126,6 +1136,11 @@ function CouponsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
             <View style={{ backgroundColor: colors.muted, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
               <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{APPLIES_LABEL[c.applicableTo]}</Text>
             </View>
+            {(c.audience ?? "all") !== "all" && (
+              <View style={{ backgroundColor: c.audience === "followers" ? colors.primary + "20" : "#0ea5e920", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: c.audience === "followers" ? colors.primary : "#0ea5e9" }}>{AUDIENCE_LABELS[c.audience]}</Text>
+              </View>
+            )}
           </View>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
@@ -1197,13 +1212,32 @@ function CouponsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
               <View style={{ gap: 6 }}>
                 <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>APPLICABLE TO</Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                  {([["both", "All bookings"], ["ticket", "Tickets only"], ["event", "Events/Tables"]] as const).map(([val, label]) => (
+                  {([["both", "All bookings"], ["ticket", "Tickets only"], ["event", "Events/Tables"], ["event_booking", "Event booking only"], ["cover_charge", "Cover charges only"], ["vip_table", "VIP Table Booking only"]] as const).map(([val, label]) => (
                     <TouchableOpacity key={val} onPress={() => setForm((p) => ({ ...p, applicableTo: val }))}
                       style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, backgroundColor: form.applicableTo === val ? colors.primary : colors.muted, borderColor: form.applicableTo === val ? colors.primary : colors.border }}>
                       <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.applicableTo === val ? colors.primaryForeground : colors.mutedForeground }}>{label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
+              </View>
+
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>AUDIENCE</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {([["all", "Everyone"], ["followers", "Followers"], ["non_followers", "Non-Followers"]] as const).map(([val, label]) => (
+                    <TouchableOpacity key={val} onPress={() => setForm((p) => ({ ...p, audience: val }))}
+                      style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, backgroundColor: form.audience === val ? colors.primary : colors.muted, borderColor: form.audience === val ? colors.primary : colors.border }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.audience === val ? colors.primaryForeground : colors.mutedForeground }}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {form.audience !== "all" && (
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 }}>
+                    {form.audience === "followers"
+                      ? "Auto-unlocked for users after they follow your venue. Non-expiring."
+                      : "Shown only to users who don't follow your venue. Non-expiring."}
+                  </Text>
+                )}
               </View>
 
               <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
@@ -1218,17 +1252,19 @@ function CouponsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
                 />
               </View>
 
-              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
-                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>EXPIRES ON — YYYY-MM-DD (BLANK = NEVER)</Text>
-                <TextInput
-                  value={form.expiresAt}
-                  onChangeText={(v) => setForm((p) => ({ ...p, expiresAt: v.replace(/[^0-9-]/g, "").slice(0, 10) }))}
-                  keyboardType="numbers-and-punctuation"
-                  placeholder="2026-12-31"
-                  placeholderTextColor={colors.mutedForeground}
-                  style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
-                />
-              </View>
+              {form.audience === "all" && (
+                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>EXPIRES ON — YYYY-MM-DD (BLANK = NEVER)</Text>
+                  <TextInput
+                    value={form.expiresAt}
+                    onChangeText={(v) => setForm((p) => ({ ...p, expiresAt: v.replace(/[^0-9-]/g, "").slice(0, 10) }))}
+                    keyboardType="numbers-and-punctuation"
+                    placeholder="2026-12-31"
+                    placeholderTextColor={colors.mutedForeground}
+                    style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
+                  />
+                </View>
+              )}
 
               <TouchableOpacity onPress={() => setForm((p) => ({ ...p, active: !p.active }))} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                 <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: form.active ? colors.primary : colors.border, backgroundColor: form.active ? colors.primary : "transparent", alignItems: "center", justifyContent: "center" }}>
@@ -2432,7 +2468,7 @@ export default function VendorDashboardScreen() {
           {form.imageUri || form.imageUrl ? (
             <View style={styles.imagePreviewWrapper}>
               <Image
-                source={{ uri: form.imageUri || form.imageUrl }}
+                source={{ uri: resolveImageUrl(form.imageUri || form.imageUrl) }}
                 style={styles.imagePreview}
                 resizeMode="cover"
               />
@@ -2764,7 +2800,7 @@ export default function VendorDashboardScreen() {
         renderItem={({ item: e }) => (
           <View style={[styles.eventRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {e.imageUrl ? (
-              <Image source={{ uri: e.imageUrl }} style={styles.eventThumb} resizeMode="cover" />
+              <Image source={{ uri: resolveImageUrl(e.imageUrl) }} style={styles.eventThumb} resizeMode="cover" />
             ) : (
               <View style={[styles.eventThumb, styles.eventThumbEmpty, { backgroundColor: colors.muted }]}>
                 <Ionicons name="calendar" size={18} color={colors.primary} />
@@ -3011,7 +3047,7 @@ export default function VendorDashboardScreen() {
                     }}
                     style={{ width: 80, height: 80, borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}
                   >
-                    <Image source={{ uri: url }} style={{ width: 80, height: 80 }} resizeMode="cover" />
+                    <Image source={{ uri: resolveImageUrl(url) }} style={{ width: 80, height: 80 }} resizeMode="cover" />
                   </TouchableOpacity>
                 ))}
                 <TouchableOpacity
@@ -3705,6 +3741,42 @@ export default function VendorDashboardScreen() {
     createdAt: string;
   }
   const emptyAnnForm = { title: "", body: "", announceDate: "", announceTime: "", genre: "", eventType: "" };
+
+  // ─── ORGANIZER EVENT REQUESTS (events organizers want to host at this venue) ─
+  interface OrgEventRequest {
+    id: number; title: string; slug: string; coverImageUrl: string; category: string;
+    city: string; startDate: string | null; startTime: string; shortDescription: string;
+    venueApprovalStatus: string; venueRejectionReason: string; organizerName: string; organizerId: number;
+  }
+  const [orgEventRequests, setOrgEventRequests] = useState<OrgEventRequest[]>([]);
+  const [orgEventBusyId, setOrgEventBusyId] = useState<number | null>(null);
+  const [rejectingOrgEventId, setRejectingOrgEventId] = useState<number | null>(null);
+  const [orgEventRejectReason, setOrgEventRejectReason] = useState("");
+
+  const fetchOrgEventRequests = useCallback(() => {
+    customFetch<OrgEventRequest[]>("/api/partner/organizer-events")
+      .then(setOrgEventRequests)
+      .catch(() => {});
+  }, []);
+
+  async function decideOrgEvent(id: number, action: "approve" | "reject", reason?: string) {
+    setOrgEventBusyId(id);
+    try {
+      await customFetch(`/api/partner/organizer-events/${id}/${action}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action === "reject" ? { rejectionReason: reason ?? "" } : {}),
+      });
+      setRejectingOrgEventId(null);
+      setOrgEventRejectReason("");
+      fetchOrgEventRequests();
+    } catch {
+      Alert.alert("Error", "Action failed.");
+    } finally {
+      setOrgEventBusyId(null);
+    }
+  }
+
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [annLoading, setAnnLoading] = useState(false);
   const [showAnnModal, setShowAnnModal] = useState(false);
@@ -3723,7 +3795,7 @@ export default function VendorDashboardScreen() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "announcements") fetchAnnouncements();
+    if (activeTab === "announcements") { fetchAnnouncements(); fetchOrgEventRequests(); }
   }, [activeTab]);
 
   async function submitAnnouncement() {
@@ -3765,8 +3837,100 @@ export default function VendorDashboardScreen() {
   }
 
   function renderAnnouncements() {
+    const orgEventPending = orgEventRequests.filter((e) => e.venueApprovalStatus === "pending");
+    const orgEventDecided = orgEventRequests.filter((e) => e.venueApprovalStatus !== "pending");
     return (
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]}>
+        {orgEventRequests.length > 0 && (
+          <View style={{ borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 16, gap: 10, marginBottom: 4 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Ionicons name="location-outline" size={18} color={colors.primary} />
+              <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color: colors.foreground, flex: 1 }}>Organizer event requests</Text>
+              {orgEventPending.length > 0 && (
+                <View style={{ borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.primary + "20" }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.primary }}>{orgEventPending.length} pending</Text>
+                </View>
+              )}
+            </View>
+            <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: -6 }}>
+              Events that organizers want to host at your venue. Approve to make them public and list them on your venue page.
+            </Text>
+            {[...orgEventPending, ...orgEventDecided].map((e) => (
+              <View key={e.id} style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 12, gap: 8 }}>
+                <View style={{ flexDirection: "row", gap: 10 }}>
+                  {e.coverImageUrl ? (
+                    <Image source={{ uri: resolveImageUrl(e.coverImageUrl) }} style={{ width: 64, height: 48, borderRadius: 10 }} />
+                  ) : (
+                    <View style={{ width: 64, height: 48, borderRadius: 10, backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }}>
+                      <Ionicons name="calendar-outline" size={18} color={colors.mutedForeground} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }} numberOfLines={1}>{e.title}</Text>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }} numberOfLines={1}>
+                      by {e.organizerName} · {e.category || "—"} · {e.startDate || "no date"}{e.startTime ? ` · ${e.startTime}` : ""}
+                    </Text>
+                    {e.venueApprovalStatus === "rejected" && e.venueRejectionReason ? (
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#ef4444", marginTop: 2 }}>Declined: {e.venueRejectionReason}</Text>
+                    ) : null}
+                  </View>
+                </View>
+                {e.venueApprovalStatus === "pending" ? (
+                  rejectingOrgEventId === e.id ? (
+                    <View style={{ gap: 8 }}>
+                      <TextInput
+                        value={orgEventRejectReason}
+                        onChangeText={setOrgEventRejectReason}
+                        placeholder="Reason for declining (optional)"
+                        placeholderTextColor={colors.mutedForeground}
+                        style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 13, minHeight: 50, textAlignVertical: "top" }}
+                        multiline
+                      />
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <TouchableOpacity
+                          style={[styles.rejectBtn, { borderColor: "#ef4444", flex: 1 }]}
+                          disabled={orgEventBusyId === e.id}
+                          onPress={() => decideOrgEvent(e.id, "reject", orgEventRejectReason)}
+                        >
+                          <Text style={[styles.rejectBtnText, { color: "#ef4444" }]}>Confirm Decline</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.rejectBtn, { borderColor: colors.border, flex: 1 }]}
+                          onPress={() => { setRejectingOrgEventId(null); setOrgEventRejectReason(""); }}
+                        >
+                          <Text style={[styles.rejectBtnText, { color: colors.mutedForeground }]}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: "row", gap: 10 }}>
+                      <TouchableOpacity
+                        style={[styles.approveBtn, { backgroundColor: "#16a34a" }]}
+                        disabled={orgEventBusyId === e.id}
+                        onPress={() => decideOrgEvent(e.id, "approve")}
+                      >
+                        {orgEventBusyId === e.id ? <ActivityIndicator size="small" color="#fff" /> : <><Ionicons name="checkmark" size={15} color="#fff" /><Text style={styles.approveBtnText}>Approve</Text></>}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.rejectBtn, { borderColor: colors.border }]}
+                        disabled={orgEventBusyId === e.id}
+                        onPress={() => { setRejectingOrgEventId(e.id); setOrgEventRejectReason(""); }}
+                      >
+                        <Ionicons name="close" size={15} color={colors.mutedForeground} />
+                        <Text style={[styles.rejectBtnText, { color: colors.mutedForeground }]}>Decline</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )
+                ) : (
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: e.venueApprovalStatus === "approved" ? "#22c55e" : "#ef4444" }}>
+                    {e.venueApprovalStatus === "approved" ? "Approved" : "Declined"}
+                  </Text>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+
         <TouchableOpacity
           style={[styles.createBtn, { backgroundColor: colors.primary }]}
           onPress={() => { setEditingAnn(null); setAnnForm(emptyAnnForm); setShowAnnModal(true); }}
@@ -4523,7 +4687,7 @@ export default function VendorDashboardScreen() {
                             }}
                             style={{ width: 80, height: 80, borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}
                           >
-                            <Image source={{ uri: url }} style={{ width: 80, height: 80 }} resizeMode="cover" />
+                            <Image source={{ uri: resolveImageUrl(url) }} style={{ width: 80, height: 80 }} resizeMode="cover" />
                           </TouchableOpacity>
                         ))}
                         <TouchableOpacity
@@ -4724,7 +4888,7 @@ export default function VendorDashboardScreen() {
                         }}
                         style={{ width: 90, height: 90, borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}
                       >
-                        <Image source={{ uri: url }} style={{ width: 90, height: 90 }} resizeMode="cover" />
+                        <Image source={{ uri: resolveImageUrl(url) }} style={{ width: 90, height: 90 }} resizeMode="cover" />
                       </TouchableOpacity>
                     ))}
                     {editForm.galleryImages.length < 10 && (
@@ -4969,7 +5133,7 @@ export default function VendorDashboardScreen() {
                             }}
                             style={{ width: 80, height: 80, borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}
                           >
-                            <Image source={{ uri: url }} style={{ width: 80, height: 80 }} resizeMode="cover" />
+                            <Image source={{ uri: resolveImageUrl(url) }} style={{ width: 80, height: 80 }} resizeMode="cover" />
                           </TouchableOpacity>
                         ))}
                         <TouchableOpacity
