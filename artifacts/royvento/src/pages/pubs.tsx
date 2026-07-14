@@ -47,9 +47,11 @@ interface PublicEvent {
   approvedAt?: string | null;
   popular: boolean;
   hasDrinkPlans?: boolean;
+  drinkPlanDaysByType?: Record<string, string[]>;
   freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
   vendorCrowdLevel?: string | null;
   vendorCategory?: string;
+  vendorOpenDays?: string[];
 }
 
 const CROWD_OPTIONS = [
@@ -58,6 +60,20 @@ const CROWD_OPTIONS = [
   { value: "party", label: "High Crowd" },
 ] as const;
 type CrowdFilter = "" | typeof CROWD_OPTIONS[number]["value"];
+
+// Day-of-week filter — lets people check which pubs are open on a given day.
+// Values match the 3-letter abbreviations used across drink_plans.days,
+// freeEntryRules.days and vendors.openDays (Sun-first, same as DAY_ABBRS below).
+const DAY_OPTIONS = [
+  { value: "Sun", label: "Sunday" },
+  { value: "Mon", label: "Monday" },
+  { value: "Tue", label: "Tuesday" },
+  { value: "Wed", label: "Wednesday" },
+  { value: "Thu", label: "Thursday" },
+  { value: "Fri", label: "Friday" },
+  { value: "Sat", label: "Saturday" },
+] as const;
+type DayFilter = "" | typeof DAY_OPTIONS[number]["value"];
 
 const PRICE_PRESETS = [
   { label: "Under ₹500", min: 0, max: 500 },
@@ -264,6 +280,8 @@ export function Pubs() {
   const [pricePreset, setPricePreset]   = useState<number | null>(null);
   const [drinkPlanType, setDrinkPlanType] = useState<DrinkPlanType>("");
   const [hasDrinkDeal, setHasDrinkDeal] = useState(false);
+  const [vipTable, setVipTable]     = useState(false);
+  const [dayFilter, setDayFilter]   = useState<DayFilter>("");
   const [freeEntry, setFreeEntry]   = useState(false);
   const [crowdLevel, setCrowdLevel] = useState<CrowdFilter>("");
   // ?category= deep-links a Popular Category from the homepage straight to its
@@ -295,16 +313,25 @@ export function Pubs() {
       const preset = PRICE_PRESETS[pricePreset];
       if (preset) { params.set("minPrice", String(preset.min)); params.set("maxPrice", String(preset.max)); }
     }
-    if (drinkPlanType) params.set("drinkPlanType", drinkPlanType);
+    // VIP Table is its own dedicated toggle and takes priority over the
+    // drink-deal type chips — the API only accepts a single drinkPlanType.
+    const effectiveDrinkPlanType = vipTable ? "vip_table" : drinkPlanType;
+    if (effectiveDrinkPlanType) params.set("drinkPlanType", effectiveDrinkPlanType);
     setLoading(true);
     apiGet<PublicEvent[]>(`/api/events?${params.toString()}`)
       .then(setPubs).catch(() => setPubs([]))
       .finally(() => setLoading(false));
-  }, [search, country, stateF, city, pricePreset, drinkPlanType]);
+  }, [search, country, stateF, city, pricePreset, drinkPlanType, vipTable]);
 
   function toggleHasDrinkDeal(val: boolean) {
     setHasDrinkDeal(val);
     if (!val) setDrinkPlanType("");
+    if (val) setVipTable(false);
+  }
+
+  function toggleVipTable(val: boolean) {
+    setVipTable(val);
+    if (val) { setHasDrinkDeal(false); setDrinkPlanType(""); }
   }
 
   const displayedPubs = useMemo(() => {
@@ -312,10 +339,30 @@ export function Pubs() {
     if (venueTab !== "All") list = list.filter((p) => sectionOf(p) === venueTab);
     if (dateNight) list = list.filter(isDateNightVenue);
     if (hasDrinkDeal && !drinkPlanType) list = list.filter((p) => p.hasDrinkPlans);
-    if (freeEntry) list = list.filter((p) => p.freeEntryRules?.enabled === true && (p.freeEntryRules?.days?.length ?? 0) > 0);
+    // Venues that haven't configured openDays yet are treated as open every
+    // day (openDays defaults to [] server-side, meaning "not specified").
+    if (dayFilter) list = list.filter((p) => !p.vendorOpenDays?.length || p.vendorOpenDays.includes(dayFilter));
+    // Day-aware narrowing for the deal-specific toggles/chips — each plan
+    // type (welcome/unlimited/.../vip_table) has its own `days` array, so
+    // picking a day should also drop venues whose deal doesn't run that day.
+    if (dayFilter && hasDrinkDeal) {
+      const type = drinkPlanType || null;
+      list = list.filter((p) => {
+        const byType = p.drinkPlanDaysByType ?? {};
+        const days = type ? (byType[type] ?? []) : Object.values(byType).flat();
+        return days.includes(dayFilter);
+      });
+    }
+    if (dayFilter && vipTable) {
+      list = list.filter((p) => (p.drinkPlanDaysByType?.["vip_table"] ?? []).includes(dayFilter));
+    }
+    if (freeEntry) {
+      list = list.filter((p) => p.freeEntryRules?.enabled === true && (p.freeEntryRules?.days?.length ?? 0) > 0);
+      if (dayFilter) list = list.filter((p) => p.freeEntryRules?.days?.includes(dayFilter));
+    }
     if (crowdLevel) list = list.filter((p) => p.vendorCrowdLevel === crowdLevel);
     return list;
-  }, [pubs, venueTab, dateNight, hasDrinkDeal, drinkPlanType, freeEntry, crowdLevel]);
+  }, [pubs, venueTab, dateNight, hasDrinkDeal, drinkPlanType, dayFilter, vipTable, freeEntry, crowdLevel]);
 
   // Group the filtered venues into per-category sections. Only sections with at
   // least one venue are rendered. When a specific category tab is active this
@@ -327,7 +374,7 @@ export function Pubs() {
   [displayedPubs]);
 
   const hasFilters = search || country || stateF || city || pricePreset !== null
-    || drinkPlanType || hasDrinkDeal || freeEntry || crowdLevel || venueTab !== "All" || dateNight;
+    || drinkPlanType || hasDrinkDeal || vipTable || dayFilter || freeEntry || crowdLevel || venueTab !== "All" || dateNight;
 
   // Real counts derived from fetched data
   const categoryCounts = useMemo(() => {
@@ -340,7 +387,7 @@ export function Pubs() {
 
   function clearAll() {
     setSearch(""); setCountry(""); setStateF(""); setCity("");
-    setPricePreset(null); setDrinkPlanType(""); setHasDrinkDeal(false);
+    setPricePreset(null); setDrinkPlanType(""); setHasDrinkDeal(false); setVipTable(false); setDayFilter("");
     setFreeEntry(false); setCrowdLevel(""); setVenueTab("All"); setDateNight(false);
   }
 
@@ -436,6 +483,25 @@ export function Pubs() {
           {/* â”€â”€ Expanded filters â”€â”€ */}
           {filtersOpen && (
             <div className="mt-4 rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 md:p-4 flex flex-wrap gap-x-6 gap-y-3 md:gap-x-8 md:gap-y-4">
+              {/* Day of week — check which pubs are open on a given day */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Day:</span>
+                <Select
+                  value={dayFilter === "" ? "any" : dayFilter}
+                  onValueChange={(v) => setDayFilter(v === "any" ? "" : (v as DayFilter))}
+                >
+                  <SelectTrigger className="h-9 w-36 bg-white/[0.04] border-white/[0.08] rounded-lg text-sm">
+                    <SelectValue placeholder="Any day" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Any day</SelectItem>
+                    {DAY_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Free entry + drink deal toggles */}
               <div className="flex items-center gap-2.5">
                 <Switch id="free-entry-pubs" checked={freeEntry} onCheckedChange={setFreeEntry} />
@@ -449,6 +515,13 @@ export function Pubs() {
                 <Label htmlFor="has-drink-deal" className="flex items-center gap-1.5 cursor-pointer text-sm">
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-400 inline-block" />
                   {t("events.drink_deals")}
+                </Label>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <Switch id="vip-table" checked={vipTable} onCheckedChange={toggleVipTable} />
+                <Label htmlFor="vip-table" className="flex items-center gap-1.5 cursor-pointer text-sm">
+                  <span className="h-1.5 w-1.5 rounded-full bg-violet-400 inline-block" />
+                  {t("events.vip_table_label")}
                 </Label>
               </div>
 

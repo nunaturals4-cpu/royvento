@@ -76,18 +76,28 @@ async function serializeEvents(rows: EventRow[]) {
             businessName: vendorsTable.businessName,
             category: vendorsTable.category,
             crowdLevel: vendorsTable.crowdLevel,
+            openDays: vendorsTable.openDays,
           })
           .from(vendorsTable)
           .where(sql`${vendorsTable.id} IN (${sql.join(vendorIds, sql`, `)})`);
   const vendorMap = new Map(vendors.map((v) => [v.id, v]));
   const ratings = await getEventRatings(rows.map((r) => r.id));
-  const vendorsWithPlans = vendorIds.length > 0
+  // One query covers both `hasDrinkPlans` (any plan at all) and the day
+  // filter on the Pubs page (which day of the week a given plan type — e.g.
+  // "vip_table" — is actually active on), keyed per vendor per plan type.
+  const planRows = vendorIds.length > 0
     ? await db
-        .selectDistinct({ vendorId: drinkPlansTable.vendorId })
+        .select({ vendorId: drinkPlansTable.vendorId, type: drinkPlansTable.type, days: drinkPlansTable.days })
         .from(drinkPlansTable)
         .where(inArray(drinkPlansTable.vendorId, vendorIds))
     : [];
-  const vendorIdsWithPlans = new Set(vendorsWithPlans.map((r) => r.vendorId));
+  const vendorIdsWithPlans = new Set(planRows.map((r) => r.vendorId));
+  const planDaysByVendor = new Map<number, Record<string, string[]>>();
+  for (const row of planRows) {
+    let byType = planDaysByVendor.get(row.vendorId);
+    if (!byType) { byType = {}; planDaysByVendor.set(row.vendorId, byType); }
+    byType[row.type] = Array.from(new Set([...(byType[row.type] ?? []), ...(row.days ?? [])]));
+  }
   return rows.map((e) => {
     const v = vendorMap.get(e.vendorId);
     const r = ratings.get(e.id) ?? { rating: 0, reviewCount: 0 };
@@ -150,8 +160,10 @@ async function serializeEvents(rows: EventRow[]) {
       partnerName: v?.businessName ?? "",
       createdAt: e.createdAt.toISOString(),
       hasDrinkPlans: vendorIdsWithPlans.has(e.vendorId),
+      drinkPlanDaysByType: planDaysByVendor.get(e.vendorId) ?? {},
       vendorCrowdLevel: (v as unknown as { crowdLevel?: string | null })?.crowdLevel ?? null,
       vendorCategory: v?.category ?? "",
+      vendorOpenDays: v?.openDays ?? [],
     };
   });
 }
