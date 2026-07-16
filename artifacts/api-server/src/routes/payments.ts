@@ -14,6 +14,7 @@ import {
   referralsTable,
 } from "@workspace/db";
 import { createUserNotification } from "../lib/notify";
+import { notifyPartnerNewBooking } from "../lib/partnerBookingNotify";
 import { computeCommissionFromPlanned } from "../lib/commission";
 import { eq, and, inArray, ne, sql } from "drizzle-orm";
 import {
@@ -214,6 +215,25 @@ async function activateBookingAfterRazorpayPayment(bookingId: number, razorpayPa
   } catch (err) {
     logger.error({ err }, "[razorpay] Failed to create booking confirmation notification");
   }
+
+  // Instant "New booking received" notification to the partner — this one
+  // hook covers the paid path for every booking kind (pub/organizer/game),
+  // since they all confirm through this same activator.
+  await notifyPartnerNewBooking({
+    id: booking.id,
+    kind: booking.kind,
+    vendorId: booking.vendorId,
+    organizerId: booking.organizerId,
+    hostVendorId: booking.hostVendorId,
+    gameOrganizerId: booking.gameOrganizerId,
+    personName: booking.personName,
+    phone: booking.phone,
+    bookingDate: booking.bookingDate,
+    arrivalTime: booking.arrivalTime,
+    guests: booking.guests,
+    pubMode: booking.pubMode,
+    paymentMethod: booking.paymentMethod,
+  });
 }
 
 async function activateSubscriptionAfterRazorpayPayment(subscriptionId: number, razorpayPaymentId: string, razorpayOrderId: string) {

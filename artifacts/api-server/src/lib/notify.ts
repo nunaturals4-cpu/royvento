@@ -19,12 +19,18 @@ export interface CreateUserNotificationInput {
   tag?: string;
   /** Category for iconography / analytics (e.g. "follow_event"). */
   type?: string;
+  /**
+   * When set, the notification carries a one-tap "Call" action (web push
+   * notification action button; Expo notification category action on
+   * mobile) that dials this number directly from the notification.
+   */
+  callPhone?: string;
 }
 
 export async function createUserNotification(
   input: CreateUserNotificationInput,
 ): Promise<void> {
-  const { userId, title, message, url, tag, type } = input;
+  const { userId, title, message, url, tag, type, callPhone } = input;
   try {
     // Persist the deep-link `url` (+ type/tag) on the in-app row so tapping the
     // notification in the bell dropdown / notifications page navigates to the
@@ -62,6 +68,7 @@ export async function createUserNotification(
     body: message,
     ...(url ? { url } : {}),
     ...(tag ? { tag } : {}),
+    ...(callPhone ? { phone: callPhone } : {}),
   }).catch(() => {});
 
   // Fan out to the mobile app too (best-effort; no-op when the user has no
@@ -69,6 +76,7 @@ export async function createUserNotification(
   sendExpoPushToUser(userId, {
     title,
     body: message,
-    data: { ...(url ? { url } : {}), ...(tag ? { tag } : {}) },
+    data: { ...(url ? { url } : {}), ...(tag ? { tag } : {}), ...(callPhone ? { phone: callPhone } : {}) },
+    ...(callPhone ? { categoryId: "booking-call" } : {}),
   }).catch(() => {});
 }

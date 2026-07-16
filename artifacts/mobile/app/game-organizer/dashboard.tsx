@@ -6,12 +6,15 @@ import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
-import { router, Stack } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { router, Stack, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { BookingFiltersBar, type BookingFilters } from "@/components/BookingFiltersBar";
+import { BookingDetailModal } from "@/components/BookingDetailModal";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -62,6 +65,7 @@ interface BookingRow {
   id: number; createdAt: string; bookingDate: string; time: string | null; durationHours: string | null;
   persons: number; amount: string; checkedIn: boolean; attendee: string; phone: string; email: string;
   itemName: string; gameName: string | null; packageName: string | null; bookingLocation?: string;
+  status?: string; paymentMethod?: string;
 }
 interface LeadView {
   viewerUserId: number | null; viewerName: string; viewerEmail: string; phone: string;
@@ -102,7 +106,34 @@ export default function GameOrganizerDashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
+
+  // Notification deep-link (?tab=bookings&bookingId=123) — land on Bookings
+  // and auto-open that booking's detail modal exactly once per notification.
+  // This lives at the top level (not inside BookingsTab) and reacts to param
+  // changes rather than only reading them at mount, because BookingsTab
+  // unmounts whenever the organizer switches to another tab — a one-time
+  // guard inside it would re-fire (reopening the popup) every time they
+  // switch back to Bookings.
+  const params = useLocalSearchParams<{ tab?: string; bookingId?: string }>();
   const [tab, setTab] = useState("overview");
+  const [detailBookingId, setDetailBookingId] = useState<number | null>(null);
+  // Tracks the *value* already consumed (not just a one-time boolean) so
+  // that if this screen stays mounted and a second, genuinely new
+  // notification arrives later, its popup still opens.
+  const consumedBookingIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const raw = params.bookingId;
+    if (!raw || consumedBookingIdRef.current === raw) return;
+    const id = Number(raw);
+    if (!Number.isFinite(id) || id <= 0) return;
+    consumedBookingIdRef.current = raw;
+    setTab("bookings");
+    setDetailBookingId(id);
+    // Clear bookingId from this screen's params so a later re-render, back
+    // navigation, or the same notification tapped again doesn't re-open the
+    // popup — it only reappears for a genuinely new notification.
+    router.setParams({ bookingId: "" });
+  }, [params.bookingId]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -138,6 +169,8 @@ export default function GameOrganizerDashboardScreen() {
         {tab === "scanner" && <ScannerTab colors={colors} insets={insets} />}
         {tab === "profile" && <ProfileTab colors={colors} insets={insets} />}
       </View>
+
+      <BookingDetailModal bookingId={detailBookingId} role="game" onClose={() => setDetailBookingId(null)} />
     </View>
   );
 }
@@ -385,7 +418,22 @@ function BookingsTab({ colors, insets }: { colors: Pal; insets: { bottom: number
   const [rows, setRows] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  useEffect(() => { customFetch<BookingRow[]>("/api/game-organizer/bookings").then(setRows).catch(() => setRows([])).finally(() => setLoading(false)); }, []);
+  const [filters, setFilters] = useState<BookingFilters>({ date: "", mode: "all", status: "all" });
+
+  // Row tap → open that booking's detail modal. (The notification deep-link
+  // case is handled by a dedicated modal instance at the
+  // GameOrganizerDashboardScreen level, since this tab unmounts whenever the
+  // organizer switches to another tab.)
+  const [detailBookingId, setDetailBookingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    const q = new URLSearchParams();
+    if (filters.date) q.set("date", filters.date);
+    if (filters.status !== "all") q.set("status", filters.status);
+    const qs = q.toString();
+    customFetch<BookingRow[]>(`/api/game-organizer/bookings${qs ? `?${qs}` : ""}`).then(setRows).catch(() => setRows([])).finally(() => setLoading(false));
+  }, [filters]);
 
   async function exportCsv() {
     if (rows.length === 0) return;
@@ -414,8 +462,11 @@ function BookingsTab({ colors, insets }: { colors: Pal; insets: { bottom: number
         <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 0 }]}>Booking report</Text>
         <SmallBtn colors={colors} icon="download-outline" label={exporting ? "Exporting…" : "CSV"} onPress={exportCsv} />
       </View>
+      <View style={{ marginBottom: 12 }}>
+        <BookingFiltersBar filters={filters} onChange={setFilters} />
+      </View>
       {rows.length === 0 ? <Text style={[styles.empty, { color: colors.mutedForeground }]}>No bookings yet.</Text> : rows.map((b) => (
-        <View key={b.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <TouchableOpacity key={b.id} activeOpacity={0.8} onPress={() => setDetailBookingId(b.id)} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{b.attendee || "Guest"}</Text>
             <View style={[styles.checkPill, { backgroundColor: b.checkedIn ? "#16a34a22" : colors.muted }]}><Text style={{ color: b.checkedIn ? "#4ade80" : colors.mutedForeground, fontSize: 10, fontFamily: "Inter_600SemiBold" }}>{b.checkedIn ? "Checked in" : "Not arrived"}</Text></View>
@@ -424,10 +475,24 @@ function BookingsTab({ colors, insets }: { colors: Pal; insets: { bottom: number
             {b.itemName || b.gameName || b.packageName || "—"}{b.durationHours ? ` · ${Number(b.durationHours)}h` : ""} · {b.persons} {b.persons === 1 ? "person" : "persons"} · {inr(b.amount)}
           </Text>
           <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{b.bookingDate}{b.time ? ` · ${b.time}` : ""}</Text>
-          {(!!b.phone || !!b.email) && <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{[b.phone, b.email].filter(Boolean).join(" · ")}</Text>}
+          {(!!b.phone || !!b.email) && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{[b.phone, b.email].filter(Boolean).join(" · ")}</Text>
+              {!!b.phone && (
+                <TouchableOpacity
+                  onPress={() => Linking.openURL(`tel:${b.phone}`)}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.primary + "20" }}
+                >
+                  <Ionicons name="call-outline" size={12} color={colors.primary} />
+                  <Text style={{ color: colors.primary, fontSize: 11, fontFamily: "Inter_600SemiBold" }}>Call</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
           {!!b.bookingLocation && <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{b.bookingLocation}</Text>}
-        </View>
+        </TouchableOpacity>
       ))}
+      <BookingDetailModal bookingId={detailBookingId} role="game" onClose={() => setDetailBookingId(null)} />
     </ScrollView>
   );
 }

@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation, useSearch, Link } from "wouter";
+import { BookingFiltersBar, type BookingFilters } from "@/components/BookingFiltersBar";
+import { BookingDetailModal } from "@/components/BookingDetailModal";
 import { useGetMe } from "@workspace/api-client-react";
 import { apiGet, apiPost, apiPatch, apiPut, apiDelete, formatINR } from "@/lib/api";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
@@ -245,7 +247,41 @@ type Tab = "overview" | "identity" | "events" | "create" | "scanner" | "managers
 
 export function OrganizerDashboard() {
   const { toast } = useToast();
-  const [tab, setTab] = useState<Tab>("overview");
+  const search = useSearch();
+  const [, navigate] = useLocation();
+  const searchParams = new URLSearchParams(search);
+  // A notification deep-link carries ?bookingId=123 — handled reactively
+  // below (not baked into the initial tab), since clicking a notification
+  // while the dashboard is already open only changes the URL's query string
+  // and does not remount this component.
+  const deepLinkBookingId = (() => {
+    const raw = searchParams.get("bookingId");
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
+  const rawTab = searchParams.get("tab") as Tab | null;
+  const initialTab: Tab = rawTab ?? "overview";
+  const [tab, setTab] = useState<Tab>(initialTab);
+
+  // Booking Report notification deep-link: force the Insights tab open and
+  // show that booking's detail popup exactly once per notification. This is
+  // a reactive effect because tapping a notification while the dashboard is
+  // already open only updates the URL's query string — React never remounts
+  // this component, so a one-time initial value would leave the organizer
+  // stuck on whatever tab they already had open.
+  const [deepLinkDetailId, setDeepLinkDetailId] = useState<number | null>(null);
+  const consumedBookingIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (deepLinkBookingId == null) return;
+    if (consumedBookingIdRef.current === deepLinkBookingId) return;
+    consumedBookingIdRef.current = deepLinkBookingId;
+    setTab("insights");
+    setDeepLinkDetailId(deepLinkBookingId);
+    // Strip bookingId from the URL immediately so refreshing, navigating back
+    // to this page later, or switching tabs and back never re-shows the popup
+    // for the same notification — it only reappears for a genuinely new one.
+    navigate("/dashboard/organizer", { replace: true });
+  }, [deepLinkBookingId, navigate]);
   const [organizer, setOrganizer] = useState<Organizer | null | undefined>(undefined);
   const [events, setEvents] = useState<OrganizerEvent[]>([]);
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
@@ -396,6 +432,8 @@ export function OrganizerDashboard() {
           )}
         </main>
       </div>
+
+      <BookingDetailModal bookingId={deepLinkDetailId} role="organizer" onClose={() => setDeepLinkDetailId(null)} />
     </div>
   );
 }
@@ -1525,19 +1563,34 @@ interface Analytics {
 interface BookingRow {
   id: number; createdAt: string; bookingDate: string; quantity: number; amount: string;
   checkedIn: boolean; attendee: string; phone: string; email: string; eventTitle: string; ticketType: string;
-  bookingLocation?: string;
+  bookingLocation?: string; status?: string; paymentMethod?: string; arrivalTime?: string | null;
 }
 
 export function InsightsPanel({ events, api = SELF_API }: { events: OrganizerEvent[]; api?: OrganizerDashboardApi }) {
   const [an, setAn] = useState<Analytics | null>(null);
   const [rows, setRows] = useState<BookingRow[]>([]);
   const [eventFilter, setEventFilter] = useState("all");
+  const [filters, setFilters] = useState<BookingFilters>({ date: "", mode: "all", status: "all" });
+
+  // Row click → open that booking's detail modal. The booking-detail modal
+  // calls the organizer-only `/api/organizer/bookings/:id` endpoint, so it's
+  // only wired up when this panel is showing the organizer's own data (not an
+  // admin viewing via adminOrganizerApi/adminEventApi). (The notification
+  // deep-link case is handled by a dedicated modal instance at the
+  // OrganizerDashboard level, since this panel unmounts whenever the
+  // organizer switches away from the Insights tab.)
+  const isSelf = api === SELF_API;
+  const [detailBookingId, setDetailBookingId] = useState<number | null>(null);
 
   useEffect(() => { apiGet<Analytics>(api.analytics).then(setAn).catch(() => {}); }, [api]);
   useEffect(() => {
-    const q = eventFilter === "all" ? "" : `?eventId=${eventFilter}`;
-    apiGet<BookingRow[]>(`${api.bookings}${q}`).then(setRows).catch(() => {});
-  }, [eventFilter, api]);
+    const params = new URLSearchParams();
+    if (eventFilter !== "all") params.set("eventId", eventFilter);
+    if (filters.date) params.set("date", filters.date);
+    if (filters.status !== "all") params.set("status", filters.status);
+    const qs = params.toString();
+    apiGet<BookingRow[]>(`${api.bookings}${qs ? `?${qs}` : ""}`).then(setRows).catch(() => {});
+  }, [eventFilter, filters, api]);
 
   const exportCsv = () => {
     const header = ["Booking", "Event", "Ticket", "Attendee", "Phone", "Email", "Qty", "Amount", "Date", "Location", "CheckedIn"];
@@ -1592,6 +1645,9 @@ export function InsightsPanel({ events, api = SELF_API }: { events: OrganizerEve
             <Button variant="outline" size="sm" className="border-white/15" onClick={exportCsv} disabled={rows.length === 0}><Download className="h-4 w-4 mr-1.5" />CSV</Button>
           </div>
         </div>
+        <div className="mb-3">
+          <BookingFiltersBar filters={filters} onChange={setFilters} />
+        </div>
         {rows.length === 0 ? <p className="text-white/50 text-sm">No bookings yet.</p> : (
           <div className="overflow-x-auto rounded-2xl border border-white/[0.07]">
             <table className="w-full text-sm">
@@ -1607,11 +1663,33 @@ export function InsightsPanel({ events, api = SELF_API }: { events: OrganizerEve
               </tr></thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-white/[0.04] last:border-0">
+                  <tr
+                    key={r.id}
+                    className={`border-b border-white/[0.04] last:border-0 hover:bg-white/[0.03] ${isSelf ? "cursor-pointer" : ""}`}
+                    onClick={() => { if (isSelf) setDetailBookingId(r.id); }}
+                  >
                     <td className="p-3">{r.attendee || "—"}</td>
                     <td className="p-3 text-white/60">{r.eventTitle}</td>
                     <td className="p-3 text-white/60">{r.ticketType}</td>
-                    <td className="p-3 text-white/50 text-xs">{[r.phone, r.email].filter(Boolean).join(" · ") || "—"}</td>
+                    <td className="p-3 text-white/50 text-xs">
+                      <div className="flex flex-col gap-1 items-start">
+                        {r.phone && (
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="h-7 gap-1 px-2 text-xs border-white/15"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <a href={`tel:${r.phone}`} title="Call guest">
+                              <Phone className="h-3 w-3 shrink-0" /> Call
+                            </a>
+                          </Button>
+                        )}
+                        {r.email && <span>{r.email}</span>}
+                        {!r.phone && !r.email && "—"}
+                      </div>
+                    </td>
                     <td className="p-3 text-white/50 text-xs">{r.bookingLocation || "—"}</td>
                     <td className="p-3 text-right">{r.quantity}</td>
                     <td className="p-3 text-right">{formatINR(Number(r.amount))}</td>
@@ -1623,6 +1701,8 @@ export function InsightsPanel({ events, api = SELF_API }: { events: OrganizerEve
           </div>
         )}
       </div>
+
+      {isSelf && <BookingDetailModal bookingId={detailBookingId} role="organizer" onClose={() => setDetailBookingId(null)} />}
     </div>
   );
 }

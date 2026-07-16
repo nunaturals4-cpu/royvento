@@ -281,6 +281,7 @@ export function Pubs() {
   const [drinkPlanType, setDrinkPlanType] = useState<DrinkPlanType>("");
   const [hasDrinkDeal, setHasDrinkDeal] = useState(false);
   const [vipTable, setVipTable]     = useState(false);
+  const [danceFloor, setDanceFloor] = useState(false);
   const [dayFilter, setDayFilter]   = useState<DayFilter>("");
   const [freeEntry, setFreeEntry]   = useState(false);
   const [crowdLevel, setCrowdLevel] = useState<CrowdFilter>("");
@@ -317,11 +318,12 @@ export function Pubs() {
     // drink-deal type chips — the API only accepts a single drinkPlanType.
     const effectiveDrinkPlanType = vipTable ? "vip_table" : drinkPlanType;
     if (effectiveDrinkPlanType) params.set("drinkPlanType", effectiveDrinkPlanType);
+    if (danceFloor) params.set("danceFloor", "true");
     setLoading(true);
     apiGet<PublicEvent[]>(`/api/events?${params.toString()}`)
       .then(setPubs).catch(() => setPubs([]))
       .finally(() => setLoading(false));
-  }, [search, country, stateF, city, pricePreset, drinkPlanType, vipTable]);
+  }, [search, country, stateF, city, pricePreset, drinkPlanType, vipTable, danceFloor]);
 
   function toggleHasDrinkDeal(val: boolean) {
     setHasDrinkDeal(val);
@@ -374,7 +376,7 @@ export function Pubs() {
   [displayedPubs]);
 
   const hasFilters = search || country || stateF || city || pricePreset !== null
-    || drinkPlanType || hasDrinkDeal || vipTable || dayFilter || freeEntry || crowdLevel || venueTab !== "All" || dateNight;
+    || drinkPlanType || hasDrinkDeal || vipTable || danceFloor || dayFilter || freeEntry || crowdLevel || venueTab !== "All" || dateNight;
 
   // Real counts derived from fetched data
   const categoryCounts = useMemo(() => {
@@ -387,7 +389,7 @@ export function Pubs() {
 
   function clearAll() {
     setSearch(""); setCountry(""); setStateF(""); setCity("");
-    setPricePreset(null); setDrinkPlanType(""); setHasDrinkDeal(false); setVipTable(false); setDayFilter("");
+    setPricePreset(null); setDrinkPlanType(""); setHasDrinkDeal(false); setVipTable(false); setDanceFloor(false); setDayFilter("");
     setFreeEntry(false); setCrowdLevel(""); setVenueTab("All"); setDateNight(false);
   }
 
@@ -522,6 +524,13 @@ export function Pubs() {
                 <Label htmlFor="vip-table" className="flex items-center gap-1.5 cursor-pointer text-sm">
                   <span className="h-1.5 w-1.5 rounded-full bg-violet-400 inline-block" />
                   {t("events.vip_table_label")}
+                </Label>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <Switch id="dance-floor" checked={danceFloor} onCheckedChange={setDanceFloor} />
+                <Label htmlFor="dance-floor" className="flex items-center gap-1.5 cursor-pointer text-sm">
+                  <Music className="h-3.5 w-3.5 text-pink-400" />
+                  Dance Floor
                 </Label>
               </div>
 

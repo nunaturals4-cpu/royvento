@@ -30,6 +30,7 @@ import { bookingLocationFromBody } from "../lib/geo";
 import { logger } from "../lib/logger";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { createUserNotification } from "../lib/notify";
+import { notifyPartnerNewBooking } from "../lib/partnerBookingNotify";
 import { notifyOrganizerNewEvent } from "../lib/organizerFollowNotify";
 
 const DEFAULT_MANAGER_PERMS: OrganizerManagerPermissions = { scan: true, attendance: true, reports: false };
@@ -1183,6 +1184,24 @@ router.post("/organizer-events/:slug/book", requireAuth(), async (req, res) => {
       tag: `organizer-booking-${booking.id}`,
     }).catch(() => {});
 
+    // Instant "New booking received" notification to the organizer (and the
+    // hosting venue partner, if this event is hosted at a partner venue).
+    notifyPartnerNewBooking({
+      id: booking.id,
+      kind: booking.kind,
+      vendorId: booking.vendorId,
+      organizerId: booking.organizerId,
+      hostVendorId: booking.hostVendorId,
+      gameOrganizerId: booking.gameOrganizerId,
+      personName: booking.personName,
+      phone: booking.phone,
+      bookingDate: booking.bookingDate,
+      arrivalTime: booking.arrivalTime,
+      guests: booking.guests,
+      pubMode: booking.pubMode,
+      paymentMethod: booking.paymentMethod,
+    }).catch(() => {});
+
     return res.json({
       ok: true,
       bookingId: booking.id,
@@ -1677,8 +1696,17 @@ router.get("/organizer/bookings", requireAuth(["organizer"]), async (req, res) =
   if (!org) return res.status(403).json({ error: "No organizer profile" });
   const eventId = Number(req.query["eventId"]);
   const filter = Number.isFinite(eventId) && eventId > 0 ? sql` AND b.organizer_event_id = ${eventId}` : sql``;
+
+  // Booking Report filter bar: exact date, mode (ticket type isn't a pubMode
+  // choice here, so "mode" maps to status/date only), and status.
+  const rawDate = String(req.query["date"] ?? "");
+  const dateFilter = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? sql` AND b.booking_date = ${rawDate}` : sql``;
+  const rawStatus = String(req.query["status"] ?? "");
+  const statusFilter = rawStatus && rawStatus !== "all" ? sql` AND b.status = ${rawStatus}` : sql``;
+
   const rows = await db.execute(sql`
     SELECT b.id, b.created_at AS "createdAt", b.booking_date AS "bookingDate",
+      b.arrival_time AS "arrivalTime", b.status, b.payment_method AS "paymentMethod",
       b.guests AS "quantity", (b.final_price + COALESCE(b.base_fee, 0)) AS "amount", b.checked_in AS "checkedIn",
       b.person_name AS "attendee", b.phone, u.email AS "email",
       b.booking_location AS "bookingLocation",
@@ -1687,10 +1715,37 @@ router.get("/organizer/bookings", requireAuth(["organizer"]), async (req, res) =
     LEFT JOIN users u ON u.id = b.user_id
     LEFT JOIN organizer_events e ON e.id = b.organizer_event_id
     LEFT JOIN event_tickets t ON t.id = b.event_ticket_id
-    WHERE b.kind='organizer' AND b.organizer_id = ${org.id} AND b.status='confirmed'${filter}
+    WHERE b.kind='organizer' AND b.organizer_id = ${org.id}${filter}${dateFilter}${statusFilter}
     ORDER BY b.created_at DESC
   `);
   return res.json(rows.rows);
+});
+
+// Single-booking fetch for the notification deep-link → Booking Detail modal.
+router.get("/organizer/bookings/:bookingId", requireAuth(["organizer"]), async (req, res) => {
+  const user = (req as any).user as { id: number };
+  const org = await getMyOrganizer(user.id);
+  if (!org) return res.status(403).json({ error: "No organizer profile" });
+  const id = Number(req.params["bookingId"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid booking id" });
+
+  const rows = await db.execute(sql`
+    SELECT b.id, b.created_at AS "createdAt", b.booking_date AS "bookingDate",
+      b.arrival_time AS "arrivalTime", b.status, b.payment_method AS "paymentMethod",
+      b.guests AS "quantity", (b.final_price + COALESCE(b.base_fee, 0)) AS "amount", b.checked_in AS "checkedIn",
+      b.person_name AS "attendee", b.phone, u.email AS "email",
+      b.booking_location AS "bookingLocation",
+      e.title AS "eventTitle", t.name AS "ticketType"
+    FROM bookings b
+    LEFT JOIN users u ON u.id = b.user_id
+    LEFT JOIN organizer_events e ON e.id = b.organizer_event_id
+    LEFT JOIN event_tickets t ON t.id = b.event_ticket_id
+    WHERE b.kind='organizer' AND b.organizer_id = ${org.id} AND b.id = ${id}
+    LIMIT 1
+  `);
+  const row = rows.rows[0];
+  if (!row) return res.status(404).json({ error: "Not found" });
+  return res.json(row);
 });
 
 // ─── coupons ────────────────────────────────────────────────────────────────

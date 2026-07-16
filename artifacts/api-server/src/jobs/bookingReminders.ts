@@ -3,6 +3,7 @@ import { eq, inArray, and, gte, isNotNull, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { createUserNotification } from "../lib/notify";
 import { sendExpoPushWithToken } from "../lib/expoPush";
+import { loadPartnerRecipientMaps, sendPartnerArrivalReminder, type PartnerBookingLike } from "../lib/partnerBookingNotify";
 
 const _istFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
 /** Returns today's date string (YYYY-MM-DD) in IST (Asia/Kolkata). */
@@ -45,6 +46,17 @@ type BookingRow = {
   vendorId: number;
   pubMode: string;
   arrivalTime: string | null;
+  // Extra columns needed by the partner reminder job (unused by the
+  // customer-facing reminders below, but fetched once for both).
+  kind: string;
+  organizerId: number | null;
+  hostVendorId: number | null;
+  gameOrganizerId: number | null;
+  personName: string;
+  phone: string;
+  bookingDate: string;
+  guests: number;
+  paymentMethod: string;
 };
 
 async function fetchTodaysBookings(todayIST: string, requireArrivalTime = false): Promise<BookingRow[]> {
@@ -62,9 +74,52 @@ async function fetchTodaysBookings(todayIST: string, requireArrivalTime = false)
       vendorId: bookingsTable.vendorId,
       pubMode: bookingsTable.pubMode,
       arrivalTime: bookingsTable.arrivalTime,
+      kind: bookingsTable.kind,
+      organizerId: bookingsTable.organizerId,
+      hostVendorId: bookingsTable.hostVendorId,
+      gameOrganizerId: bookingsTable.gameOrganizerId,
+      personName: bookingsTable.personName,
+      phone: bookingsTable.phone,
+      bookingDate: bookingsTable.bookingDate,
+      guests: bookingsTable.guests,
+      paymentMethod: bookingsTable.paymentMethod,
     })
     .from(bookingsTable)
     .where(and(...conditions));
+}
+
+function toPartnerBookingLike(b: BookingRow): PartnerBookingLike {
+  return {
+    id: b.id,
+    kind: b.kind,
+    vendorId: b.vendorId,
+    organizerId: b.organizerId,
+    hostVendorId: b.hostVendorId,
+    gameOrganizerId: b.gameOrganizerId,
+    personName: b.personName,
+    phone: b.phone,
+    bookingDate: b.bookingDate,
+    arrivalTime: b.arrivalTime,
+    guests: b.guests,
+    pubMode: b.pubMode,
+    paymentMethod: b.paymentMethod,
+  };
+}
+
+/** Exact-tag dedup — has a notification with this tag already been sent to this user today? */
+async function alreadySentTag(userId: number, tag: string, todayStartUTC: Date): Promise<boolean> {
+  const existing = await db
+    .select({ id: notificationsTable.id })
+    .from(notificationsTable)
+    .where(
+      and(
+        eq(notificationsTable.userId, userId),
+        eq(notificationsTable.tag, tag),
+        gte(notificationsTable.createdAt, todayStartUTC),
+      ),
+    )
+    .limit(1);
+  return existing.length > 0;
 }
 
 async function loadMaps(bookings: BookingRow[]) {
@@ -246,5 +301,64 @@ export async function runPreArrivalReminders(): Promise<void> {
     logger.info({ sent, skipped }, "[bookingReminders] Pre-arrival reminder tick complete");
   } catch (err) {
     logger.error({ err }, "[bookingReminders] Pre-arrival reminder job failed");
+  }
+}
+
+/**
+ * Runs every 5 minutes.
+ * For each booking whose arrivalTime is ~30 minutes from now (within the
+ * current 5-minute tick window), sends one "guest arriving soon" reminder to
+ * the partner(s) who own it (vendor / organizer / game organizer). Because
+ * this re-reads live booking rows every tick — instead of consulting a
+ * pre-scheduled row — a cancelled booking simply drops out of the
+ * confirmed/completed filter and a rescheduled arrivalTime is picked up by
+ * the next tick, with no separate invalidation step required.
+ */
+export async function runPartnerPreArrivalReminders(): Promise<void> {
+  const todayIST = getTodayIST();
+  const todayStartUTC = getTodayStartUTC();
+  const nowMinutes = getNowISTMinutes();
+
+  try {
+    const bookings = await fetchTodaysBookings(todayIST, true);
+
+    // Keep only those whose (arrivalTime - 30min) falls within this 5-minute tick
+    const due = bookings.filter((b) => {
+      const arrMinutes = parseTimeToMinutes(b.arrivalTime);
+      if (arrMinutes === null) return false;
+      const targetMinutes = arrMinutes - 30;
+      return nowMinutes >= targetMinutes && nowMinutes < targetMinutes + 5;
+    });
+
+    if (due.length === 0) return;
+
+    logger.info({ count: due.length, nowMinutes }, "[bookingReminders] Partner pre-arrival reminders due");
+
+    const partnerLikes = due.map(toPartnerBookingLike);
+    const recipientMap = await loadPartnerRecipientMaps(partnerLikes);
+
+    let sent = 0;
+    let skipped = 0;
+
+    for (const b of partnerLikes) {
+      const recipients = recipientMap.get(b.id) ?? [];
+      for (const recipient of recipients) {
+        const tag = `partner-reminder-${b.id}-${recipient.userId}`;
+        try {
+          if (await alreadySentTag(recipient.userId, tag, todayStartUTC)) {
+            skipped++;
+            continue;
+          }
+          await sendPartnerArrivalReminder(recipient, b);
+          sent++;
+        } catch (err) {
+          logger.warn({ err, bookingId: b.id, userId: recipient.userId }, "[bookingReminders] Failed to send partner pre-arrival reminder");
+        }
+      }
+    }
+
+    logger.info({ sent, skipped }, "[bookingReminders] Partner pre-arrival reminder tick complete");
+  } catch (err) {
+    logger.error({ err }, "[bookingReminders] Partner pre-arrival reminder job failed");
   }
 }

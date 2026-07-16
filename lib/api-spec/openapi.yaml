@@ -1200,6 +1200,11 @@ paths:
           schema:
             type: string
             enum: [welcome, unlimited, ticket, custom, cover_charge, vip_table]
+        - name: danceFloor
+          in: query
+          required: false
+          schema:
+            type: boolean
       responses:
         "200":
           description: Events list (Event[] when no page param; ListEventsPaginatedResponse when page param provided)

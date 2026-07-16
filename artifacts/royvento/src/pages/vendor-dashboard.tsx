@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LocationSelect } from "@/components/LocationSelect";
+import { BookingFiltersBar, type BookingFilters } from "@/components/BookingFiltersBar";
+import { BookingDetailModal } from "@/components/BookingDetailModal";
 import { EventEditor, partnerEventApi } from "./organizer-dashboard";
 import {
   Trash2, Calendar as CalIcon, Image as ImageIcon,
@@ -395,7 +397,18 @@ function PartnerHeader({
 
 export function VendorDashboard() {
   const search = useSearch();
-  const rawTab = new URLSearchParams(search).get("tab") ?? "overview";
+  const [, navigate] = useLocation();
+  const searchParams = new URLSearchParams(search);
+  const rawTab = searchParams.get("tab") ?? "overview";
+  // A notification deep-link carries ?bookingId=123 — handled reactively
+  // below (not baked into the initial tab), since clicking a notification
+  // while the dashboard is already open only changes the URL's query string
+  // and does not remount this component.
+  const deepLinkBookingId = (() => {
+    const raw = searchParams.get("bookingId");
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
   const initialTab = rawTab === "listing" ? "events" : rawTab;
   const { data: vendorData, refetch: refetchVendor } = useGetMyVendor();
   const vendor = (vendorData?.vendor ?? null) as any;
@@ -434,6 +447,28 @@ export function VendorDashboard() {
   const [tab, setTab] = useState(safeInitialTab);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [bookTablePage, setBookTablePage] = useState(1);
+
+  // Booking Report notification deep-link: force the Bookings tab open and
+  // show that booking's detail popup exactly once per notification. This is
+  // a reactive effect (not just the initial tab computed above) because
+  // tapping a notification while the dashboard is already open only updates
+  // the URL's query string — the route itself doesn't change, so React never
+  // remounts this component and a one-time initial value would leave the
+  // partner stuck on whatever tab they already had open (e.g. Profile).
+  const [deepLinkDetailId, setDeepLinkDetailId] = useState<number | null>(null);
+  const consumedBookingIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (deepLinkBookingId == null || !isApprovedAndListed) return;
+    if (consumedBookingIdRef.current === deepLinkBookingId) return;
+    consumedBookingIdRef.current = deepLinkBookingId;
+    setTab("bookings");
+    setDeepLinkDetailId(deepLinkBookingId);
+    // Strip bookingId from the URL immediately so refreshing, navigating back
+    // to this page later, or simply switching tabs and back never re-shows
+    // the popup for the same notification — it only reappears when a new
+    // notification carries a new bookingId.
+    navigate("/dashboard/vendor", { replace: true });
+  }, [deepLinkBookingId, isApprovedAndListed, navigate]);
 
   useEffect(() => { setDrawerOpen(false); }, [tab]);
 
@@ -566,6 +601,8 @@ export function VendorDashboard() {
           </main>
         </div>
       </Tabs>
+
+      <BookingDetailModal bookingId={deepLinkDetailId} role="vendor" onClose={() => setDeepLinkDetailId(null)} />
     </div>
   );
 }
@@ -2793,6 +2830,19 @@ export function BookingReport({ bookTablePage, setBookTablePage, adminVendorId }
   // Admins (Venues → Booking Report) pass a vendorId; partners resolve to their own venue.
   const vParam = adminVendorId ? `&vendorId=${adminVendorId}` : "";
 
+  const [filters, setFilters] = useState<BookingFilters>({ date: "", mode: "all", status: "all" });
+  useEffect(() => { setBookTablePage(1); }, [filters, setBookTablePage]);
+  const filterParams =
+    (filters.date ? `&date=${encodeURIComponent(filters.date)}` : "") +
+    (filters.mode !== "all" ? `&mode=${encodeURIComponent(filters.mode)}` : "") +
+    (filters.status !== "all" ? `&status=${encodeURIComponent(filters.status)}` : "");
+
+  // Row click → open that booking's detail modal. (The notification deep-link
+  // case is handled by a dedicated modal instance at the VendorDashboard level,
+  // since this component unmounts whenever the partner switches away from the
+  // Bookings tab and a one-time-per-mount guard here would otherwise re-fire.)
+  const [detailBookingId, setDetailBookingId] = useState<number | null>(null);
+
   const now = new Date();
   const startDate = (() => {
     if (preset === "30d") return new Date(now.getTime() - 30 * 86400000);
@@ -2808,8 +2858,8 @@ export function BookingReport({ bookTablePage, setBookTablePage, adminVendorId }
   });
 
   const { data: tableResp } = useQuery<{ data: any[]; total: number; page: number; totalPages: number }>({
-    queryKey: ["vendor-bookings", bookTablePage, startStr, adminVendorId ?? "me"],
-    queryFn: () => apiGet(`/api/bookings/vendor?page=${bookTablePage}&limit=${BR_PAGE_SIZE}&from=${encodeURIComponent(startStr)}${vParam}`),
+    queryKey: ["vendor-bookings", bookTablePage, startStr, adminVendorId ?? "me", filters],
+    queryFn: () => apiGet(`/api/bookings/vendor?page=${bookTablePage}&limit=${BR_PAGE_SIZE}&from=${encodeURIComponent(startStr)}${vParam}${filterParams}`),
   });
 
   // Per-booking event report: the venue's own event bookings + events organizers
@@ -3018,6 +3068,17 @@ export function BookingReport({ bookTablePage, setBookTablePage, adminVendorId }
                   {brTableTotal} booking{brTableTotal !== 1 ? "s" : ""}
                 </span>
               </div>
+              <div className="mb-4">
+                <BookingFiltersBar
+                  filters={filters}
+                  onChange={setFilters}
+                  modeOptions={[
+                    { value: "event", label: "Table" },
+                    { value: "vip_table", label: "VIP Table" },
+                    { value: "ticket", label: "Ticket" },
+                  ]}
+                />
+              </div>
               <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
                 <table className="w-full text-sm min-w-[640px]">
                   <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
@@ -3037,13 +3098,31 @@ export function BookingReport({ bookTablePage, setBookTablePage, adminVendorId }
                   </thead>
                   <tbody>
                     {brPageRows.map((b: any) => (
-                      <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                      <tr
+                        key={b.id}
+                        className="border-t border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+                        onClick={() => setDetailBookingId(b.id)}
+                      >
                         <td className="py-2.5 pr-3 text-muted-foreground tabular-nums">#{b.id}</td>
                         <td className="py-2.5 pr-3 tabular-nums">{b.bookingDate}</td>
                         <td className="py-2.5 pr-3">
                           <span className="font-medium">{b.personName || "—"}</span>
                         </td>
-                        <td className="py-2.5 pr-3 text-muted-foreground text-xs tabular-nums">{(b as any).phone || "—"}</td>
+                        <td className="py-2.5 pr-3 text-muted-foreground text-xs tabular-nums">
+                          {(b as any).phone ? (
+                            <Button
+                              asChild
+                              size="sm"
+                              variant="outline"
+                              className="h-7 gap-1 px-2 text-xs"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <a href={`tel:${(b as any).phone}`} title="Call guest">
+                                <Phone className="h-3 w-3 shrink-0" /> Call
+                              </a>
+                            </Button>
+                          ) : "—"}
+                        </td>
                         <td className="py-2.5 pr-3 text-muted-foreground text-xs max-w-[140px] truncate" title={(b as any).bookingLocation || ""}>{(b as any).bookingLocation || "—"}</td>
                         <td className="py-2.5 pr-3 text-muted-foreground max-w-[120px] truncate">{b.eventTitle || "—"}</td>
                         <td className="py-2.5 pr-3 capitalize text-muted-foreground">{b.pubMode === "event" ? "Table" : b.pubMode === "vip_table" ? "VIP Table" : b.pubMode === "ticket" ? "Ticket" : "—"}</td>
@@ -3161,6 +3240,8 @@ export function BookingReport({ bookTablePage, setBookTablePage, adminVendorId }
 
       {/* Walk-In Log — manual bookings shown separately */}
       <PartnerManualBookingLog adminVendorId={adminVendorId} startStr={startStr} />
+
+      <BookingDetailModal bookingId={detailBookingId} role="vendor" onClose={() => setDetailBookingId(null)} />
     </div>
   );
 }

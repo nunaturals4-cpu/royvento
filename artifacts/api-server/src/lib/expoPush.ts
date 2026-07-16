@@ -15,6 +15,8 @@ export interface ExpoPushMessage {
   data?: Record<string, unknown>;
   sound?: "default" | null;
   badge?: number;
+  /** iOS notification category identifier (drives actionable-notification buttons, e.g. "booking-call"). */
+  categoryId?: string;
 }
 
 /** Response from the /push/send endpoint — these are "tickets", not receipts. */
@@ -90,7 +92,7 @@ export async function sendExpoPushNotification(
 export async function sendExpoPushWithToken(
   userId: number,
   token: string,
-  payload: { title: string; body: string; data?: Record<string, unknown> },
+  payload: { title: string; body: string; data?: Record<string, unknown>; categoryId?: string },
 ): Promise<void> {
   if (!isValidExpoToken(token)) return;
 
@@ -108,6 +110,7 @@ export async function sendExpoPushWithToken(
         body: payload.body,
         sound: "default",
         data: payload.data,
+        ...(payload.categoryId ? { categoryId: payload.categoryId } : {}),
       }),
     });
 
@@ -156,7 +159,7 @@ export async function sendExpoPushWithToken(
  */
 export async function sendExpoPushToUser(
   userId: number,
-  payload: { title: string; body: string; data?: Record<string, unknown> },
+  payload: { title: string; body: string; data?: Record<string, unknown>; categoryId?: string },
 ): Promise<void> {
   const [row] = await db
     .select({ expoPushToken: usersTable.expoPushToken })

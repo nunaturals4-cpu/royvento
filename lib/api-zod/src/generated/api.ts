@@ -1934,7 +1934,8 @@ export const ListEventsQueryParams = zod.object({
   "maxPrice": zod.coerce.string().optional(),
   "page": zod.coerce.number().optional(),
   "limit": zod.coerce.number().optional(),
-  "drinkPlanType": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge', 'vip_table']).optional()
+  "drinkPlanType": zod.enum(['welcome', 'unlimited', 'ticket', 'custom', 'cover_charge', 'vip_table']).optional(),
+  "danceFloor": zod.coerce.boolean().optional()
 }).strict()
 
 export const listEventsResponseFreeEntryRulesOneBeforeTimeRegExp = new RegExp('^([01][0-9]|2[0-3]):([0-5][0-9])$');

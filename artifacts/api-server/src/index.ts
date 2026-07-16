@@ -1,7 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { runCleanup, autoCheckoutStaleBookings } from "./jobs/cleanup";
-import { runMorningReminders, runPreArrivalReminders } from "./jobs/bookingReminders";
+import { runMorningReminders, runPreArrivalReminders, runPartnerPreArrivalReminders } from "./jobs/bookingReminders";
 import { runExpoPushReceiptPoll } from "./jobs/expoPushReceipts";
 import { runPointsExpiry } from "./jobs/pointsExpiry";
 import { runTonightDigest, runStartingSoonReminders } from "./jobs/tonightNotifications";
@@ -1492,6 +1492,14 @@ const server = app.listen(port, (err) => {
   cron.schedule("*/5 * * * *", () => {
     runPreArrivalReminders().catch((err) =>
       logger.error({ err }, "Pre-arrival reminder job failed"),
+    );
+  }, { timezone: "Asia/Kolkata" });
+
+  // Partner Booking Notification System — every 5 min: notify the partner
+  // (vendor/organizer/game organizer) when a guest is arriving in ~30 min.
+  cron.schedule("*/5 * * * *", () => {
+    runPartnerPreArrivalReminders().catch((err) =>
+      logger.error({ err }, "Partner pre-arrival reminder job failed"),
     );
   }, { timezone: "Asia/Kolkata" });
 

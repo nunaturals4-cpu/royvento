@@ -121,6 +121,8 @@ type WebPushPayload = {
   url?: string;
   tag?: string;
   type?: string;
+  /** When set, the service worker adds a one-tap "Call" action to the notification. */
+  phone?: string;
 };
 
 export async function sendWebPushToUser(

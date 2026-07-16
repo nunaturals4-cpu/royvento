@@ -2673,6 +2673,7 @@ maxPrice?: string;
 page?: number;
 limit?: number;
 drinkPlanType?: ListEventsDrinkPlanType;
+danceFloor?: boolean;
 };
 
 export type ListEventsDrinkPlanType = typeof ListEventsDrinkPlanType[keyof typeof ListEventsDrinkPlanType];

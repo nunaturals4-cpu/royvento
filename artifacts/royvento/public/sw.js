@@ -69,12 +69,19 @@ self.addEventListener("push", (event) => {
   let payload;
   try { payload = event.data.json(); } catch { payload = { title: "Royvento", body: event.data.text() }; }
   const title = payload.title ?? "Royvento";
+  // Up to 2 action buttons (the practical desktop-browser limit): a one-tap
+  // Call when the notification carries a phone, and a View Booking action
+  // when it carries a specific deep link (both fire from notificationclick).
+  const actions = [];
+  if (payload.phone) actions.push({ action: "call", title: "📞 Call" });
+  if (payload.url) actions.push({ action: "view", title: "View Booking" });
   const options = {
     body: payload.body ?? "",
     icon: "/pwa-192x192.png",
     badge: "/favicon-48x48.png",
-    data: { url: payload.url ?? "/", ...(payload.data ?? {}) },
+    data: { url: payload.url ?? "/", phone: payload.phone ?? null, ...(payload.data ?? {}) },
     tag: payload.tag ?? "royvento-push",
+    ...(actions.length ? { actions } : {}),
   };
   event.waitUntil(
     Promise.all([
@@ -92,6 +99,14 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+
+  // One-tap "Call" action — dial the customer directly instead of navigating.
+  if (event.action === "call") {
+    const phone = event.notification.data?.phone;
+    if (phone) event.waitUntil(clients.openWindow("tel:" + phone));
+    return;
+  }
+
   const url = event.notification.data?.url ?? "/";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {

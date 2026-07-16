@@ -32,6 +32,7 @@ import {
 } from "../lib/commission";
 import { sendExpoPushToUser } from "../lib/expoPush";
 import { createUserNotification } from "../lib/notify";
+import { notifyPartnerNewBooking } from "../lib/partnerBookingNotify";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { eq, desc, and, inArray, sql, gte, lte, ne } from "drizzle-orm";
 import { z } from "zod";
@@ -864,6 +865,23 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       ticketWomen: b.ticketWomen || undefined,
       ticketMen: b.ticketMen || undefined,
       ticketCouple: b.ticketCouple || undefined,
+    });
+
+    // Instant "New booking received" notification to the venue partner.
+    await notifyPartnerNewBooking({
+      id: b.id,
+      kind: b.kind,
+      vendorId: b.vendorId,
+      organizerId: b.organizerId,
+      hostVendorId: b.hostVendorId,
+      gameOrganizerId: b.gameOrganizerId,
+      personName: b.personName,
+      phone: b.phone,
+      bookingDate: b.bookingDate,
+      arrivalTime: b.arrivalTime,
+      guests: b.guests,
+      pubMode: b.pubMode,
+      paymentMethod: b.paymentMethod,
     });
 
   } catch (err) {
@@ -1859,9 +1877,21 @@ router.get("/bookings/vendor", requireAuth(["vendor", "admin"]), async (req, res
 
   const rawFrom = String(req.query["from"] ?? "");
   const fromDate = /^\d{4}-\d{2}-\d{2}$/.test(rawFrom) ? rawFrom : null;
-  const where = fromDate
-    ? and(eq(bookingsTable.vendorId, vendor.id), gte(bookingsTable.bookingDate, fromDate))
-    : eq(bookingsTable.vendorId, vendor.id);
+
+  // Booking Report filter bar: exact date, booking mode, and status.
+  const rawDate = String(req.query["date"] ?? "");
+  const exactDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : null;
+  const rawMode = String(req.query["mode"] ?? "");
+  const mode = rawMode && rawMode !== "all" ? rawMode : null;
+  const rawStatus = String(req.query["status"] ?? "");
+  const status = rawStatus && rawStatus !== "all" ? rawStatus : null;
+
+  const conditions = [eq(bookingsTable.vendorId, vendor.id)];
+  if (fromDate) conditions.push(gte(bookingsTable.bookingDate, fromDate));
+  if (exactDate) conditions.push(eq(bookingsTable.bookingDate, exactDate));
+  if (mode) conditions.push(eq(bookingsTable.pubMode, mode));
+  if (status) conditions.push(eq(bookingsTable.status, status));
+  const where = and(...conditions);
 
   const [countRow] = await db
     .select({ total: sql<number>`count(*)::int` })
@@ -1888,6 +1918,38 @@ router.get("/bookings/vendor", requireAuth(["vendor", "admin"]), async (req, res
     effectiveRevenue: effById.get(b.id) ?? b.finalPrice,
   }));
   res.json({ data, total, page, totalPages });
+});
+
+// Single-booking fetch for the notification deep-link → Booking Detail modal.
+router.get("/bookings/vendor/:bookingId", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const id = Number(req.params["bookingId"]);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid booking id" });
+    return;
+  }
+  let where = eq(bookingsTable.id, id);
+  if (user.role !== "admin") {
+    const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+    if (!vendor) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    where = and(eq(bookingsTable.id, id), eq(bookingsTable.vendorId, vendor.id))!;
+  }
+
+  const [b] = await db.select().from(bookingsTable).where(where).limit(1);
+  if (!b) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  const [serialized] = await serializeBookings([b]);
+  res.json(serialized);
 });
 
 router.patch(

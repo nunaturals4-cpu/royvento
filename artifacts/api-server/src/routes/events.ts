@@ -216,6 +216,14 @@ router.get("/events", async (req, res) => {
     }
     conditions.push(inArray(eventsTable.vendorId, ids));
   }
+  // zod.coerce.boolean() (from the generated `danceFloor: boolean` OpenAPI
+  // param) coerces the string "false" to `true` since it's non-empty — read
+  // the raw query value instead, matching the same workaround in reviews.ts.
+  if (req.query["danceFloor"] === "true") {
+    conditions.push(
+      sql`EXISTS (SELECT 1 FROM vendors v WHERE v.id = ${eventsTable.vendorId} AND v.dance_floor_photos IS NOT NULL AND array_length(v.dance_floor_photos, 1) > 0)`,
+    );
+  }
 
   if (hasPage) {
     const page = Math.max(1, q.page ?? 1);

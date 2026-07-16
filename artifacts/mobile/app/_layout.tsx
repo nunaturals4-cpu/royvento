@@ -14,7 +14,7 @@ import { router, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useRef, useState } from "react";
-import { Platform } from "react-native";
+import { Linking, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -73,6 +73,17 @@ function resolveNotificationRoute(data: Record<string, unknown> | undefined): st
   // Dashboard bookings → the bookings tab.
   if (url.startsWith("/dashboard/bookings")) return "/(tabs)/bookings";
 
+  // Partner booking notification: /dashboard/<role>?tab=…&bookingId=123 →
+  // the matching partner dashboard's Bookings tab with the detail modal open.
+  // Mobile always calls this tab "bookings", even though the web organizer
+  // and game-organizer dashboards fold the same report into an "insights" tab.
+  const dashboardMatch = /^\/dashboard\/(vendor|organizer|game-organizer)(?:\?(.*))?$/.exec(url);
+  if (dashboardMatch) {
+    const qs = new URLSearchParams(dashboardMatch[2] ?? "");
+    const bookingId = qs.get("bookingId");
+    if (bookingId) return `/${dashboardMatch[1]}/dashboard?tab=bookings&bookingId=${encodeURIComponent(bookingId)}`;
+  }
+
   // Paths whose mobile route matches the web path 1:1.
   const PASSTHROUGH = [
     "/organizer-events/",
@@ -93,6 +104,19 @@ function resolveNotificationRoute(data: Record<string, unknown> | undefined): st
   if (PASSTHROUGH.some((p) => url === p || url.startsWith(p))) return url;
 
   return null;
+}
+
+/**
+ * One-tap "Call" action on a booking notification (see the "booking-call"
+ * category registered in registerForPushNotifications). Returns true when it
+ * handled the tap, so the caller skips its normal deep-link navigation.
+ */
+function handleCallAction(actionIdentifier: string, data: Record<string, unknown> | undefined): boolean {
+  if (actionIdentifier !== "call") return false;
+  const phone = typeof data?.phone === "string" ? data.phone.trim() : "";
+  if (!phone) return false;
+  Linking.openURL(`tel:${phone}`).catch(() => {});
+  return true;
 }
 
 /**
@@ -128,6 +152,17 @@ export async function registerForPushNotifications(): Promise<string | null> {
         lightColor: "#d4a017",
       });
     }
+
+    // Partner Booking Notification System — registers one-tap "Call" and
+    // "View Booking" actions on any notification tagged with this category
+    // (booking alerts carrying a customer phone number). "View Booking" needs
+    // no special handling below — it falls through to the same
+    // resolveNotificationRoute() deep-link logic as a plain tap. Safe to
+    // re-register on every launch.
+    await Notifications.setNotificationCategoryAsync("booking-call", [
+      { identifier: "view", buttonTitle: "View Booking", options: { opensAppToForeground: true } },
+      { identifier: "call", buttonTitle: "Call", options: { opensAppToForeground: true } },
+    ]);
 
     return tokenData.data;
   } catch {
@@ -214,6 +249,7 @@ function NotificationHandler({ pushToken }: NotificationHandlerProps) {
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         const data = response.notification.request.content.data as Record<string, unknown>;
+        if (handleCallAction(response.actionIdentifier, data)) return;
         const target = resolveNotificationRoute(data);
         if (target) router.push(target as never);
       },
@@ -225,6 +261,7 @@ function NotificationHandler({ pushToken }: NotificationHandlerProps) {
       .then((response) => {
         if (!response) return;
         const data = response.notification.request.content.data as Record<string, unknown>;
+        if (handleCallAction(response.actionIdentifier, data)) return;
         const target = resolveNotificationRoute(data);
         if (target) router.push(target as never);
       })

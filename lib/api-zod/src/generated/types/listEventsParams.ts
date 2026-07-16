@@ -19,4 +19,5 @@ maxPrice?: string;
 page?: number;
 limit?: number;
 drinkPlanType?: ListEventsDrinkPlanType;
+danceFloor?: boolean;
 };

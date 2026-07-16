@@ -24,7 +24,9 @@ import * as Haptics from "expo-haptics";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
+import { BookingFiltersBar, type BookingFilters } from "@/components/BookingFiltersBar";
+import { BookingDetailModal } from "@/components/BookingDetailModal";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -1799,6 +1801,30 @@ export default function VendorDashboardScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const isVendorOrAdmin = user?.role === "vendor" || user?.role === "admin";
 
+  // Notification deep-link (?tab=bookings&bookingId=123) — always land on the
+  // bookings tab and auto-open that booking's detail modal exactly once per
+  // notification. Tracks the *value* already consumed (not just a one-time
+  // boolean) so that if this screen stays mounted and a second, genuinely
+  // new notification arrives later, its popup still opens.
+  const params = useLocalSearchParams<{ tab?: string; bookingId?: string }>();
+  const [detailBookingId, setDetailBookingId] = useState<number | null>(null);
+  const consumedBookingIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const raw = params.bookingId;
+    if (!raw || consumedBookingIdRef.current === raw) return;
+    const id = Number(raw);
+    if (!Number.isFinite(id) || id <= 0) return;
+    consumedBookingIdRef.current = raw;
+    setActiveTab("bookings");
+    setDetailBookingId(id);
+    // Clear bookingId from this screen's params so a later re-render, back
+    // navigation, or the same notification tapped again doesn't re-open the
+    // popup — it only reappears for a genuinely new notification.
+    router.setParams({ bookingId: "" });
+  }, [params.bookingId]);
+
+  const [bookingFilters, setBookingFilters] = useState<BookingFilters>({ date: "", mode: "all", status: "all" });
+
   // ─── Data hooks ─────────────────────────────────────────────────────────────
   const vendorQuery = useGetMyVendor();
   const vendor = vendorQuery.data?.vendor ?? null;
@@ -1819,8 +1845,12 @@ export default function VendorDashboardScreen() {
     if (pg === 1) setBookingLoading(true);
     else setBookingFetching(true);
     try {
+      const q = new URLSearchParams({ page: String(pg), limit: String(BOOKING_PAGE_LIMIT) });
+      if (bookingFilters.date) q.set("date", bookingFilters.date);
+      if (bookingFilters.mode !== "all") q.set("mode", bookingFilters.mode);
+      if (bookingFilters.status !== "all") q.set("status", bookingFilters.status);
       const resp = await customFetch<{ data: VendorBookingItem[]; total: number; page: number; totalPages: number }>(
-        `/api/bookings/vendor?page=${pg}&limit=${BOOKING_PAGE_LIMIT}`,
+        `/api/bookings/vendor?${q.toString()}`,
       );
       const newItems = resp.data ?? [];
       setBookingTotal(resp.total ?? 0);
@@ -1832,7 +1862,7 @@ export default function VendorDashboardScreen() {
       setBookingLoading(false);
       setBookingFetching(false);
     }
-  }, []);
+  }, [bookingFilters]);
 
   const EVENT_PAGE_LIMIT = 20;
   const [eventItems, setEventItems] = useState<VendorEvent[]>([]);
@@ -2676,9 +2706,6 @@ export default function VendorDashboardScreen() {
 
   function renderBookings() {
     if (bookingLoading && bookingItems.length === 0) return <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />;
-    if (bookingItems.length === 0) return (
-      <EmptyState icon="ticket-outline" title="No bookings yet" subtitle="Customer booking requests will appear here" />
-    );
     return (
       <FlatList
         data={bookingItems}
@@ -2688,11 +2715,21 @@ export default function VendorDashboardScreen() {
         refreshing={bookingLoading && bookingItems.length > 0}
         onEndReached={onBookingEndReached}
         onEndReachedThreshold={0.4}
+        ListHeaderComponent={<View style={{ marginBottom: 12 }}><BookingFiltersBar filters={bookingFilters} onChange={setBookingFilters} modeOptions={[
+          { value: "event", label: "Table" },
+          { value: "vip_table", label: "VIP Table" },
+          { value: "ticket", label: "Ticket" },
+        ]} /></View>}
+        ListEmptyComponent={<EmptyState icon="ticket-outline" title="No bookings yet" subtitle="Customer booking requests will appear here" />}
         ListFooterComponent={bookingFetching ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} /> : null}
         renderItem={({ item: b }) => {
           const statusStyle = STATUS_COLORS[b.status ?? "pending"] ?? STATUS_COLORS.pending!;
           return (
-            <View style={[styles.bookingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setDetailBookingId(b.id)}
+              style={[styles.bookingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
               <View style={styles.cardHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.cardId, { color: colors.foreground }]}>Booking #{b.id}</Text>
@@ -2705,9 +2742,23 @@ export default function VendorDashboardScreen() {
                   {b.pubMode === "event" && b.arrivalTime ? (
                     <Text style={[styles.cardSub, { color: colors.primary }]}>⏰ Arrival: {b.arrivalTime}</Text>
                   ) : null}
+                  {b.personName ? (
+                    <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{b.personName}</Text>
+                  ) : null}
                 </View>
-                <View style={[styles.badge, { backgroundColor: statusStyle.bg }]}>
-                  <Text style={[styles.badgeText, { color: statusStyle.text }]}>{b.status}</Text>
+                <View style={{ alignItems: "flex-end", gap: 6 }}>
+                  <View style={[styles.badge, { backgroundColor: statusStyle.bg }]}>
+                    <Text style={[styles.badgeText, { color: statusStyle.text }]}>{b.status}</Text>
+                  </View>
+                  {b.phone ? (
+                    <TouchableOpacity
+                      onPress={() => Linking.openURL(`tel:${b.phone}`)}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.primary + "20" }}
+                    >
+                      <Ionicons name="call-outline" size={12} color={colors.primary} />
+                      <Text style={{ color: colors.primary, fontSize: 11, fontFamily: "Inter_600SemiBold" }}>Call</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </View>
               {b.notes ? <Text style={[styles.notes, { color: colors.mutedForeground }]}>{b.notes}</Text> : null}
@@ -2740,7 +2791,7 @@ export default function VendorDashboardScreen() {
                   </TouchableOpacity>
                 </View>
               ) : null}
-            </View>
+            </TouchableOpacity>
           );
         }}
       />
@@ -4495,6 +4546,8 @@ export default function VendorDashboardScreen() {
       {activeTab === "managers"       && renderManagers()}
       {activeTab === "banking"        && <BankingTab colors={colors} />}
       {activeTab === "reviews"        && <PartnerReviewsTab colors={colors} />}
+
+      <BookingDetailModal bookingId={detailBookingId} role="vendor" onClose={() => setDetailBookingId(null)} />
 
       {/* ── Create Event Modal ── */}
       <Modal visible={showCreateModal} animationType="slide" presentationStyle="pageSheet">

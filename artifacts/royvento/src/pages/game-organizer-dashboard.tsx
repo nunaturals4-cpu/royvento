@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Link } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
+import { BookingFiltersBar, type BookingFilters } from "@/components/BookingFiltersBar";
+import { BookingDetailModal } from "@/components/BookingDetailModal";
 import { apiGet, apiPost, apiPatch, apiPut, apiDelete, formatINR } from "@/lib/api";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +22,7 @@ import {
   Gamepad2, LayoutGrid, Plus, Package, Settings, ImagePlus, Trash2, Pencil,
   CheckCircle2, Clock, XCircle, ExternalLink, X,
   ScanLine, UserCog, Camera, CameraOff, Mail, Shield, Wallet, TrendingUp, Banknote,
-  BarChart3, Tag, Megaphone, Eye, Clock3, Timer, IndianRupee, Users,
+  BarChart3, Tag, Megaphone, Eye, Clock3, Timer, IndianRupee, Users, Phone,
 } from "lucide-react";
 
 // ─── shared types (mirror api-server/src/routes/gameOrganizers.ts) ──────────
@@ -192,7 +194,42 @@ type Tab = "overview" | "games" | "createGame" | "packages" | "createPackage" | 
 
 export function GameOrganizerDashboard() {
   const { toast } = useToast();
-  const [tab, setTab] = useState<Tab>("overview");
+  const search = useSearch();
+  const [, navigate] = useLocation();
+  const searchParams = new URLSearchParams(search);
+  // A notification deep-link carries ?bookingId=123 — handled reactively
+  // below (not baked into the initial tab), since clicking a notification
+  // while the dashboard is already open only changes the URL's query string
+  // and does not remount this component.
+  const deepLinkBookingId = (() => {
+    const raw = searchParams.get("bookingId");
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
+  const rawTab = searchParams.get("tab") as Tab | null;
+  const initialTab: Tab = rawTab ?? "overview";
+  const [tab, setTab] = useState<Tab>(initialTab);
+
+  // Booking Report notification deep-link: force the Insights tab open and
+  // show that booking's detail popup exactly once per notification. This is
+  // a reactive effect because tapping a notification while the dashboard is
+  // already open only updates the URL's query string — React never remounts
+  // this component, so a one-time initial value would leave the game
+  // organizer stuck on whatever tab they already had open.
+  const [deepLinkDetailId, setDeepLinkDetailId] = useState<number | null>(null);
+  const consumedBookingIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (deepLinkBookingId == null) return;
+    if (consumedBookingIdRef.current === deepLinkBookingId) return;
+    consumedBookingIdRef.current = deepLinkBookingId;
+    setTab("insights");
+    setDeepLinkDetailId(deepLinkBookingId);
+    // Strip bookingId from the URL immediately so refreshing, navigating back
+    // to this page later, or switching tabs and back never re-shows the popup
+    // for the same notification — it only reappears for a genuinely new one.
+    navigate("/dashboard/game-organizer", { replace: true });
+  }, [deepLinkBookingId, navigate]);
+
   const [org, setOrg] = useState<GameOrganizer | null | undefined>(undefined);
   const [games, setGames] = useState<Game[]>([]);
   const [packages, setPackages] = useState<GamePackage[]>([]);
@@ -324,6 +361,8 @@ export function GameOrganizerDashboard() {
           {tab === "profile" && <ProfileSettings org={org} onSaved={loadProfile} />}
         </main>
       </div>
+
+      <BookingDetailModal bookingId={deepLinkDetailId} role="game" onClose={() => setDeepLinkDetailId(null)} />
     </div>
   );
 }
@@ -1060,6 +1099,7 @@ interface BookingRow {
   id: number; createdAt: string; bookingDate: string; time: string | null; durationHours: string | null;
   persons: number; amount: string; checkedIn: boolean; attendee: string; phone: string; email: string;
   itemName: string; gameName: string | null; packageName: string | null; bookingLocation?: string;
+  status?: string; paymentMethod?: string;
 }
 
 // Endpoint config so the game dashboard panels (Analytics/Leads/Coupons) serve
@@ -1084,9 +1124,26 @@ export function adminGameOrgApi(orgId: number): GameOrgDashboardApi {
 export function InsightsPanel({ api = GAME_SELF_API }: { api?: GameOrgDashboardApi } = {}) {
   const [an, setAn] = useState<Analytics | null>(null);
   const [rows, setRows] = useState<BookingRow[]>([]);
+  const [filters, setFilters] = useState<BookingFilters>({ date: "", mode: "all", status: "all" });
+
+  // Row click → open that booking's detail modal. The booking-detail modal
+  // calls the game-organizer-only `/api/game-organizer/bookings/:id`
+  // endpoint, so it's only wired up when this panel is showing the
+  // organizer's own data (not an admin viewing via adminGameOrganizerApi).
+  // (The notification deep-link case is handled by a dedicated modal
+  // instance at the GameOrganizerDashboard level, since this panel unmounts
+  // whenever the organizer switches away from the Insights tab.)
+  const isSelf = api === GAME_SELF_API;
+  const [detailBookingId, setDetailBookingId] = useState<number | null>(null);
 
   useEffect(() => { apiGet<Analytics>(api.analytics).then(setAn).catch(() => {}); }, [api]);
-  useEffect(() => { apiGet<BookingRow[]>(api.bookings).then(setRows).catch(() => {}); }, [api]);
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filters.date) params.set("date", filters.date);
+    if (filters.status !== "all") params.set("status", filters.status);
+    const qs = params.toString();
+    apiGet<BookingRow[]>(`${api.bookings}${qs ? `?${qs}` : ""}`).then(setRows).catch(() => {});
+  }, [api, filters]);
 
   const peakMax = Math.max(1, ...(an?.peakHours ?? []).map((h) => h.bookings));
 
@@ -1146,6 +1203,9 @@ export function InsightsPanel({ api = GAME_SELF_API }: { api?: GameOrgDashboardA
 
       <div>
         <h2 className="font-serif text-lg mb-3">Booking report</h2>
+        <div className="mb-3">
+          <BookingFiltersBar filters={filters} onChange={setFilters} />
+        </div>
         {rows.length === 0 ? <p className="text-white/50 text-sm">No bookings yet.</p> : (
           <div className="overflow-x-auto rounded-2xl border border-white/[0.07]">
             <table className="w-full text-sm min-w-[640px]">
@@ -1161,11 +1221,33 @@ export function InsightsPanel({ api = GAME_SELF_API }: { api?: GameOrgDashboardA
               </tr></thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-white/[0.04] last:border-0">
+                  <tr
+                    key={r.id}
+                    className={`border-b border-white/[0.04] last:border-0 hover:bg-white/[0.03] ${isSelf ? "cursor-pointer" : ""}`}
+                    onClick={() => { if (isSelf) setDetailBookingId(r.id); }}
+                  >
                     <td className="p-3 text-white/60">#{r.id}</td>
                     <td className="p-3">{r.itemName || r.gameName || r.packageName || "—"}{r.durationHours ? ` · ${Number(r.durationHours)}h` : ""}</td>
                     <td className="p-3">{r.attendee}</td>
-                    <td className="p-3 text-white/50 text-xs hidden sm:table-cell">{[r.email, r.phone].filter(Boolean).join(" · ") || "—"}</td>
+                    <td className="p-3 text-white/50 text-xs hidden sm:table-cell">
+                      <div className="flex flex-col gap-1 items-start">
+                        {r.phone && (
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="h-7 gap-1 px-2 text-xs border-white/15"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <a href={`tel:${r.phone}`} title="Call guest">
+                              <Phone className="h-3 w-3 shrink-0" /> Call
+                            </a>
+                          </Button>
+                        )}
+                        {r.email && <span>{r.email}</span>}
+                        {!r.phone && !r.email && "—"}
+                      </div>
+                    </td>
                     <td className="p-3 text-white/50 text-xs">{r.bookingLocation || "—"}</td>
                     <td className="p-3 text-right text-white/60">{r.bookingDate}{r.time ? ` ${r.time}` : ""}</td>
                     <td className="p-3 text-right">{formatINR(Number(r.amount))}</td>
@@ -1177,6 +1259,8 @@ export function InsightsPanel({ api = GAME_SELF_API }: { api?: GameOrgDashboardA
           </div>
         )}
       </div>
+
+      {isSelf && <BookingDetailModal bookingId={detailBookingId} role="game" onClose={() => setDetailBookingId(null)} />}
     </div>
   );
 }

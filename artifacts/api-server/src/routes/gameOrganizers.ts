@@ -27,6 +27,7 @@ import { bookingLocationFromBody } from "../lib/geo";
 import { logger } from "../lib/logger";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { createUserNotification } from "../lib/notify";
+import { notifyPartnerNewBooking } from "../lib/partnerBookingNotify";
 
 const DEFAULT_MANAGER_PERMS: GameManagerPermissions = { scan: true, attendance: true, reports: false };
 
@@ -921,6 +922,23 @@ router.post("/game-organizers/:slug/book", requireAuth(), async (req, res) => {
       tag: `game-booking-${booking.id}`,
     }).catch(() => {});
 
+    // Instant "New booking received" notification to the game organizer.
+    notifyPartnerNewBooking({
+      id: booking.id,
+      kind: booking.kind,
+      vendorId: booking.vendorId,
+      organizerId: booking.organizerId,
+      hostVendorId: booking.hostVendorId,
+      gameOrganizerId: booking.gameOrganizerId,
+      personName: booking.personName,
+      phone: booking.phone,
+      bookingDate: booking.bookingDate,
+      arrivalTime: booking.arrivalTime,
+      guests: booking.guests,
+      pubMode: booking.pubMode,
+      paymentMethod: booking.paymentMethod,
+    }).catch(() => {});
+
     return res.json({
       ok: true,
       bookingId: booking.id,
@@ -1391,9 +1409,16 @@ router.get("/game-organizer/bookings", requireAuth(["game_organizer"]), async (r
   if (!org) return res.status(403).json({ error: "No game organizer profile" });
   const gameId = Number(req.query["gameId"]);
   const filter = Number.isFinite(gameId) && gameId > 0 ? sql` AND b.game_id = ${gameId}` : sql``;
+
+  // Booking Report filter bar: exact date and status.
+  const rawDate = String(req.query["date"] ?? "");
+  const dateFilter = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? sql` AND b.booking_date = ${rawDate}` : sql``;
+  const rawStatus = String(req.query["status"] ?? "");
+  const statusFilter = rawStatus && rawStatus !== "all" ? sql` AND b.status = ${rawStatus}` : sql``;
+
   const rows = await db.execute(sql`
     SELECT b.id, b.created_at AS "createdAt", b.booking_date AS "bookingDate",
-      b.arrival_time AS "time", b.duration_hours AS "durationHours",
+      b.arrival_time AS "time", b.duration_hours AS "durationHours", b.status, b.payment_method AS "paymentMethod",
       b.guests AS "persons", b.final_price AS "amount", b.checked_in AS "checkedIn",
       b.person_name AS "attendee", b.phone, u.email AS "email",
       b.booking_location AS "bookingLocation",
@@ -1403,10 +1428,38 @@ router.get("/game-organizer/bookings", requireAuth(["game_organizer"]), async (r
     LEFT JOIN users u ON u.id = b.user_id
     LEFT JOIN games g ON g.id = b.game_id
     LEFT JOIN game_packages p ON p.id = b.game_package_id
-    WHERE b.kind='game' AND b.game_organizer_id = ${org.id} AND b.status='confirmed'${filter}
+    WHERE b.kind='game' AND b.game_organizer_id = ${org.id}${filter}${dateFilter}${statusFilter}
     ORDER BY b.created_at DESC
   `);
   return res.json(rows.rows);
+});
+
+// Single-booking fetch for the notification deep-link → Booking Detail modal.
+router.get("/game-organizer/bookings/:bookingId", requireAuth(["game_organizer"]), async (req, res) => {
+  const user = (req as any).user as { id: number };
+  const org = await getMyOrganizer(user.id);
+  if (!org) return res.status(403).json({ error: "No game organizer profile" });
+  const id = Number(req.params["bookingId"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid booking id" });
+
+  const rows = await db.execute(sql`
+    SELECT b.id, b.created_at AS "createdAt", b.booking_date AS "bookingDate",
+      b.arrival_time AS "time", b.duration_hours AS "durationHours", b.status, b.payment_method AS "paymentMethod",
+      b.guests AS "persons", b.final_price AS "amount", b.checked_in AS "checkedIn",
+      b.person_name AS "attendee", b.phone, u.email AS "email",
+      b.booking_location AS "bookingLocation",
+      b.selected_pub_event AS "itemName",
+      g.name AS "gameName", p.name AS "packageName"
+    FROM bookings b
+    LEFT JOIN users u ON u.id = b.user_id
+    LEFT JOIN games g ON g.id = b.game_id
+    LEFT JOIN game_packages p ON p.id = b.game_package_id
+    WHERE b.kind='game' AND b.game_organizer_id = ${org.id} AND b.id = ${id}
+    LIMIT 1
+  `);
+  const row = rows.rows[0];
+  if (!row) return res.status(404).json({ error: "Not found" });
+  return res.json(row);
 });
 
 // ─── coupons ────────────────────────────────────────────────────────────────
