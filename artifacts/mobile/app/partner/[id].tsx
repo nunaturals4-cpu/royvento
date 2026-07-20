@@ -59,6 +59,18 @@ interface DrinkPlan {
   validUntil?: string | null;
 }
 
+/* Standard Terms & Conditions shown on every pub profile by default — mirrors web event-detail.tsx. */
+const DEFAULT_PUB_TERMS: string[] = [
+  "Please carry a valid ID proof along with you.",
+  "No refunds on purchased ticket are possible, even in case of any rescheduling.",
+  "Security procedures, including frisking remain the right of the management.",
+  "No dangerous or potentially hazardous objects including but not limited to weapons, knives, guns, fireworks, helmets, lazer devices, bottles, musical instruments will be allowed in the venue and may be ejected with or without the owner from the venue.",
+  "The sponsors/performers/organizers are not responsible for any injury or damage occurring due to the event. Any claims regarding the same would be settled in courts in Mumbai.",
+  "People in an inebriated state may not be allowed entry.",
+  "Organizers hold the right to deny late entry to the event.",
+  "Venue rules apply.",
+];
+
 interface VendorAnnouncement {
   id: number;
   title: string;
@@ -261,6 +273,8 @@ export default function PartnerDetailScreen() {
   const { data: vendor, isLoading } = useGetVendor(vendorId);
   const REVIEWS_PAGE_SIZE = 5;
   const [reviewsPage, setReviewsPage] = useState(1);
+  const [venueFaqExpanded, setVenueFaqExpanded] = useState(false);
+  const [venueTermsExpanded, setVenueTermsExpanded] = useState(false);
   useEffect(() => { setReviewsPage(1); }, [vendorId]);
 
   // Track profile view; skip self-views and StrictMode double-invokes.
@@ -666,6 +680,93 @@ export default function PartnerDetailScreen() {
             <Text style={[styles.description, { color: colors.mutedForeground }]}>{vendor.openDays!.join(", ")}</Text>
           </View>
         ) : null}
+
+        {/* Cuisines, Languages & Available facilities */}
+        {(() => {
+          const vAny = vendor as unknown as { cuisines?: string[] | null; facilities?: string[] | null; languages?: string[] | null };
+          const cuisines = (vAny.cuisines ?? []).filter(Boolean);
+          const facilities = (vAny.facilities ?? []).filter(Boolean);
+          const langs = (vAny.languages ?? []).filter(Boolean);
+          if (cuisines.length === 0 && facilities.length === 0 && langs.length === 0) return null;
+          return (
+            <View style={{ gap: 20 }}>
+              {cuisines.length > 0 ? (
+                <View style={{ gap: 6 }}>
+                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Cuisines</Text>
+                  <Text style={[styles.description, { color: colors.mutedForeground }]}>{cuisines.join(", ")}</Text>
+                </View>
+              ) : null}
+              {langs.length > 0 ? (
+                <View style={{ gap: 6 }}>
+                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Languages</Text>
+                  <Text style={[styles.description, { color: colors.mutedForeground }]}>{langs.join(", ")}</Text>
+                </View>
+              ) : null}
+              {facilities.length > 0 ? (
+                <View style={{ gap: 10 }}>
+                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Available facilities</Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                    {facilities.map((f) => (
+                      <View key={f} style={{ flexDirection: "row", alignItems: "center", gap: 6, width: "47%" }}>
+                        <Text style={{ color: colors.primary, fontSize: 12 }}>✦</Text>
+                        <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground, flex: 1 }} numberOfLines={1}>{f}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          );
+        })()}
+
+        {/* More — FAQ + Terms (collapsible rows), mirrors web's default 8-item pub terms */}
+        {(() => {
+          const vAny = vendor as unknown as { faqs?: { question: string; answer?: string }[] | null };
+          const faqs = (vAny.faqs ?? []).filter((f) => f?.question);
+          return (
+            <View style={{ gap: 10 }}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>More</Text>
+              <View style={{ borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: "hidden" }}>
+                {faqs.length > 0 ? (
+                  <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                    <Pressable style={{ flexDirection: "row", alignItems: "center", gap: 10, padding: 16 }} onPress={() => setVenueFaqExpanded((v) => !v)}>
+                      <Ionicons name="help-circle-outline" size={16} color={colors.primary} />
+                      <Text style={{ flex: 1, fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>Frequently asked questions</Text>
+                      <Ionicons name={venueFaqExpanded ? "chevron-up" : "chevron-down"} size={14} color={colors.mutedForeground} />
+                    </Pressable>
+                    {venueFaqExpanded ? (
+                      <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+                        {faqs.map((f, i) => (
+                          <View key={i} style={{ marginBottom: 12 }}>
+                            <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{f.question}</Text>
+                            {f.answer ? <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 18, marginTop: 2 }}>{f.answer}</Text> : null}
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+                <View>
+                  <Pressable style={{ flexDirection: "row", alignItems: "center", gap: 10, padding: 16 }} onPress={() => setVenueTermsExpanded((v) => !v)}>
+                    <Ionicons name="document-text-outline" size={16} color={colors.primary} />
+                    <Text style={{ flex: 1, fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>Terms and Conditions</Text>
+                    <Ionicons name={venueTermsExpanded ? "chevron-up" : "chevron-down"} size={14} color={colors.mutedForeground} />
+                  </Pressable>
+                  {venueTermsExpanded ? (
+                    <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+                      {DEFAULT_PUB_TERMS.map((term, i) => (
+                        <View key={i} style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+                          <Text style={{ color: colors.primary }}>•</Text>
+                          <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 18, flex: 1 }}>{term}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Find us — Google Maps deep link */}
         {vendor.address ? (

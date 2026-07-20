@@ -58,6 +58,12 @@ export default function CommunityGuidelinesScreen() {
             <Text style={[styles.sectionBody, { color: colors.mutedForeground }]}>{s.body}</Text>
           </View>
         ))}
+        <Text style={[styles.acknowledgment, { color: colors.mutedForeground, borderColor: colors.border }]}>
+          By using Solo Connector you confirm you have read and accepted these guidelines together with our{" "}
+          <Text style={{ color: colors.primary }} onPress={() => router.push("/terms" as never)}>Terms & Conditions</Text>
+          {" "}and{" "}
+          <Text style={{ color: colors.primary }} onPress={() => router.push("/privacy" as never)}>Privacy Policy</Text>.
+        </Text>
         <MobileFooter />
       </ScrollView>
     </View>
@@ -74,4 +80,5 @@ const styles = StyleSheet.create({
   section: { borderTopWidth: 1, paddingVertical: 16, gap: 8 },
   sectionTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
   sectionBody: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
+  acknowledgment: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 20, marginTop: 16, paddingTop: 16, borderTopWidth: 1 },
 });

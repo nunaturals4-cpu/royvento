@@ -59,12 +59,19 @@ export function CityProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const alreadyAttempted = await AsyncStorage.getItem(AUTO_ATTEMPTED_KEY);
-        if (alreadyAttempted) return;
-
-        await AsyncStorage.setItem(AUTO_ATTEMPTED_KEY, "1");
-
-        const { status } = await Location.requestForegroundPermissionsAsync();
+        // Re-detect on every load while permission is already granted (keeps
+        // the city fresh, mirrors web's behaviour), but only ever *prompt*
+        // for permission once — a user who denied it shouldn't be re-asked
+        // on every app open.
+        const existing = await Location.getForegroundPermissionsAsync();
+        let status = existing.status;
+        if (status === "undetermined") {
+          const alreadyPrompted = await AsyncStorage.getItem(AUTO_ATTEMPTED_KEY);
+          if (alreadyPrompted) return;
+          await AsyncStorage.setItem(AUTO_ATTEMPTED_KEY, "1");
+          const requested = await Location.requestForegroundPermissionsAsync();
+          status = requested.status;
+        }
         if (status !== "granted") return;
 
         setDetectingCity(true);

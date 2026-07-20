@@ -19,11 +19,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
+import { resolveNotificationRoute } from "@/lib/resolveNotificationRoute";
 
 interface Notification {
   id: number;
   title: string;
   message: string;
+  url?: string;
   isRead: boolean;
   createdAt: string;
 }
@@ -45,16 +47,19 @@ export default function NotificationsScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
 
-  const markAllRead = async () => {
-    const unread = (data ?? []).filter((n) => !n.isRead);
-    for (const n of unread) {
-      await customFetch(`/api/notifications/${n.id}/read`, { method: "PATCH" });
-    }
-    qc.invalidateQueries({ queryKey: ["notifications"] });
-  };
+  const markAllRead = useMutation({
+    mutationFn: () => customFetch("/api/notifications/read-all", { method: "PATCH" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+  });
 
   const notifications = data ?? [];
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  function openNotification(n: Notification) {
+    if (!n.isRead) markRead.mutate(n.id);
+    const target = resolveNotificationRoute({ url: n.url });
+    if (target) router.push(target as never);
+  }
 
   function formatTime(iso: string) {
     const d = new Date(iso);
@@ -89,8 +94,16 @@ export default function NotificationsScreen() {
             )}
           </View>
           {unreadCount > 0 && (
-            <TouchableOpacity onPress={markAllRead} style={[styles.markAllBtn, { backgroundColor: colors.muted }]}>
-              <Text style={[styles.markAllText, { color: colors.primary }]}>Mark all read</Text>
+            <TouchableOpacity
+              onPress={() => markAllRead.mutate()}
+              disabled={markAllRead.isPending}
+              style={[styles.markAllBtn, { backgroundColor: colors.muted, opacity: markAllRead.isPending ? 0.6 : 1 }]}
+            >
+              {markAllRead.isPending ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={[styles.markAllText, { color: colors.primary }]}>Mark all read</Text>
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -129,9 +142,7 @@ export default function NotificationsScreen() {
                   borderBottomColor: colors.border,
                 },
               ]}
-              onPress={() => {
-                if (!item.isRead) markRead.mutate(item.id);
-              }}
+              onPress={() => openNotification(item)}
             >
               <View style={[styles.dot, { backgroundColor: item.isRead ? "transparent" : colors.primary }]} />
               <View style={{ flex: 1, gap: 3 }}>

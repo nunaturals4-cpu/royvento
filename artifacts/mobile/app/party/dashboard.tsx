@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { customFetch } from "@workspace/api-client-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Haptics from "expo-haptics";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -87,11 +88,13 @@ export default function PartyDashboardScreen() {
         headers: { "Content-Type": "application/json" },
       }),
     onSuccess: (res, variables) => {
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setScanMsg({ ok: true, text: `Checked in: ${res.name ?? variables}` });
       setCode("");
       qc.invalidateQueries({ queryKey: ["party-dashboard", id] });
     },
     onError: (e: any, variables) => {
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setScanMsg({ ok: false, text: e?.data?.error ?? e?.message ?? `Invalid ticket: ${variables}` });
     },
   });
@@ -151,6 +154,11 @@ export default function PartyDashboardScreen() {
           <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>{party.name}</Text>
           <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{formatPartyDate(party.partyDate)} · {party.city}</Text>
         </View>
+        {party.status !== "cancelled" && (
+          <TouchableOpacity onPress={() => router.push({ pathname: "/party/edit", params: { id: String(id) } } as never)} hitSlop={10} style={{ padding: 6 }}>
+            <Ionicons name="pencil-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView

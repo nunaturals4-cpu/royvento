@@ -76,6 +76,10 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const [resendBusy, setResendBusy] = useState(false);
+  const [useGoogleHint, setUseGoogleHint] = useState(false);
+  const [noAccount, setNoAccount] = useState(false);
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
@@ -163,19 +167,14 @@ export default function LoginScreen() {
           return;
         }
         if (code === "EMAIL_NOT_VERIFIED" || /EMAIL_NOT_VERIFIED|verify your email/i.test(serverMsg)) {
-          Alert.alert(
-            t("auth.email_not_verified"),
-            t("auth.email_not_verified_desc"),
-          );
+          setUnverifiedEmail(email);
         } else if (code === "USE_GOOGLE_SIGNIN") {
-          Alert.alert(
-            t("auth.use_google_signin_title"),
-            t("auth.use_google_signin"),
-          );
+          setUseGoogleHint(true);
         } else if (code === "NO_ACCOUNT" || status === 404) {
+          setNoAccount(true);
           setErrors((p) => ({
             ...p,
-            email: "No account found for that email. Tap “Sign Up” below to create one.",
+            email: "No account found for that email.",
           }));
           emailRef.current?.focus();
         } else {
@@ -186,7 +185,26 @@ export default function LoginScreen() {
     },
   });
 
+  const handleResendVerification = async () => {
+    setResendBusy(true);
+    try {
+      await customFetch("/api/auth/resend-verification", {
+        method: "POST",
+        body: JSON.stringify({ email: unverifiedEmail }),
+        headers: { "Content-Type": "application/json" },
+      });
+      Alert.alert(t("auth.resend_success"));
+    } catch {
+      Alert.alert(t("auth.resend_error"));
+    } finally {
+      setResendBusy(false);
+    }
+  };
+
   const handleLogin = () => {
+    setUnverifiedEmail("");
+    setUseGoogleHint(false);
+    setNoAccount(false);
     const next: { email?: string; password?: string } = {};
     if (!email.trim()) next.email = "Please enter your email address.";
     else if (!isValidEmail(email)) next.email = "Please enter a valid email address.";
@@ -228,6 +246,43 @@ export default function LoginScreen() {
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t("auth.sign_in")}</Text>
+
+          {/* Email not verified — resend inline */}
+          {unverifiedEmail ? (
+            <View style={[styles.hintBanner, { borderColor: "#f59e0b4D", backgroundColor: "#f59e0b1A" }]}>
+              <Ionicons name="mail-unread-outline" size={18} color="#f59e0b" style={{ marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.hintTitle, { color: "#fbbf24" }]}>{t("auth.email_not_verified")}</Text>
+                <Text style={[styles.hintDesc, { color: "#fde68a" }]}>{t("auth.email_not_verified_desc")}</Text>
+                <TouchableOpacity
+                  style={[styles.hintBtn, { borderColor: "#f59e0b66" }]}
+                  onPress={handleResendVerification}
+                  disabled={resendBusy}
+                >
+                  <Text style={[styles.hintBtnText, { color: "#fbbf24" }]}>
+                    {resendBusy ? t("auth.resend_sending") : t("auth.resend_verification")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
+
+          {/* This email signed up with Google — offer the right path inline */}
+          {useGoogleHint ? (
+            <View style={[styles.hintBanner, { borderColor: "#3b82f64D", backgroundColor: "#3b82f61A" }]}>
+              <Ionicons name="logo-google" size={18} color="#4285F4" style={{ marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.hintTitle, { color: "#93c5fd" }]}>{t("auth.use_google_signin_title")}</Text>
+                <Text style={[styles.hintDesc, { color: "#bfdbfe" }]}>{t("auth.use_google_signin")}</Text>
+                <TouchableOpacity
+                  style={[styles.hintBtn, { borderColor: "#3b82f666" }]}
+                  onPress={handleGooglePress}
+                >
+                  <Text style={[styles.hintBtnText, { color: "#93c5fd" }]}>{t("auth.continue_google")}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
 
           {!!googleClientId && (
             <TouchableOpacity
@@ -275,7 +330,16 @@ export default function LoginScreen() {
                   returnKeyType="next"
                 />
               </View>
-              {errors.email ? <Text style={[styles.errorText, { color: colors.destructive }]}>{errors.email}</Text> : null}
+              {errors.email ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <Text style={[styles.errorText, { color: colors.destructive }]}>{errors.email}</Text>
+                  {noAccount ? (
+                    <TouchableOpacity onPress={() => router.push({ pathname: "/(auth)/register", params: { email } } as never)}>
+                      <Text style={[styles.errorText, { color: colors.primary, textDecorationLine: "underline" }]}>Create an account</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
 
             <View style={styles.field}>
@@ -362,6 +426,11 @@ const styles = StyleSheet.create({
   tagline: { fontSize: 14, fontFamily: "Inter_400Regular" },
   card: { borderRadius: 20, borderWidth: 1, padding: 24, gap: 16 },
   cardTitle: { fontSize: 20, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  hintBanner: { flexDirection: "row", alignItems: "flex-start", gap: 10, borderWidth: 1, borderRadius: 14, padding: 14 },
+  hintTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", marginBottom: 3 },
+  hintDesc: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17, marginBottom: 10 },
+  hintBtn: { alignSelf: "flex-start", borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
+  hintBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   googleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderWidth: 1, borderRadius: 14, paddingVertical: 14 },
   googleBtnText: { fontSize: 14, fontFamily: "Inter_500Medium" },
   dividerRow: { flexDirection: "row", alignItems: "center", gap: 12 },

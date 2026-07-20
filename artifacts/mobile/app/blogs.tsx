@@ -35,6 +35,39 @@ interface Blog {
   createdAt: string;
 }
 
+function FeaturedBlogCard({ colors, blog, onPress }: { colors: ReturnType<typeof useColors>; blog: Blog; onPress: () => void }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.featuredCard, { backgroundColor: colors.card, borderColor: colors.primary + "40" }, pressed && { opacity: 0.85 }]}
+      onPress={onPress}
+    >
+      {blog.imageUrl ? (
+        <Image source={{ uri: resolveImageUrl(blog.imageUrl) }} style={styles.featuredImage} contentFit="cover" />
+      ) : (
+        <LinearGradient colors={[colors.primary + "40", colors.card]} style={styles.featuredImage}>
+          <Ionicons name="newspaper-outline" size={32} color={colors.primary} />
+        </LinearGradient>
+      )}
+      <View style={styles.featuredBody}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {(blog.tags ?? []).length > 0 && (
+            <View style={[styles.featuredBadge, { backgroundColor: colors.primary }]}>
+              <Text style={{ color: colors.primaryForeground, fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.6 }}>{blog.tags[0].toUpperCase()}</Text>
+            </View>
+          )}
+          <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{blog.authorName}</Text>
+        </View>
+        <Text style={[styles.featuredTitle, { color: colors.foreground }]} numberOfLines={3}>{blog.title}</Text>
+        {!!blog.excerpt && <Text style={[styles.excerpt, { color: colors.mutedForeground }]} numberOfLines={2}>{blog.excerpt}</Text>}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
+          <Text style={{ color: colors.primary, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>Read article</Text>
+          <Ionicons name="arrow-forward" size={14} color={colors.primary} />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 export default function BlogsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -144,9 +177,10 @@ export default function BlogsScreen() {
         </>
       ) : (
         <FlatList
-          data={blogs}
+          data={blogs.slice(1)}
           keyExtractor={(b) => String(b.id)}
           contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }}
+          ListHeaderComponent={blogs[0] ? <FeaturedBlogCard colors={colors} blog={blogs[0]} onPress={() => router.push({ pathname: "/blog/[slug]", params: { slug: blogs[0].slug } })} /> : null}
           ListFooterComponent={<MobileFooter />}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
           renderItem={({ item }) => (
@@ -213,6 +247,11 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
   emptySub: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center" },
   card: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
+  featuredCard: { borderRadius: 18, borderWidth: 1.5, overflow: "hidden" },
+  featuredImage: { height: 180, alignItems: "center", justifyContent: "center" },
+  featuredBody: { padding: 16, gap: 8 },
+  featuredBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-start" },
+  featuredTitle: { fontSize: 19, fontFamily: "Inter_700Bold", lineHeight: 25 },
   imagePlaceholder: { height: 140, alignItems: "center", justifyContent: "center" },
   cardBody: { padding: 14, gap: 6 },
   category: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1 },

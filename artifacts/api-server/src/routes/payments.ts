@@ -549,11 +549,12 @@ router.get("/pay/checkout", (req, res) => {
   var DESC = ${jsStr(q["desc"] || "Payment")};
   var REDIRECT = ${jsStr(redirect)};
   var RID = ${jsStr(rid)};
-  function back(status, paymentId){
+  function back(status, paymentId, errorCode){
     var sep = REDIRECT.indexOf('?') >= 0 ? '&' : '?';
     var url = REDIRECT + sep + 'payment=' + encodeURIComponent(status)
       + (RID ? '&id=' + encodeURIComponent(RID) : '')
-      + (paymentId ? '&razorpay_payment_id=' + encodeURIComponent(paymentId) : '');
+      + (paymentId ? '&razorpay_payment_id=' + encodeURIComponent(paymentId) : '')
+      + (errorCode ? '&code=' + encodeURIComponent(errorCode) : '');
     window.location.href = url;
   }
   function startPay(){
@@ -572,7 +573,7 @@ router.get("/pay/checkout", (req, res) => {
     };
     try {
       var rzp = new Razorpay(options);
-      rzp.on('payment.failed', function(){ back('failed'); });
+      rzp.on('payment.failed', function(resp){ back('failed', null, resp && resp.error && resp.error.code); });
       rzp.open();
     } catch (e) {
       document.getElementById('retry').style.display = 'inline-block';

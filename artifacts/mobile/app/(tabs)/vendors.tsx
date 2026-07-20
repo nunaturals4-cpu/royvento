@@ -45,9 +45,22 @@ const DANCE_FLOOR_OPTIONS: { label: string; value: DanceFloorFilter }[] = [
   { label: "Seated only", value: "none" },
 ];
 
+const DANCE_FLOOR_LABEL: Record<string, string> = {
+  dedicated: "Dedicated dance floor",
+  general: "Dancing in main area",
+};
+
+const CROWD_CONFIG: Record<string, { label: string; bg: string }> = {
+  low: { label: "Low Crowd", bg: "#16a34a" },
+  moderate: { label: "Moderate", bg: "#d97706" },
+  party: { label: "🔥 High Crowd", bg: "#dc2626" },
+};
+
 function VendorCard({ vendor }: { vendor: Vendor }) {
   const colors = useColors();
   const image = vendor.bannerImage || vendor.coverImageUrl;
+  const hasFreeEntry = vendor.freeEntryRules?.enabled === true && (vendor.freeEntryRules?.days?.length ?? 0) > 0;
+  const danceFloorLabel = vendor.danceFloor ? DANCE_FLOOR_LABEL[vendor.danceFloor] : undefined;
 
   return (
     <Pressable
@@ -66,6 +79,11 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
         <View style={[styles.categoryBadge, { backgroundColor: colors.primary }]}>
           <Text style={[styles.categoryBadgeText, { color: colors.primaryForeground }]}>{vendor.category}</Text>
         </View>
+        {vendor.crowdLevel && CROWD_CONFIG[vendor.crowdLevel] ? (
+          <View style={[styles.crowdBadge, { backgroundColor: CROWD_CONFIG[vendor.crowdLevel]!.bg }]}>
+            <Text style={styles.crowdBadgeText}>{CROWD_CONFIG[vendor.crowdLevel]!.label}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.cardBody}>
@@ -92,6 +110,31 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
             <Text style={[styles.reviewCount, { color: colors.mutedForeground }]}>({vendor.reviewCount})</Text>
           ) : null}
         </View>
+
+        {(hasFreeEntry || danceFloorLabel) ? (
+          <View style={[styles.cardRow, { flexWrap: "wrap", gap: 6 }]}>
+            {hasFreeEntry ? (
+              <View style={styles.freeEntryBadge}>
+                <View style={styles.freeEntryDot} />
+                <Text style={styles.freeEntryText}>Free Entry</Text>
+              </View>
+            ) : null}
+            {danceFloorLabel ? (
+              <View style={[styles.danceFloorBadge, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                <Ionicons name="musical-notes-outline" size={10} color={colors.mutedForeground} />
+                <Text style={[styles.danceFloorText, { color: colors.mutedForeground }]}>{danceFloorLabel}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        <Pressable
+          onPress={(e) => { e.stopPropagation(); router.push(`/partner/${vendor.id}` as never); }}
+          style={[styles.bookBtn, { backgroundColor: colors.primary }]}
+        >
+          <Ionicons name="calendar-outline" size={13} color={colors.primaryForeground} />
+          <Text style={[styles.bookBtnText, { color: colors.primaryForeground }]}>Book now</Text>
+        </Pressable>
       </View>
     </Pressable>
   );
@@ -239,4 +282,13 @@ const styles = StyleSheet.create({
   locationText: { fontSize: 12, fontFamily: "Inter_400Regular", flex: 1 },
   ratingText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   reviewCount: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  crowdBadge: { position: "absolute", top: 10, right: 10, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  crowdBadgeText: { fontSize: 9, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.4, color: "#fff" },
+  freeEntryBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: "rgba(34,197,94,0.12)", borderWidth: 1, borderColor: "rgba(34,197,94,0.25)" },
+  freeEntryDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: "#22c55e" },
+  freeEntryText: { fontSize: 9, fontFamily: "Inter_600SemiBold", color: "#22c55e", textTransform: "uppercase", letterSpacing: 0.3 },
+  danceFloorBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
+  danceFloorText: { fontSize: 10, fontFamily: "Inter_500Medium" },
+  bookBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 20, paddingVertical: 8, marginTop: 6 },
+  bookBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 });

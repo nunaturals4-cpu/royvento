@@ -8,9 +8,11 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import React from "react";
 import {
   ActivityIndicator,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -25,6 +27,8 @@ import { useColors } from "@/hooks/useColors";
 // Mirror of the web /organizers/:slug page. Shows the organizer plus their
 // upcoming & past events; each event opens /organizer-events/:slug.
 
+const WEB_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com"}`;
+
 interface Organizer {
   id: number; name: string; slug: string; description: string;
   logoUrl: string; coverImageUrl: string; website: string;
@@ -34,9 +38,11 @@ interface Organizer {
 interface PublicEvent {
   id: number; title: string; slug: string; category: string; shortDescription: string;
   coverImageUrl: string; city: string; startDate: string | null; startTime: string;
+  galleryImages: string[] | null;
 }
+interface Review { id: number; userId: number; rating: number; comment: string; createdAt: string; }
 interface Stats { totalEvents: number; ticketsSold: number; avgRating: number; reviewCount: number; }
-interface ProfilePayload { organizer: Organizer; upcoming: PublicEvent[]; past: PublicEvent[]; stats: Stats; }
+interface ProfilePayload { organizer: Organizer; upcoming: PublicEvent[]; past: PublicEvent[]; reviews: Review[]; stats: Stats; }
 
 function eventDate(d: string | null) {
   if (!d) return "Date TBA";
@@ -80,7 +86,17 @@ export default function OrganizerProfileScreen() {
     );
   }
 
-  const { organizer, upcoming, past, stats } = data;
+  const { organizer, upcoming, past, reviews, stats } = data;
+  const gallery = [...upcoming, ...past].flatMap((e) => e.galleryImages || []).slice(0, 12);
+
+  async function handleShare() {
+    try { await Share.share({ title: organizer.name, message: `Check out ${organizer.name} on Royvento!\n\n${WEB_BASE}/organizers/${organizer.slug}` }); }
+    catch { /* share dismissed or failed — no-op */ }
+  }
+  function openSocial(href: string) {
+    const url = /^https?:\/\//.test(href) ? href : `https://${href}`;
+    Linking.openURL(url);
+  }
 
   const renderEvent = (e: PublicEvent) => (
     <Pressable
@@ -155,12 +171,32 @@ export default function OrganizerProfileScreen() {
           <StatBox label="Reviews" value={String(stats.reviewCount)} />
         </View>
 
-        <View style={{ paddingHorizontal: 20, marginTop: 16, alignItems: "flex-start" }}>
+        <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: 20, marginTop: 16, alignItems: "center" }}>
           <FollowButton targetType="organizer" targetId={organizer.id} name={organizer.name} />
+          <Pressable onPress={handleShare} style={[styles.shareBtn, { borderColor: colors.border }]}>
+            <Ionicons name="share-social-outline" size={16} color={colors.foreground} />
+          </Pressable>
         </View>
 
         {!!organizer.description && (
           <Text style={[styles.description, { color: colors.mutedForeground }]}>{organizer.description}</Text>
+        )}
+
+        {(!!organizer.website || !!organizer.instagram || !!organizer.facebook || !!organizer.youtube || !!organizer.supportEmail) && (
+          <View style={[styles.section, { marginTop: 20 }]}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Connect</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {!!organizer.website && <SocialChip icon="globe-outline" label="Website" onPress={() => openSocial(organizer.website)} colors={colors} />}
+              {!!organizer.instagram && <SocialChip icon="logo-instagram" label="Instagram" onPress={() => openSocial(organizer.instagram)} colors={colors} />}
+              {!!organizer.facebook && <SocialChip icon="logo-facebook" label="Facebook" onPress={() => openSocial(organizer.facebook)} colors={colors} />}
+              {!!organizer.youtube && <SocialChip icon="logo-youtube" label="YouTube" onPress={() => openSocial(organizer.youtube)} colors={colors} />}
+            </View>
+            {!!organizer.supportEmail && (
+              <Pressable onPress={() => Linking.openURL(`mailto:${organizer.supportEmail}`)}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13, marginTop: 10 }}>{organizer.supportEmail}</Text>
+              </Pressable>
+            )}
+          </View>
         )}
 
         {upcoming.length > 0 && (
@@ -181,10 +217,48 @@ export default function OrganizerProfileScreen() {
           </View>
         )}
 
+        {gallery.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Gallery</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              {gallery.map((src, i) => (
+                <View key={i} style={styles.galleryThumb}>
+                  <Image source={{ uri: resolveImageUrl(src) }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {reviews.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Reviews & ratings</Text>
+            {reviews.map((r) => (
+              <View key={r.id} style={[styles.reviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={{ flexDirection: "row", gap: 2, marginBottom: 4 }}>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Ionicons key={i} name={i < r.rating ? "star" : "star-outline"} size={13} color="#f59e0b" />
+                  ))}
+                </View>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>{r.comment || "—"}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         <MobileFooter />
         <View style={{ height: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }} />
       </ScrollView>
     </View>
+  );
+}
+
+function SocialChip({ icon, label, onPress, colors }: { icon: React.ComponentProps<typeof Ionicons>["name"]; label: string; onPress: () => void; colors: ReturnType<typeof useColors> }) {
+  return (
+    <Pressable onPress={onPress} style={{ flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 }}>
+      <Ionicons name={icon} size={14} color={colors.mutedForeground} />
+      <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -221,4 +295,7 @@ const styles = StyleSheet.create({
   eventBody: { flex: 1, padding: 12, gap: 4 },
   eventCat: { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 1 },
   eventTitle: { fontSize: 15, fontFamily: "Inter_700Bold", lineHeight: 20 },
+  shareBtn: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  galleryThumb: { width: "31.5%", aspectRatio: 1, borderRadius: 10, overflow: "hidden" },
+  reviewCard: { borderRadius: 14, borderWidth: 1, padding: 12 },
 });

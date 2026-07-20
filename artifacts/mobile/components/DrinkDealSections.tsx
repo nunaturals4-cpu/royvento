@@ -182,13 +182,18 @@ export function VipTableBookingSection({ vendors }: { vendors: VendorWithPlans[]
 export function splitVendorsByPlanType(
   offers: VendorDrinkOffer[],
   genderFilter?: "" | "female" | "other",
+  dayFilter?: string,
 ): { freeVendors: VendorWithPlans[]; ticketVendors: VendorWithPlans[]; coverChargeVendors: VendorWithPlans[]; vipTableVendors: VendorWithPlans[] } {
   const genderMatch = (p: DrinkPlanSummary) => !genderFilter || (genderFilter === "female" ? p.gender === "female" : p.gender !== "female");
+  // Keeps a vendor if ANY of its plans run on the selected day — mirrors web's
+  // dayFilter semantics (a vendor-level filter, not a per-plan one like gender).
+  const dayMatch = (v: VendorWithPlans) => !dayFilter || v.plans.some((p) => Array.isArray(p.days) && p.days.includes(dayFilter));
 
   const byType = (type: string) =>
     offers
       .map((offer) => ({ offer, plans: offer.plans.filter((p) => p.type === type && genderMatch(p)) }))
-      .filter((v) => v.plans.length > 0);
+      .filter((v) => v.plans.length > 0)
+      .filter(dayMatch);
 
   return {
     freeVendors: [...byType("welcome"), ...byType("unlimited")].reduce<VendorWithPlans[]>((acc, cur) => {

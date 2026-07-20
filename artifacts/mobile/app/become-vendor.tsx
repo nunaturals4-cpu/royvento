@@ -26,9 +26,17 @@ const CATEGORIES = [
   "Pub",
   "Club",
   "Pub & Club",
+  "Pub & Bar",
   "Event Organizer",
   "Game Organizer",
 ];
+
+const CATEGORY_HINTS: Record<string, string> = {
+  "Event Organizer": "Unlocks the Event Organizer dashboard for ticketed events you host across venues.",
+  "Game Organizer": "Unlocks the Game Organizer dashboard for gaming-venue bookings and packages.",
+};
+
+const PARTNER_ROLES = new Set(["vendor", "organizer", "game_organizer"]);
 
 interface ExistingRequest {
   id: number;
@@ -40,6 +48,10 @@ export default function BecomeVendorScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  // Source of truth for "already a partner" is the live role, not the request
+  // row — an admin-deleted partner (role reset to "user") falls through to the
+  // application form even if a stale "approved" vendor_requests row remains.
+  const isPartner = user?.role != null && PARTNER_ROLES.has(user.role);
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
   const [businessName, setBusinessName] = useState("");
@@ -92,7 +104,7 @@ export default function BecomeVendorScreen() {
       });
       Alert.alert(
         "Application Submitted",
-        "Your partner application is under review. You'll be notified once an admin approves it. Your account will be upgraded then.",
+        "Thank you for applying to become a Royvento partner. Our team will review your application within 1 working day. Once approved, your dashboard unlocks automatically based on the category you chose.",
         [{ text: "OK", onPress: () => router.back() }]
       );
     } catch (e: unknown) {
@@ -109,6 +121,36 @@ export default function BecomeVendorScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator color={colors.primary} size="large" />
+      </View>
+    );
+  }
+
+  // Approved state — keyed off the live role, not the request row, so a
+  // revoked partner (role reset to "user") can re-apply even if an old
+  // "approved" request row lingers.
+  if (isPartner) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={[styles.header, { paddingTop: topPadding + 20, backgroundColor: colors.card }]}>
+          <Pressable style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+          </Pressable>
+        </View>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32 }}>
+          <View style={[styles.statusIconWrap, { backgroundColor: colors.primary + "20" }]}>
+            <Ionicons name="checkmark-circle-outline" size={40} color={colors.primary} />
+          </View>
+          <Text style={[styles.statusTitle, { color: colors.foreground }]}>You're already a partner!</Text>
+          <Text style={[styles.statusSub, { color: colors.mutedForeground }]}>
+            Your application was approved. Go to your vendor dashboard to manage your listing.
+          </Text>
+          <TouchableOpacity
+            style={[styles.backBtnLarge, { borderColor: colors.primary, backgroundColor: colors.primary }]}
+            onPress={() => router.push("/vendor/dashboard" as never)}
+          >
+            <Text style={[styles.backBtnText, { color: colors.primaryForeground }]}>Go to Dashboard</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -142,34 +184,6 @@ export default function BecomeVendorScreen() {
             onPress={() => router.back()}
           >
             <Text style={[styles.backBtnText, { color: colors.foreground }]}>Back to Profile</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  // Approved state
-  if (existingRequest?.status === "approved") {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <View style={[styles.header, { paddingTop: topPadding + 20, backgroundColor: colors.card }]}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={22} color={colors.foreground} />
-          </Pressable>
-        </View>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32 }}>
-          <View style={[styles.statusIconWrap, { backgroundColor: colors.primary + "20" }]}>
-            <Ionicons name="checkmark-circle-outline" size={40} color={colors.primary} />
-          </View>
-          <Text style={[styles.statusTitle, { color: colors.foreground }]}>You're already a partner!</Text>
-          <Text style={[styles.statusSub, { color: colors.mutedForeground }]}>
-            Your application was approved. Go to your vendor dashboard to manage your listing.
-          </Text>
-          <TouchableOpacity
-            style={[styles.backBtnLarge, { borderColor: colors.primary, backgroundColor: colors.primary }]}
-            onPress={() => router.push("/vendor/dashboard" as never)}
-          >
-            <Text style={[styles.backBtnText, { color: colors.primaryForeground }]}>Go to Dashboard</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -269,6 +283,9 @@ export default function BecomeVendorScreen() {
                 ))}
               </View>
             </ScrollView>
+            {CATEGORY_HINTS[category] ? (
+              <Text style={[styles.categoryHint, { color: colors.mutedForeground }]}>{CATEGORY_HINTS[category]}</Text>
+            ) : null}
           </View>
 
           <View style={styles.field}>
@@ -295,7 +312,7 @@ export default function BecomeVendorScreen() {
         <View style={[styles.noteCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
           <Text style={[styles.noteText, { color: colors.mutedForeground }]}>
-            Applications are reviewed within 2–3 business days. You'll receive a notification once approved.
+            Applications are reviewed within 1 working day. You'll receive a notification once approved.
           </Text>
         </View>
 
@@ -339,6 +356,7 @@ const styles = StyleSheet.create({
   textarea: { minHeight: 100, paddingTop: 12 },
   categoryChip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
   categoryText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  categoryHint: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 8, lineHeight: 17 },
   noteCard: { marginHorizontal: 20, marginBottom: 20, borderRadius: 14, borderWidth: 1, padding: 14, flexDirection: "row", gap: 10, alignItems: "flex-start" },
   noteText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
   submitBtn: { marginHorizontal: 20, borderRadius: 16, paddingVertical: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },

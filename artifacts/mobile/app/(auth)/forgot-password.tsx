@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
+import { getEmailError } from "@workspace/validators";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -30,8 +31,9 @@ export default function ForgotPasswordScreen() {
 
   async function handleSubmit() {
     setEmailError("");
-    if (!email.trim()) {
-      setEmailError(t("auth.enter_email"));
+    const emailErr = getEmailError(email);
+    if (emailErr) {
+      setEmailError(emailErr);
       return;
     }
     setLoading(true);

@@ -59,9 +59,13 @@ function groupByLetter(cities: string[]): { title: string; data: string[] }[] {
     .map((letter) => ({ title: letter, data: groups[letter] }));
 }
 
+class LocationDetectionError extends Error {}
+
 async function detectCityFromLocation(): Promise<string> {
   const { status } = await Location.requestForegroundPermissionsAsync();
-  if (status !== "granted") return "";
+  if (status !== "granted") {
+    throw new LocationDetectionError("Location permission denied. Enable it in your device settings to auto-detect your city.");
+  }
   const coords = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
   const [place] = await Location.reverseGeocodeAsync({
     latitude: coords.coords.latitude,
@@ -76,7 +80,7 @@ async function detectCityFromLocation(): Promise<string> {
       ALL_CITIES.find((c) => normalized(c).includes(normalized(candidate)));
     if (match) return match;
   }
-  return "";
+  throw new LocationDetectionError("Couldn't determine your area from GPS. Please search for your city below.");
 }
 
 export function CityPickerSheet({ visible, onClose, selectedCity, onSelect }: Props) {
@@ -84,6 +88,7 @@ export function CityPickerSheet({ visible, onClose, selectedCity, onSelect }: Pr
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
   const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
 
   const filteredCities = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -109,14 +114,14 @@ export function CityPickerSheet({ visible, onClose, selectedCity, onSelect }: Pr
 
   async function handleUseMyLocation() {
     setLocating(true);
+    setLocationError("");
     try {
       const city = await detectCityFromLocation();
-      if (city) {
-        onSelect(city);
-        setQuery("");
-        onClose();
-      }
-    } catch {
+      onSelect(city);
+      setQuery("");
+      onClose();
+    } catch (e) {
+      setLocationError(e instanceof LocationDetectionError ? e.message : "Couldn't detect your location. Please try again or search for your city below.");
     } finally {
       setLocating(false);
     }
@@ -214,6 +219,13 @@ export function CityPickerSheet({ visible, onClose, selectedCity, onSelect }: Pr
               </TouchableOpacity>
             ) : null}
           </View>
+
+          {locationError ? (
+            <View style={[styles.locationErrorBox, { backgroundColor: "#f59e0b15", borderColor: "#f59e0b40" }]}>
+              <Ionicons name="alert-circle-outline" size={14} color="#f59e0b" />
+              <Text style={styles.locationErrorText}>{locationError}</Text>
+            </View>
+          ) : null}
 
           {isSearching ? (
             <FlatList
@@ -411,6 +423,22 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
+  },
+  locationErrorBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+  },
+  locationErrorText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: "#f59e0b",
+    lineHeight: 15,
   },
   list: {
     flex: 1,

@@ -3,7 +3,7 @@ import { useRegister } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useRef, useState } from "react";
-import { getEmailError, getPasswordError } from "@workspace/validators";
+import { getEmailError, getPasswordError, getIndianPhoneError, normalizeIndianPhone, PASSWORD_RULES } from "@workspace/validators";
 import {
   ActivityIndicator,
   Alert,
@@ -32,14 +32,18 @@ export default function RegisterScreen() {
   const prefillEmail = typeof rawPrefillEmail === "string" ? rawPrefillEmail : "";
   const [name, setName] = useState("");
   const [email, setEmail] = useState(prefillEmail);
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordTouched, setPasswordTouched] = useState(false);
   const [referralCode, setReferralCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [pendingEmail, setPendingEmail] = useState("");
   const [resendBusy, setResendBusy] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string; password?: string }>({});
+  const [duplicateEmail, setDuplicateEmail] = useState(false);
   const nameRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
   const registerMutation = useRegister({
@@ -55,9 +59,10 @@ export default function RegisterScreen() {
         const serverMsg = err?.data?.error ?? err?.message ?? "";
         const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
         if (Object.keys(fe).length > 0) {
-          setErrors((p) => ({ ...p, ...(fe.name ? { name: fe.name } : {}), ...(fe.email ? { email: fe.email } : {}), ...(fe.password ? { password: fe.password } : {}) }));
+          setErrors((p) => ({ ...p, ...(fe.name ? { name: fe.name } : {}), ...(fe.email ? { email: fe.email } : {}), ...(fe.phone ? { phone: fe.phone } : {}), ...(fe.password ? { password: fe.password } : {}) }));
           if (fe.name) nameRef.current?.focus();
           else if (fe.email) emailRef.current?.focus();
+          else if (fe.phone) phoneRef.current?.focus();
           else if (fe.password) passwordRef.current?.focus();
           return;
         }
@@ -70,9 +75,10 @@ export default function RegisterScreen() {
         }
         const isDuplicate = status === 409 || /already in use|already exists/i.test(serverMsg);
         if (isDuplicate) {
+          setDuplicateEmail(true);
           setErrors((p) => ({
             ...p,
-            email: "An account with this email already exists. Tap “Sign In” below to log in.",
+            email: "An account with this email already exists.",
           }));
           emailRef.current?.focus();
         } else {
@@ -83,24 +89,28 @@ export default function RegisterScreen() {
   });
 
   const handleRegister = () => {
+    setDuplicateEmail(false);
     const next: typeof errors = {};
     if (!name.trim()) next.name = "Name is required.";
     const emailErr = getEmailError(email);
     if (emailErr) next.email = emailErr;
+    const phoneErr = getIndianPhoneError(phone, { required: false });
+    if (phoneErr) next.phone = phoneErr;
     const pwErr = getPasswordError(password);
     if (pwErr) next.password = pwErr;
     setErrors(next);
     if (next.name) { nameRef.current?.focus(); return; }
     if (next.email) { emailRef.current?.focus(); return; }
+    if (next.phone) { phoneRef.current?.focus(); return; }
     if (next.password) { passwordRef.current?.focus(); return; }
-    registerMutation.mutate({
-      data: {
-        name: name.trim(),
-        email: email.trim(),
-        password,
-        ...(referralCode.trim() ? { referralCode: referralCode.trim().toUpperCase() } : {}),
-      },
-    });
+    const payload: Record<string, unknown> = {
+      name: name.trim(),
+      email: email.trim(),
+      password,
+      ...(phone.trim() ? { phone: normalizeIndianPhone(phone) } : {}),
+      ...(referralCode.trim() ? { referralCode: referralCode.trim().toUpperCase() } : {}),
+    };
+    registerMutation.mutate({ data: payload as unknown as Parameters<typeof registerMutation.mutate>[0]["data"] });
   };
 
   const handleResend = async () => {
@@ -244,7 +254,38 @@ export default function RegisterScreen() {
                 autoCorrect={false}
               />
             </View>
-            {errors.email ? <Text style={[styles.errorText, { color: colors.destructive }]}>{errors.email}</Text> : null}
+            {errors.email ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <Text style={[styles.errorText, { color: colors.destructive }]}>{errors.email}</Text>
+                {duplicateEmail ? (
+                  <TouchableOpacity onPress={() => router.push({ pathname: "/(auth)/login", params: { email } } as never)}>
+                    <Text style={[styles.errorText, { color: colors.primary, textDecorationLine: "underline" }]}>Sign in instead</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.field}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={[styles.label, { color: colors.mutedForeground }]}>{t("auth.phone")}</Text>
+              <Text style={[styles.label, { color: colors.mutedForeground, opacity: 0.6, textTransform: "none" }]}>{t("auth.optional")}</Text>
+            </View>
+            <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: errors.phone ? colors.destructive : colors.border }]}>
+              <Ionicons name="call-outline" size={16} color={colors.mutedForeground} />
+              <TextInput
+                ref={phoneRef}
+                style={[styles.input, { color: colors.foreground }]}
+                value={phone}
+                onChangeText={(v) => { setPhone(v); if (errors.phone) setErrors((p) => ({ ...p, phone: undefined })); }}
+                placeholder="10-digit mobile number"
+                placeholderTextColor={colors.mutedForeground}
+                keyboardType="phone-pad"
+                autoCorrect={false}
+                returnKeyType="next"
+              />
+            </View>
+            {errors.phone ? <Text style={[styles.errorText, { color: colors.destructive }]}>{errors.phone}</Text> : null}
           </View>
 
           <View style={styles.field}>
@@ -255,7 +296,7 @@ export default function RegisterScreen() {
                 ref={passwordRef}
                 style={[styles.input, { color: colors.foreground }]}
                 value={password}
-                onChangeText={(v) => { setPassword(v); if (errors.password) setErrors((p) => ({ ...p, password: undefined })); }}
+                onChangeText={(v) => { setPassword(v); setPasswordTouched(true); if (errors.password) setErrors((p) => ({ ...p, password: undefined })); }}
                 placeholder={t("auth.password_min")}
                 placeholderTextColor={colors.mutedForeground}
                 secureTextEntry={!showPassword}
@@ -272,6 +313,25 @@ export default function RegisterScreen() {
               </Pressable>
             </View>
             {errors.password ? <Text style={[styles.errorText, { color: colors.destructive }]}>{errors.password}</Text> : null}
+            {passwordTouched && password.length > 0 ? (
+              <View style={{ gap: 4, marginTop: 4 }}>
+                {PASSWORD_RULES.map((rule) => {
+                  const ok = rule.test(password);
+                  return (
+                    <View key={rule.id} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons
+                        name={ok ? "checkmark-circle" : "ellipse-outline"}
+                        size={12}
+                        color={ok ? "#22c55e" : colors.mutedForeground}
+                      />
+                      <Text style={{ fontSize: 11, color: ok ? "#22c55e" : colors.mutedForeground, fontFamily: "Inter_400Regular" }}>
+                        {rule.label}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.field}>

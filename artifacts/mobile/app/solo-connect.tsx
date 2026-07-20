@@ -11,6 +11,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Share,
   Text,
   TextInput,
   TouchableOpacity,
@@ -19,6 +20,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { uploadImageToStorage } from "@/lib/uploadImage";
+
+const WEB_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com"}`;
 
 // ─── Types (mirror the SoloConnect API responses) ────────────────────────────
 interface SoloAccess {
@@ -52,6 +55,8 @@ interface SoloGroup {
   description?: string;
   groupDate?: string;
   startTime?: string;
+  visibility?: "public" | "private";
+  inviteToken?: string;
 }
 interface SoloMessage {
   id: number;
@@ -435,6 +440,7 @@ function CreateGroupModal({ c, city, onClose }: { c: ReturnType<typeof useColors
   const [description, setDescription] = useState("");
   const [maxMembers, setMaxMembers] = useState(8);
   const [genderType, setGenderType] = useState<string>("mixed");
+  const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [busy, setBusy] = useState(false);
 
   // Venue suggestions for the chosen activity type.
@@ -464,7 +470,7 @@ function CreateGroupModal({ c, city, onClose }: { c: ReturnType<typeof useColors
           name: name.trim(), activityType, activityLabel: activityLabel.trim(),
           venueName: venueName.trim(), vendorId: venueVendorId, eventId: venueEventId,
           groupDate: groupDate || undefined, startTime: startTime || undefined,
-          description: description.trim(), maxMembers, visibility: "public", genderType,
+          description: description.trim(), maxMembers, visibility, genderType,
           city, country: "India",
         }),
       });
@@ -554,6 +560,23 @@ function CreateGroupModal({ c, city, onClose }: { c: ReturnType<typeof useColors
             })}
           </View>
 
+          <Label c={c}>Visibility</Label>
+          <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+            {([
+              { value: "public" as const, label: "Public", sub: "Anyone can request to join" },
+              { value: "private" as const, label: "Private", sub: "Invite link only" },
+            ]).map((o) => {
+              const active = visibility === o.value;
+              return (
+                <TouchableOpacity key={o.value} onPress={() => setVisibility(o.value)}
+                  style={{ flex: 1, padding: 12, borderRadius: 10, borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primary + "1f" : c.muted }}>
+                  <Text style={{ color: active ? c.text : c.mutedForeground, fontWeight: "700", fontSize: 13 }}>{o.label}</Text>
+                  <Text style={{ color: active ? c.primary : c.mutedForeground, fontSize: 10, marginTop: 2 }}>{o.sub}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           <View style={{ flexDirection: "row", gap: 10 }}>
             <SecondaryBtn c={c} label="Cancel" onPress={() => onClose(false)} flex />
             <PrimaryBtn c={c} label={busy ? "Creating…" : "Create group"} onPress={submit} disabled={busy} flex />
@@ -606,12 +629,28 @@ function GroupDetailModal({ c, groupId, city, onClose }: { c: ReturnType<typeof 
   const isAdmin = group?.isAdmin ?? false;
   const myStatus = group?.myMembershipStatus ?? null;
   const joined = myStatus === "approved" || isAdmin;
+  const isPrivate = group?.visibility === "private";
+
+  async function shareGroup() {
+    if (!group) return;
+    const base = `${WEB_BASE}/solo-connect?group=${group.id}`;
+    const shareUrl = isAdmin && isPrivate && group.inviteToken ? `${base}&invite=${group.inviteToken}` : base;
+    try {
+      await Share.share({
+        title: group.name,
+        message: `${isPrivate ? `You're invited to "${group.name}"` : `Join "${group.name}"`} on Royvento!\n\n${shareUrl}`,
+      });
+    } catch { /* share dismissed or failed — no-op */ }
+  }
 
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: c.background, paddingTop: insets.top }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, gap: 8 }}>
           <Text style={{ color: c.text, fontSize: 18, fontWeight: "700", flex: 1 }} numberOfLines={1}>{group?.name ?? "Group"}</Text>
+          {!!group && (
+            <Pressable onPress={shareGroup} hitSlop={8}><Ionicons name="share-social-outline" size={22} color={c.primary} /></Pressable>
+          )}
           <Pressable onPress={onClose}><Ionicons name="close" size={26} color={c.text} /></Pressable>
         </View>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40 }}>
@@ -621,6 +660,12 @@ function GroupDetailModal({ c, groupId, city, onClose }: { c: ReturnType<typeof 
                 <Text style={{ color: c.mutedForeground }}>👨 {group.menCount}</Text>
                 <Text style={{ color: c.mutedForeground }}>👩 {group.womenCount}</Text>
                 <Text style={{ color: c.primary }}>{group.memberCount}/{group.maxMembers} members</Text>
+                {isPrivate && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                    <Ionicons name="lock-closed" size={11} color="#fbbf24" />
+                    <Text style={{ color: "#fbbf24", fontSize: 12 }}>Private</Text>
+                  </View>
+                )}
               </View>
 
               {!!group.description && <Text style={{ color: c.mutedForeground, fontSize: 13, marginBottom: 14, lineHeight: 19 }}>{group.description}</Text>}

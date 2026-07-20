@@ -9,6 +9,7 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   NativeScrollEvent,
@@ -26,7 +27,19 @@ import { CoverChargeSection, FreeDrinkSection, splitVendorsByPlanType, TicketSec
 import { EmptyState } from "@/components/EmptyState";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
+import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+
+const DAYS_OF_WEEK = [
+  { key: "", label: "All Days" },
+  { key: "Mon", label: "Monday" },
+  { key: "Tue", label: "Tuesday" },
+  { key: "Wed", label: "Wednesday" },
+  { key: "Thu", label: "Thursday" },
+  { key: "Fri", label: "Friday" },
+  { key: "Sat", label: "Saturday" },
+  { key: "Sun", label: "Sunday" },
+] as const;
 
 interface Announcement {
   id: number;
@@ -45,6 +58,84 @@ interface Announcement {
 
 const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
 const ANN_EVENT_TYPES = ["Ladies Night", "DJ Night", "Live Music", "Karaoke", "Open Bar", "Theme Party", "Open Mic", "Brunch", "Pool Party", "Sufi Night"];
+
+interface AllDrinkDeal {
+  id: number;
+  vendorId: number;
+  category: "food" | "drink" | "exclusive" | string;
+  title: string;
+  description?: string;
+  discountType: "percent" | "fixed" | "bogo" | "free_item" | string;
+  discountValue: string | number;
+  freeItemName?: string;
+  gender: string;
+  days: string[];
+  timeFrom?: string;
+  timeTo?: string;
+  vendorName: string;
+  vendorCity?: string;
+  vendorCoverImage?: string;
+}
+
+function discountHero(deal: AllDrinkDeal): { eyebrow: string; value: string } {
+  const amount = Number(deal.discountValue) || 0;
+  if (deal.discountType === "percent") return { eyebrow: "Flat", value: `${amount}% OFF` };
+  if (deal.discountType === "fixed") return { eyebrow: "Flat", value: `₹${amount} OFF` };
+  if (deal.discountType === "bogo") return { eyebrow: "Offer", value: "Buy 1 Get 1" };
+  if (deal.discountType === "free_item") return { eyebrow: "Free", value: deal.freeItemName || "Item" };
+  return { eyebrow: "Offer", value: deal.category === "exclusive" ? "Exclusive" : "Special" };
+}
+
+function DiscountDealCard({ deal, colors, accent }: { deal: AllDrinkDeal; colors: ReturnType<typeof useColors>; accent: string }) {
+  const { eyebrow, value } = discountHero(deal);
+  const timeLabel = deal.timeFrom && deal.timeTo ? `${deal.timeFrom} – ${deal.timeTo}` : deal.timeFrom || "";
+  return (
+    <Pressable
+      onPress={() => router.push(`/partner/${deal.vendorId}` as never)}
+      style={[styles.discountCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <View style={[styles.discountBadge, { backgroundColor: accent + "20" }]}>
+          <Text style={[styles.discountEyebrow, { color: accent }]}>{eyebrow}</Text>
+          <Text style={[styles.discountValue, { color: accent }]}>{value}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.discountTitle, { color: colors.foreground }]} numberOfLines={1}>{deal.title}</Text>
+          <Text style={[styles.discountVendor, { color: colors.mutedForeground }]} numberOfLines={1}>{deal.vendorName}{deal.vendorCity ? ` · ${deal.vendorCity}` : ""}</Text>
+        </View>
+      </View>
+      {deal.description ? (
+        <Text style={[styles.discountDesc, { color: colors.mutedForeground }]} numberOfLines={2}>{deal.description}</Text>
+      ) : null}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 6 }}>
+        {deal.gender === "female" ? (
+          <View style={[styles.discountTag, { borderColor: colors.border }]}><Text style={[styles.discountTagText, { color: colors.mutedForeground }]}>Ladies</Text></View>
+        ) : null}
+        {timeLabel ? (
+          <View style={[styles.discountTag, { borderColor: colors.border }]}><Text style={[styles.discountTagText, { color: colors.mutedForeground }]}>{timeLabel}</Text></View>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
+function DiscountPanel({ deals, title, subtitle, icon, accent, colors }: { deals: AllDrinkDeal[]; title: string; subtitle: string; icon: React.ComponentProps<typeof Ionicons>["name"]; accent: string; colors: ReturnType<typeof useColors> }) {
+  if (deals.length === 0) return null;
+  return (
+    <View style={{ marginBottom: 24 }}>
+      <View style={[styles.sectionHeader, { paddingHorizontal: 20 }]}>
+        <Ionicons name={icon} size={14} color={accent} />
+        <View>
+          <Text style={[styles.sectionTitle, { color: accent }]}>{title}</Text>
+          <Text style={[styles.discountSubtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>
+        </View>
+      </View>
+      <View style={{ paddingHorizontal: 20, gap: 10 }}>
+        {deals.map((d) => <DiscountDealCard key={d.id} deal={d} colors={colors} accent={accent} />)}
+      </View>
+    </View>
+  );
+}
 
 const DEAL_TYPE_LABELS: Record<string, string> = {
   welcome: "Free Drink",
@@ -425,11 +516,33 @@ export default function PubOffersScreen() {
     queryFn: () => customFetch<Announcement[]>("/api/announcements/recent"),
   });
 
+  const { data: allDrinkDeals = [], refetch: refetchDiscounts } = useQuery<AllDrinkDeal[]>({
+    queryKey: ["vendors", "all-drink-deals"],
+    queryFn: () => customFetch<AllDrinkDeal[]>("/api/vendors/all-drink-deals"),
+  });
+  const { user } = useAuth();
+
+  const handleNotifyMe = useCallback(async () => {
+    if (user) {
+      try {
+        const sub = await customFetch<{ planType: string; status: string } | null>("/api/subscriptions/me");
+        if (sub && sub.status === "active") {
+          Alert.alert("You're all set!", "We'll send you exclusive coupons and happy-hour alerts. Watch out for something special!");
+          return;
+        }
+      } catch {
+        // fall through to subscription page
+      }
+    }
+    router.push("/subscription" as never);
+  }, [user]);
+
   const [dealGenderFilter, setDealGenderFilter] = useState<"" | "female" | "other">("");
+  const [dealDayFilter, setDealDayFilter] = useState("");
   const [annGenreFilter, setAnnGenreFilter] = useState("");
   const [annEventTypeFilter, setAnnEventTypeFilter] = useState("");
 
-  const { freeVendors, ticketVendors, coverChargeVendors, vipTableVendors } = splitVendorsByPlanType(drinkOffers as VendorDrinkOffer[], dealGenderFilter);
+  const { freeVendors, ticketVendors, coverChargeVendors, vipTableVendors } = splitVendorsByPlanType(drinkOffers as VendorDrinkOffer[], dealGenderFilter, dealDayFilter);
   const totalDeals = freeVendors.length + ticketVendors.length + coverChargeVendors.length + vipTableVendors.length;
 
   const filteredAnnouncements = announcements.filter((a) => {
@@ -437,6 +550,10 @@ export default function PubOffersScreen() {
     if (annEventTypeFilter && a.eventType !== annEventTypeFilter) return false;
     return true;
   });
+
+  const foodDeals = allDrinkDeals.filter((d) => d.category === "food");
+  const drinkDiscounts = allDrinkDeals.filter((d) => d.category === "drink");
+  const exclusiveDeals = allDrinkDeals.filter((d) => d.category === "exclusive");
 
   const onRefresh = useCallback(() => {
     refetchDeals();
@@ -530,6 +647,24 @@ export default function PubOffersScreen() {
                 />
               </ScrollView>
 
+              {/* Filters: which day */}
+              <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Day</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipRow}
+              >
+                {DAYS_OF_WEEK.map((d) => (
+                  <FilterChip
+                    key={d.key || "all"}
+                    label={d.label}
+                    active={dealDayFilter === d.key}
+                    onPress={() => setDealDayFilter(dealDayFilter === d.key ? "" : d.key)}
+                    accent="primary"
+                  />
+                ))}
+              </ScrollView>
+
               {totalDeals === 0 ? (
                 <Text style={[styles.noMatchText, { color: colors.mutedForeground }]}>No deals match these filters.</Text>
               ) : (
@@ -542,6 +677,32 @@ export default function PubOffersScreen() {
               )}
             </View>
           ) : null}
+
+          {/* Food Discounts + Drink Discounts + Exclusive Offers — vendor_offers,
+              a separate feed from the drink-plan sections above. */}
+          {exclusiveDeals.length > 0 ? (
+            <DiscountPanel deals={exclusiveDeals} title="Exclusive Offers" subtitle="Curated perks beyond food & drink" icon="sparkles-outline" accent="#a855f7" colors={colors} />
+          ) : null}
+          {foodDeals.length > 0 ? (
+            <DiscountPanel deals={foodDeals} title="Food Discounts" subtitle="Chef specials & prix-fixe savings" icon="restaurant-outline" accent="#f59e0b" colors={colors} />
+          ) : null}
+          {drinkDiscounts.length > 0 ? (
+            <DiscountPanel deals={drinkDiscounts} title="Drink Discounts" subtitle="Signature pours at member prices" icon="wine-outline" accent="#22c55e" colors={colors} />
+          ) : null}
+
+          {/* Notify Me — subscription CTA banner */}
+          <Pressable onPress={handleNotifyMe} style={[styles.notifyBanner, { borderColor: colors.primary + "40" }]}>
+            <LinearGradient colors={["#d4a85325", "#d4a85308"]} style={StyleSheet.absoluteFill} />
+            <Ionicons name="notifications-outline" size={20} color="#d4a853" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.notifyTitle, { color: colors.foreground }]}>Never miss a deal</Text>
+              <Text style={[styles.notifySub, { color: colors.mutedForeground }]}>Get exclusive coupons & happy-hour alerts</Text>
+            </View>
+            <View style={[styles.notifyBtn, { backgroundColor: "#d4a853" }]}>
+              <Ionicons name="notifications-outline" size={13} color="#000" />
+              <Text style={styles.notifyBtnText}>Notify Me</Text>
+            </View>
+          </Pressable>
 
           {/* What's On — announcements */}
           {hasAnnouncements ? (
@@ -793,6 +954,21 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     paddingVertical: 16,
   },
+  discountSubtitle: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
+  discountCard: { borderRadius: 16, borderWidth: 1, padding: 14, gap: 8 },
+  discountBadge: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, alignItems: "center", minWidth: 64 },
+  discountEyebrow: { fontSize: 8, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 },
+  discountValue: { fontSize: 12, fontFamily: "Inter_700Bold", marginTop: 1 },
+  discountTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  discountVendor: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
+  discountDesc: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  discountTag: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  discountTagText: { fontSize: 10, fontFamily: "Inter_500Medium" },
+  notifyBanner: { flexDirection: "row", alignItems: "center", gap: 12, marginHorizontal: 20, marginBottom: 24, padding: 16, borderRadius: 16, borderWidth: 1, overflow: "hidden" },
+  notifyTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  notifySub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
+  notifyBtn: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8 },
+  notifyBtnText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#000" },
   dealsList: { paddingBottom: 4 },
   dealCard: { borderRadius: 18, borderWidth: 1, overflow: "hidden" },
   pressed: { opacity: 0.88, transform: [{ scale: 0.98 }] },

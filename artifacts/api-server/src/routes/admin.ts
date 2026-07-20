@@ -1242,6 +1242,7 @@ router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
     danceFloor, danceFloorPhotos, menuUrl, menuUrls, barMenuUrls,
     startTime, endTime, happeningTonight, startingSoon, lastMinuteDeal, dealLabel,
     freeEntryForTable, freeEntryForTableDays, freeEntryForTableBeforeTime,
+    disabledGenders, cuisines, facilities, languages, faqs,
   } = req.body as {
     businessName: string;
     category?: string;
@@ -1280,6 +1281,12 @@ router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
     freeEntryForTable?: boolean;
     freeEntryForTableDays?: string[];
     freeEntryForTableBeforeTime?: string | null;
+    // Entry Restrictions + "More venue info" (parity with partner listing form)
+    disabledGenders?: string[];
+    cuisines?: string[];
+    facilities?: string[];
+    languages?: string[];
+    faqs?: { question: string; answer: string }[];
   };
 
   const title = (businessName ?? "").trim();
@@ -1316,6 +1323,18 @@ router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
   const menus = (menuUrls && menuUrls.length > 0) ? menuUrls : (menuUrl ? [menuUrl] : []);
   const barMenus = (barMenuUrls && barMenuUrls.length > 0) ? barMenuUrls : [];
 
+  // Entry Restrictions (disabled genders) + "More venue info" tag arrays / FAQs.
+  const cleanDisabledGenders = Array.isArray(disabledGenders) ? disabledGenders.filter((g) => typeof g === "string") : [];
+  const cleanCuisines = Array.isArray(cuisines) ? cuisines.filter((s) => typeof s === "string") : [];
+  const cleanFacilities = Array.isArray(facilities) ? facilities.filter((s) => typeof s === "string") : [];
+  const cleanLanguages = Array.isArray(languages) ? languages.filter((s) => typeof s === "string") : [];
+  const cleanFaqs = Array.isArray(faqs)
+    ? faqs
+        .filter((f) => f && (typeof f.question === "string" || typeof f.answer === "string"))
+        .map((f) => ({ question: String(f.question ?? "").trim(), answer: String(f.answer ?? "").trim() }))
+        .filter((f) => f.question || f.answer)
+    : [];
+
   try {
     const result = await db.transaction(async (tx) => {
       const [vendor] = await tx
@@ -1344,6 +1363,10 @@ router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
           menuUrl: menus[0] ?? "",
           menuUrls: menus,
           barMenuUrls: barMenus,
+          cuisines: cleanCuisines,
+          facilities: cleanFacilities,
+          languages: cleanLanguages,
+          faqs: cleanFaqs,
         })
         .returning();
 
@@ -1369,6 +1392,7 @@ router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
           galleryImages: galleryImages ?? [],
           galleryVideos: galleryVideo ? [galleryVideo] : [],
           pubEventTypes: pubEventTypes ?? [],
+          disabledGenders: cleanDisabledGenders,
           dayPricing: dayPricing && Object.keys(dayPricing).length > 0 ? dayPricing : null,
           freeEntryRules,
           startTime: startTime ?? "",
@@ -1759,6 +1783,12 @@ router.get("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
     freeEntryForTable: pub?.freeEntryForTable ?? false,
     freeEntryForTableDays: (pub?.freeEntryForTableDays as string[] | null) ?? [],
     freeEntryForTableBeforeTime: pub?.freeEntryForTableBeforeTime ?? "",
+    // Entry Restrictions (pub-event) + "More venue info" (vendor row)
+    disabledGenders: (pub?.disabledGenders as string[] | null) ?? [],
+    cuisines: vendor.cuisines ?? [],
+    facilities: vendor.facilities ?? [],
+    languages: vendor.languages ?? [],
+    faqs: (vendor.faqs as { question: string; answer: string }[] | null) ?? [],
   });
 });
 
@@ -1774,10 +1804,23 @@ router.patch("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
     danceFloor, danceFloorPhotos, menuUrls, barMenuUrls,
     startTime, endTime, happeningTonight, startingSoon, lastMinuteDeal, dealLabel,
     freeEntryForTable, freeEntryForTableDays, freeEntryForTableBeforeTime,
+    disabledGenders, cuisines, facilities, languages, faqs,
   } = req.body as Record<string, unknown>;
 
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, id)).limit(1);
   if (!vendor) { res.status(404).json({ error: "Venue not found" }); return; }
+
+  // Entry Restrictions + "More venue info": only overwrite when the client
+  // actually sent the field (partial PATCH — undefined means "leave as-is").
+  const nextDisabledGenders = Array.isArray(disabledGenders) ? (disabledGenders as unknown[]).filter((g) => typeof g === "string") as string[] : undefined;
+  const nextCuisines = Array.isArray(cuisines) ? (cuisines as unknown[]).filter((s) => typeof s === "string") as string[] : undefined;
+  const nextFacilities = Array.isArray(facilities) ? (facilities as unknown[]).filter((s) => typeof s === "string") as string[] : undefined;
+  const nextLanguages = Array.isArray(languages) ? (languages as unknown[]).filter((s) => typeof s === "string") as string[] : undefined;
+  const nextFaqs = Array.isArray(faqs)
+    ? (faqs as { question?: unknown; answer?: unknown }[])
+        .map((f) => ({ question: String(f?.question ?? "").trim(), answer: String(f?.answer ?? "").trim() }))
+        .filter((f) => f.question || f.answer)
+    : undefined;
 
   // Google Maps Location → parse coordinates for the 25 km radius notifications.
   const mapLocationVal = typeof mapLocation === "string" ? mapLocation : undefined;
@@ -1825,6 +1868,10 @@ router.patch("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
         menuUrl: menus[0] ?? "",
         menuUrls: menus,
         barMenuUrls: barMenus,
+        ...(nextCuisines !== undefined ? { cuisines: nextCuisines } : {}),
+        ...(nextFacilities !== undefined ? { facilities: nextFacilities } : {}),
+        ...(nextLanguages !== undefined ? { languages: nextLanguages } : {}),
+        ...(nextFaqs !== undefined ? { faqs: nextFaqs } : {}),
       }).where(eq(vendorsTable.id, id));
 
       // Keep the denormalized venue name on hosted organizer events in sync.
@@ -1853,6 +1900,7 @@ router.patch("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
           galleryImages: Array.isArray(galleryImages) ? (galleryImages as string[]) : undefined,
           galleryVideos: typeof galleryVideo === "string" ? (galleryVideo ? [galleryVideo] : []) : undefined,
           pubEventTypes: Array.isArray(pubEventTypes) ? (pubEventTypes as string[]) : undefined,
+          disabledGenders: nextDisabledGenders,
           dayPricing: dayPricing && typeof dayPricing === "object" && Object.keys(dayPricing).length > 0 ? (dayPricing as Record<string, { women: number; men: number; couple: number }>) : null,
           freeEntryRules,
           startTime: typeof startTime === "string" ? startTime : undefined,

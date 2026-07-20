@@ -52,6 +52,7 @@ interface DateNightEvent {
   hasDrinkPlans?: boolean;
   freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
   dateNight?: boolean;
+  approvedAt?: string | null;
 }
 
 interface RecentAnnouncement {
@@ -102,17 +103,34 @@ function getPlanLabel(plan: DrinkPlanSummary): string {
   return plan.productName || "Drinks discount";
 }
 
-function sortCityFirst<T extends { location?: string | null }>(
+// Requested local-first discovery order: Pubs → Clubs → Events → Gaming
+// Venues → Stand-Up Shows, then everything else. Mirrors web home.tsx's
+// CATEGORY_PRIORITY so mixed-category rails order identically on both platforms.
+const CATEGORY_PRIORITY: { rank: number; keywords: string[] }[] = [
+  { rank: 0, keywords: ["pub", "bar", "brewery"] },
+  { rank: 1, keywords: ["club", "night", "lounge", "disco"] },
+  { rank: 2, keywords: ["event", "concert", "gig", "live", "music", "festival"] },
+  { rank: 3, keywords: ["game", "gaming", "arcade", "play", "esport"] },
+  { rank: 4, keywords: ["standup", "stand-up", "stand up", "comedy", "drama"] },
+];
+function categoryRank(e: { category?: string; type?: string }): number {
+  const hay = `${e.category ?? ""} ${e.type ?? ""}`.toLowerCase();
+  for (const { rank, keywords } of CATEGORY_PRIORITY) {
+    if (keywords.some((k) => hay.includes(k))) return rank;
+  }
+  return 5;
+}
+
+function sortCityFirst<T extends { location?: string | null; category?: string; type?: string }>(
   items: T[],
   city: string
 ): T[] {
-  if (!city) return items;
+  const ranked = (group: T[]) => [...group].sort((a, b) => categoryRank(a) - categoryRank(b));
+  if (!city) return ranked(items);
   const lower = city.toLowerCase();
-  return [...items].sort((a, b) => {
-    const aMatch = (a.location ?? "").toLowerCase().includes(lower) ? 0 : 1;
-    const bMatch = (b.location ?? "").toLowerCase().includes(lower) ? 0 : 1;
-    return aMatch - bMatch;
-  });
+  const local = items.filter((i) => (i.location ?? "").toLowerCase().includes(lower));
+  const rest = items.filter((i) => !(i.location ?? "").toLowerCase().includes(lower));
+  return [...ranked(local), ...ranked(rest)];
 }
 
 export default function HomeScreen() {
@@ -261,6 +279,8 @@ export default function HomeScreen() {
                 price={item.priceWomen}
                 type="pub"
                 popular={(item as { popular?: boolean }).popular}
+                vendorCategory={(item as { vendorCategory?: string }).vendorCategory}
+                approvedAt={item.approvedAt}
                 rating={item.rating}
                 reviewCount={item.reviewCount}
                 hasDrinkPlans={item.hasDrinkPlans}
@@ -290,6 +310,8 @@ export default function HomeScreen() {
                 location={item.location}
                 price={item.priceWomen}
                 type="pub"
+                vendorCategory={(item as { vendorCategory?: string }).vendorCategory}
+                approvedAt={item.approvedAt}
                 rating={item.rating}
                 reviewCount={item.reviewCount}
                 hasDrinkPlans={item.hasDrinkPlans}
@@ -318,6 +340,25 @@ export default function HomeScreen() {
         );
       })()}
 
+      {/* Promo banner */}
+      <Pressable onPress={() => router.push("/pub-offers" as never)} style={styles.promoBanner}>
+        <Image
+          source={{ uri: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1600&q=70" }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
+        <LinearGradient colors={["rgba(0,0,0,0.35)", "rgba(0,0,0,0.85)"]} style={StyleSheet.absoluteFill} />
+        <View style={styles.promoContent}>
+          <View style={[styles.promoIcon, { backgroundColor: colors.primary }]}>
+            <Ionicons name="megaphone-outline" size={22} color={colors.primaryForeground} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.promoTitle} numberOfLines={2}>Flat 20% OFF on your first booking!</Text>
+            <Text style={styles.promoSub} numberOfLines={2}>New here? Explore tonight's best pubs, clubs & exclusive drink deals.</Text>
+          </View>
+        </View>
+      </Pressable>
+
       {/* Featured Events */}
       {(featured.data?.length ?? 0) > 0 && (
         <Section title={t("home.featured_events")} onSeeAll={() => router.push("/(tabs)/explore")}>
@@ -337,6 +378,8 @@ export default function HomeScreen() {
                 location={item.location}
                 price={item.price}
                 category={item.category}
+                vendorCategory={(item as { vendorCategory?: string }).vendorCategory}
+                approvedAt={item.approvedAt}
                 type={item.type}
                 popular={(item as { popular?: boolean }).popular}
                 rating={item.rating}
@@ -503,6 +546,38 @@ function Section({
 }
 
 const styles = StyleSheet.create({
+  promoBanner: {
+    marginHorizontal: 20,
+    marginVertical: 16,
+    height: 110,
+    borderRadius: 18,
+    overflow: "hidden",
+  },
+  promoContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 16,
+  },
+  promoIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  promoTitle: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
+  },
+  promoSub: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 3,
+  },
   hero: {
     paddingBottom: 16,
     paddingHorizontal: 20,

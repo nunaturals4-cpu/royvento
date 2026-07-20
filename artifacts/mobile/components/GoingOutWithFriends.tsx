@@ -81,6 +81,7 @@ const TYPE_CHIPS: { label: string; value: string }[] = [
   { label: "Pub", value: "pub" },
   { label: "Club", value: "club" },
   { label: "Happy Hours", value: "happy-hours" },
+  { label: "Food & Drinks Offers", value: "food-drink-offers" },
   { label: "Event", value: "event" },
   { label: "DJ Night", value: "dj-night" },
   { label: "Live Music", value: "live-music" },

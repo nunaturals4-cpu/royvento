@@ -8493,6 +8493,48 @@ const CP_GENDERS = [
   { canon: "couple", label: "Couple" },
 ] as const;
 
+// Kept in sync with vendor-dashboard.tsx (partner listing form) so the admin
+// Venues → Create/Edit form offers the same "More venue info" facilities.
+const VENUE_FACILITY_OPTIONS = [
+  "Lunch", "Dinner", "Home delivery", "Full bar available", "Open mic",
+  "Parking available", "DJ", "Stags allowed", "Dance floor", "Nightlife",
+  "Kid friendly", "Private dining area", "Wifi", "Large groups", "Vegetarian",
+  "Live music", "Rooftop", "Outdoor seating", "Card payment", "Valet parking",
+  "Hookah", "Air conditioned", "Wheelchair accessible", "Smoking area",
+];
+
+// Free-text tag input (chips) — mirrors the partner dashboard's VenueTagInput.
+function VenueTagInput({ label, values, onChange, placeholder }: {
+  label: string; values: string[]; onChange: (v: string[]) => void; placeholder: string;
+}) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const t = draft.trim();
+    if (!t) return;
+    if (!values.some((v) => v.toLowerCase() === t.toLowerCase())) onChange([...values, t]);
+    setDraft("");
+  };
+  return (
+    <div>
+      <Label className="mb-2 block text-sm font-medium">{label}</Label>
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {values.map((v) => (
+            <span key={v} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary">
+              {v}
+              <button type="button" onClick={() => onChange(values.filter((x) => x !== v))} className="hover:text-destructive" aria-label={`Remove ${v}`}><X className="h-3 w-3" /></button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} placeholder={placeholder} className="bg-black/40 border-white/10" />
+        <Button type="button" variant="outline" onClick={add}>Add</Button>
+      </div>
+    </div>
+  );
+}
+
 type LookupResult = {
   user: { id: number; name: string; email: string; role: string; signInMethod: string };
   vendor: { id: number; businessName: string; status: string; category: string; city: string; state: string } | null;
@@ -8541,6 +8583,12 @@ interface VenuePayload {
   freeEntryForTable: boolean;
   freeEntryForTableDays: string[];
   freeEntryForTableBeforeTime?: string | null;
+  // Entry Restrictions + "More venue info" (parity with partner listing form)
+  disabledGenders?: string[];
+  cuisines?: string[];
+  facilities?: string[];
+  languages?: string[];
+  faqs?: { question: string; answer: string }[];
 }
 
 interface VenueFormInitial {
@@ -8556,6 +8604,8 @@ interface VenueFormInitial {
   startTime?: string; endTime?: string; happeningTonight?: boolean; startingSoon?: boolean;
   lastMinuteDeal?: boolean; dealLabel?: string;
   freeEntryForTable?: boolean; freeEntryForTableDays?: string[]; freeEntryForTableBeforeTime?: string | null;
+  disabledGenders?: string[]; cuisines?: string[]; facilities?: string[]; languages?: string[];
+  faqs?: { question: string; answer: string }[];
 }
 
 // Create / edit an Event Organizer or Game Organizer from the admin Venues tab.
@@ -9172,6 +9222,12 @@ function VenueForm({
   const [freeEntryForTable, setFreeEntryForTable] = useState(!!initial?.freeEntryForTable);
   const [freeEntryForTableDays, setFreeEntryForTableDays] = useState<string[]>(initial?.freeEntryForTableDays ?? []);
   const [freeEntryForTableBeforeTime, setFreeEntryForTableBeforeTime] = useState(initial?.freeEntryForTableBeforeTime ?? "");
+  // Entry Restrictions + "More venue info" (cuisines/facilities/languages/FAQs).
+  const [disabledGenders, setDisabledGenders] = useState<string[]>(initial?.disabledGenders ?? []);
+  const [cuisines, setCuisines] = useState<string[]>(initial?.cuisines ?? []);
+  const [facilities, setFacilities] = useState<string[]>(initial?.facilities ?? []);
+  const [languages, setLanguages] = useState<string[]>(initial?.languages ?? []);
+  const [faqs, setFaqs] = useState<{ question: string; answer: string }[]>(initial?.faqs ?? []);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -9187,6 +9243,7 @@ function VenueForm({
     setDanceFloor(""); setDanceFloorPhotos([]); setMenuUrls([]); setBarMenuUrls([]);
     setTonightVis(defaultTonightVisibility);
     setFreeEntryForTable(false); setFreeEntryForTableDays([]); setFreeEntryForTableBeforeTime("");
+    setDisabledGenders([]); setCuisines([]); setFacilities([]); setLanguages([]); setFaqs([]);
     setSubmitError("");
   }
 
@@ -9290,6 +9347,12 @@ function VenueForm({
   function toggleFreeEntryDay(d: string) {
     setFreeEntryDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]);
   }
+  function toggleDisabledGender(g: string) {
+    setDisabledGenders((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]);
+  }
+  function toggleFacility(f: string) {
+    setFacilities((prev) => prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]);
+  }
 
   async function handleSubmit(e: any) {
     e.preventDefault();
@@ -9341,6 +9404,11 @@ function VenueForm({
         freeEntryForTable,
         freeEntryForTableDays: freeEntryForTable ? freeEntryForTableDays : [],
         freeEntryForTableBeforeTime: freeEntryForTable ? (freeEntryForTableBeforeTime || null) : null,
+        disabledGenders,
+        cuisines,
+        facilities,
+        languages,
+        faqs: faqs.filter((f) => f.question.trim() || f.answer.trim()),
       });
       if (resetOnSuccess) resetForm();
     } catch (err: any) {
@@ -9604,6 +9672,27 @@ function VenueForm({
             </div>
           </section>
 
+          {/* -- Entry Restrictions ------------------------------------------- */}
+          <section className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 space-y-2.5">
+            <p className="text-sm font-medium flex items-center gap-2 text-red-300">
+              <UserX className="h-4 w-4" />Entry Restrictions
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Disable entry for a gender — booking that tier will be blocked everywhere on Royvento.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {CP_GENDERS.map(({ canon, label }) => (
+                <button key={canon} type="button" onClick={() => toggleDisabledGender(canon)}
+                  className={cn(
+                    "text-xs px-3 py-1.5 rounded-full border transition-colors",
+                    disabledGenders.includes(canon) ? "bg-red-500/20 border-red-500/50 text-red-300" : "border-white/10 text-white/60 hover:bg-white/5",
+                  )}>
+                  {disabledGenders.includes(canon) ? `${label} entry disabled` : `Disable ${label.toLowerCase()} entry`}
+                </button>
+              ))}
+            </div>
+          </section>
+
           {/* -- Free Entry --------------------------------------------------- */}
           <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 overflow-hidden">
             <button type="button" onClick={() => setFreeEntryEnabled((v) => !v)}
@@ -9810,6 +9899,73 @@ function VenueForm({
                     onChange={(e) => handleBarMenuUpload(e.target.files)} />
                 </label>
               )}
+            </div>
+          </section>
+
+          {/* -- More venue info (cuisines / facilities / languages / FAQs) ---- */}
+          <section className="rounded-xl border border-white/8 p-4 space-y-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                <FileText className="h-3.5 w-3.5 text-primary" />More venue info
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Shown on the venue's public profile — cuisines, languages, facilities &amp; FAQs.
+              </p>
+            </div>
+
+            {/* Cuisines */}
+            <VenueTagInput label="Cuisines" values={cuisines} onChange={setCuisines} placeholder="e.g. North Indian, Chinese, Continental" />
+
+            {/* Available facilities */}
+            <div>
+              <Label className="mb-2 block text-sm font-medium">Available facilities</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {VENUE_FACILITY_OPTIONS.map((f) => {
+                  const on = facilities.includes(f);
+                  return (
+                    <button key={f} type="button" onClick={() => toggleFacility(f)}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs transition-colors",
+                        on ? "border-primary bg-primary/10 text-primary" : "border-white/12 text-muted-foreground hover:border-primary/40",
+                      )}>
+                      <span className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                        on ? "border-primary bg-primary text-primary-foreground" : "border-white/25",
+                      )}>
+                        {on && <Check className="h-3 w-3" />}
+                      </span>
+                      <span className="truncate">{f}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Languages */}
+            <VenueTagInput label="Languages" values={languages} onChange={setLanguages} placeholder="e.g. English, Hindi" />
+
+            {/* FAQs */}
+            <div className="space-y-3">
+              <Label className="block text-sm font-medium">Frequently asked questions</Label>
+              {faqs.map((f, idx) => (
+                <div key={idx} className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
+                  <div className="flex gap-2">
+                    <Input value={f.question}
+                      onChange={(e) => setFaqs((prev) => prev.map((x, i) => i === idx ? { ...x, question: e.target.value } : x))}
+                      placeholder="Question" className="bg-black/40 border-white/10" />
+                    <button type="button" onClick={() => setFaqs((prev) => prev.filter((_, i) => i !== idx))}
+                      className="text-muted-foreground hover:text-destructive shrink-0" aria-label="Remove FAQ">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <Textarea value={f.answer}
+                    onChange={(e) => setFaqs((prev) => prev.map((x, i) => i === idx ? { ...x, answer: e.target.value } : x))}
+                    placeholder="Answer" rows={2} className="bg-black/40 border-white/10" />
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" onClick={() => setFaqs((prev) => [...prev, { question: "", answer: "" }])}>
+                <Plus className="h-3.5 w-3.5 mr-1" />Add FAQ
+              </Button>
             </div>
           </section>
 

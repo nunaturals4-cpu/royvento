@@ -66,6 +66,13 @@ const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const VALID_API_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const WEEKEND_DAYS = ["Sat", "Sun"];
+const FACILITY_OPTIONS = [
+  "Lunch", "Dinner", "Home delivery", "Full bar available", "Open mic",
+  "Parking available", "DJ", "Stags allowed", "Dance floor", "Nightlife",
+  "Kid friendly", "Private dining area", "Wifi", "Large groups", "Vegetarian",
+  "Live music", "Rooftop", "Outdoor seating", "Card payment", "Valet parking",
+  "Hookah", "Air conditioned", "Wheelchair accessible", "Smoking area",
+];
 
 const DAY_FULL_NAMES: Record<string, string> = {
   Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday",
@@ -385,6 +392,60 @@ const lineItemForWire = (i: DrinkPlanLineItem): DrinkPlanLineItemWire => ({
 
 const emptyLineItem = (): DrinkPlanLineItem => ({ name: "", qty: 1, discountedPrice: "" });
 
+// Live "real cost vs. package price" preview shown while a partner builds a
+// cover-charge / VIP table package, so they can see exactly how much guests
+// save. Mirrors web's coverSavings()/CoverSavingsSummary.
+function coverSavings(items: DrinkPlanLineItem[], packageRupees: number) {
+  const realCost = items.reduce(
+    (sum, i) => sum + (i.discountedPrice === "" ? 0 : Math.max(0, Number(i.discountedPrice) || 0)) * Math.max(1, i.qty || 1),
+    0,
+  );
+  const pkg = Math.max(0, packageRupees || 0);
+  const savings = Math.max(0, realCost - pkg);
+  const pct = realCost > 0 ? Math.round((savings / realCost) * 100) : 0;
+  return { realCost, pkg, savings, pct, hasValue: realCost > 0 };
+}
+
+function CoverSavingsPreview({ items, packageRupees, colors }: { items: DrinkPlanLineItem[]; packageRupees: string; colors: ReturnType<typeof useColors> }) {
+  const { realCost, pkg, savings, pct, hasValue } = coverSavings(items, Number(packageRupees) || 0);
+  if (!hasValue) {
+    return (
+      <Text style={{ fontSize: 11, color: colors.mutedForeground, fontStyle: "italic", marginTop: 2 }}>
+        Tip: enter the regular price next to each offer to preview how much guests save by buying the package.
+      </Text>
+    );
+  }
+  return (
+    <View style={{ marginTop: 6, borderRadius: 12, borderWidth: 1, borderColor: "#10b98140", backgroundColor: "#10b98112", padding: 12, gap: 6 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+        <Ionicons name="trending-up-outline" size={13} color="#34d399" />
+        <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: "#34d399", textTransform: "uppercase", letterSpacing: 0.5 }}>Savings preview</Text>
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Text style={{ fontSize: 13, color: colors.mutedForeground }}>Real cost (bought separately)</Text>
+        <Text style={{ fontSize: 13, color: colors.mutedForeground, textDecorationLine: "line-through" }}>₹{realCost.toLocaleString("en-IN")}</Text>
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Text style={{ fontSize: 13, color: colors.mutedForeground }}>Package price</Text>
+        <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>₹{pkg.toLocaleString("en-IN")}</Text>
+      </View>
+      <View style={{ height: 1, backgroundColor: colors.border }} />
+      {savings > 0 ? (
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#34d399" }}>Guests save</Text>
+          <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color: "#34d399" }}>
+            ₹{savings.toLocaleString("en-IN")}{pct > 0 ? ` · ${pct}% off` : ""}
+          </Text>
+        </View>
+      ) : (
+        <Text style={{ fontSize: 11, color: "#fbbf24" }}>
+          Your package price is at or above the real cost — lower it below ₹{realCost.toLocaleString("en-IN")} to show guests a saving.
+        </Text>
+      )}
+    </View>
+  );
+}
+
 interface DrinkPlan {
   id: number;
   type: string;
@@ -403,13 +464,13 @@ interface DrinkPlan {
   validFrom?: string | null;
 }
 
-const PLAN_TYPES = ["welcome", "unlimited", "ticket", "custom", "vip_table"] as const;
+const PLAN_TYPES = ["welcome", "unlimited", "ticket", "custom", "vip_table", "cover_charge"] as const;
 const PLAN_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 interface DrinkPlanFormState {
-  type: "welcome" | "unlimited" | "ticket" | "custom" | "vip_table";
+  type: "welcome" | "unlimited" | "ticket" | "custom" | "vip_table" | "cover_charge";
   productName: string;
-  gender: "all" | "female";
+  gender: "all" | "female" | "male";
   price: string;
   peoplePerPackage: string;
   days: string[];
@@ -461,6 +522,8 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
       && (form.type === "welcome" || form.type === "unlimited");
     const isTicket = form.type === "ticket";
     const isVipTable = form.type === "vip_table";
+    const isCoverCharge = form.type === "cover_charge";
+    const isPackageType = isVipTable || isCoverCharge;
     if (isTicket && form.lineItems.some((i) => !i.name.trim())) {
       Alert.alert("Each ticket item must have a name");
       setSaving(false);
@@ -474,25 +537,28 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
       setSaving(false);
       return;
     }
-    if (isVipTable && !form.productName.trim()) {
-      Alert.alert("Package name is required for VIP Table Booking");
+    if (isPackageType && !form.productName.trim()) {
+      Alert.alert(`Package name is required for ${isCoverCharge ? "Cover Charge" : "VIP Table Booking"}`);
       setSaving(false);
       return;
     }
-    if (isVipTable && (!form.price || Number(form.price) <= 0)) {
-      Alert.alert("Package price must be greater than 0 for VIP Table Booking");
+    if (isPackageType && (!form.price || Number(form.price) <= 0)) {
+      Alert.alert(`Package price must be greater than 0 for ${isCoverCharge ? "Cover Charge" : "VIP Table Booking"}`);
       setSaving(false);
       return;
     }
-    // Offers included are optional for a VIP table package — empty rows are dropped.
-    const vipLineItems = isVipTable
+    // Offers included are optional for a package — empty rows are dropped.
+    const packageLineItems = isPackageType
       ? form.lineItems.filter((i) => i.name.trim()).map(lineItemForWire)
       : undefined;
     try {
       const commonBody = {
         productName: form.productName.trim(),
         gender: form.gender,
-        price: parseInt(form.price) || 0,
+        // Cover-charge & VIP Table are priced in rupees on the form but stored
+        // in paise (mirrors web's Math.round(price * 100)); every other type
+        // either forces 0 or keeps the pre-existing raw value.
+        price: isPackageType ? Math.round((Number(form.price) || 0) * 100) : parseInt(form.price) || 0,
         days: form.days,
         timeFrom: form.timeFrom.trim(),
         timeTo: form.timeTo.trim(),
@@ -502,7 +568,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
         validFrom: form.validFrom.trim() || null,
         validUntil: form.validUntil.trim() || null,
         ...(isTicket ? { lineItems: ticketLineItems } : {}),
-        ...(isVipTable ? { lineItems: vipLineItems, peoplePerPackage: form.peoplePerPackage ? Math.max(0, parseInt(form.peoplePerPackage) || 0) : null } : {}),
+        ...(isPackageType ? { lineItems: packageLineItems, peoplePerPackage: form.peoplePerPackage ? Math.max(0, parseInt(form.peoplePerPackage) || 0) : null } : {}),
       };
       if (editId) {
         await customFetch(`/api/vendors/me/drink-plans/${editId}`, {
@@ -575,7 +641,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
     ]);
   }
 
-  const TYPE_LABEL: Record<string, string> = { welcome: "Welcome Drink", unlimited: "Unlimited", ticket: "Ticket Plan", custom: "Custom", vip_table: "VIP Table Booking" };
+  const TYPE_LABEL: Record<string, string> = { welcome: "Welcome Drink", unlimited: "Unlimited", ticket: "Ticket Plan", custom: "Custom", vip_table: "VIP Table Booking", cover_charge: "Cover Charge" };
 
   if (isLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
 
@@ -746,11 +812,11 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                       </View>
                     )}
                   </View>
-                  {/* Ticket / Custom / VIP Table Booking */}
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    {(["ticket", "custom", "vip_table"] as const).map((t) => (
+                  {/* Ticket / Custom / Cover Charge / VIP Table Booking */}
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                    {(["ticket", "custom", "cover_charge", "vip_table"] as const).map((t) => (
                       <TouchableOpacity key={t} onPress={() => setForm((p) => ({ ...p, type: t }))}
-                        style={{ flex: 1, paddingVertical: 9, borderRadius: 12, borderWidth: 1, alignItems: "center", backgroundColor: form.type === t ? colors.primary : colors.muted, borderColor: form.type === t ? colors.primary : colors.border }}>
+                        style={{ flexGrow: 1, minWidth: "45%", paddingVertical: 9, borderRadius: 12, borderWidth: 1, alignItems: "center", backgroundColor: form.type === t ? colors.primary : colors.muted, borderColor: form.type === t ? colors.primary : colors.border }}>
                         <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.type === t ? colors.primaryForeground : colors.mutedForeground }}>
                           {TYPE_LABEL[t]}
                         </Text>
@@ -776,7 +842,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
               <View style={{ gap: 6 }}>
                 <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>FOR</Text>
                 <View style={{ flexDirection: "row", gap: 8 }}>
-                  {([{ v: "all", label: "Everyone" }, { v: "female", label: "Ladies Only" }] as { v: DrinkPlanFormState["gender"]; label: string }[]).map(({ v, label }) => (
+                  {([{ v: "all", label: "Everyone" }, { v: "female", label: "Ladies Only" }, { v: "male", label: "Men Only" }] as { v: DrinkPlanFormState["gender"]; label: string }[]).map(({ v, label }) => (
                     <TouchableOpacity key={v} onPress={() => setForm((p) => ({ ...p, gender: v }))}
                       style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, backgroundColor: form.gender === v ? colors.primary : colors.muted, borderColor: form.gender === v ? colors.primary : colors.border }}>
                       <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.gender === v ? colors.primaryForeground : colors.mutedForeground }}>{label}</Text>
@@ -797,7 +863,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   />
                 </View>
               )}
-              {form.type === "vip_table" && (
+              {(form.type === "vip_table" || form.type === "cover_charge") && (
                 <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
                   <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PEOPLE PER PACKAGE (optional)</Text>
                   <TextInput
@@ -810,9 +876,9 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   />
                 </View>
               )}
-              {(form.type === "ticket" || form.type === "vip_table") && (
+              {(form.type === "ticket" || form.type === "vip_table" || form.type === "cover_charge") && (
                 <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 10 }}>
-                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{form.type === "vip_table" ? "OFFERS INCLUDED (optional)" : "TICKET LINE ITEMS"}</Text>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{form.type === "ticket" ? "TICKET LINE ITEMS" : "OFFERS INCLUDED (optional)"}</Text>
                   {form.lineItems.map((item, idx) => (
                     <View key={idx} style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
                       <TextInput
@@ -864,6 +930,9 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                     <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
                     <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.primary }}>Add item</Text>
                   </TouchableOpacity>
+                  {(form.type === "vip_table" || form.type === "cover_charge") && (
+                    <CoverSavingsPreview items={form.lineItems} packageRupees={form.price} colors={colors} />
+                  )}
                 </View>
               )}
               {/* Days */}
@@ -1283,8 +1352,9 @@ function CouponsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
 }
 
 // ─── Food & Drink Offers Tab (mirrors web FoodDrinkOffersPanel + analytics) ──
-type OfferCategory = "food" | "drink";
-type OfferDiscountType = "percent" | "fixed" | "bogo" | "free_item";
+type OfferCategory = "food" | "drink" | "exclusive";
+type OfferDiscountType = "percent" | "fixed" | "bogo" | "free_item" | "nothing";
+type OfferGender = "all" | "female" | "male";
 type OfferDay = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 interface VendorOffer {
   id: number;
@@ -1294,6 +1364,7 @@ interface VendorOffer {
   discountType: OfferDiscountType;
   discountValue: string;
   freeItemName: string;
+  gender: OfferGender;
   days: OfferDay[];
   timeFrom: string;
   timeTo: string;
@@ -1308,6 +1379,7 @@ interface OfferFormState {
   discountType: OfferDiscountType;
   discountValue: string;
   freeItemName: string;
+  gender: OfferGender;
   days: OfferDay[];
   timeFrom: string;
   timeTo: string;
@@ -1315,7 +1387,7 @@ interface OfferFormState {
   endsAt: string;
   active: boolean;
 }
-const BLANK_OFFER: OfferFormState = { category: "food", title: "", description: "", discountType: "percent", discountValue: "20", freeItemName: "", days: [], timeFrom: "", timeTo: "", startsAt: "", endsAt: "", active: true };
+const BLANK_OFFER: OfferFormState = { category: "food", title: "", description: "", discountType: "percent", discountValue: "20", freeItemName: "", gender: "all", days: [], timeFrom: "", timeTo: "", startsAt: "", endsAt: "", active: true };
 const OFFER_DAY_ORDER: { key: OfferDay; label: string }[] = [
   { key: "mon", label: "Mon" }, { key: "tue", label: "Tue" }, { key: "wed", label: "Wed" },
   { key: "thu", label: "Thu" }, { key: "fri", label: "Fri" }, { key: "sat", label: "Sat" }, { key: "sun", label: "Sun" },
@@ -1327,13 +1399,13 @@ interface OfferAnalytics {
   totalRevenue: number;
   top: { id: number; title: string } | null;
 }
-function offerBadgeText(o: Pick<VendorOffer, "discountType" | "discountValue" | "freeItemName">): string {
+function offerBadgeText(o: Pick<VendorOffer, "discountType" | "discountValue" | "freeItemName" | "category">): string {
   const v = Number(o.discountValue) || 0;
   if (o.discountType === "percent") return `${v}% OFF`;
   if (o.discountType === "fixed") return `₹${v} OFF`;
   if (o.discountType === "bogo") return "BUY 1 GET 1";
   if (o.discountType === "free_item") return o.freeItemName ? `FREE: ${o.freeItemName}` : "FREE ITEM";
-  return "OFFER";
+  return o.category === "exclusive" ? "EXCLUSIVE" : "OFFER";
 }
 
 function OffersTab({ colors }: { colors: ReturnType<typeof useColors> }) {
@@ -1360,6 +1432,7 @@ function OffersTab({ colors }: { colors: ReturnType<typeof useColors> }) {
     setForm({
       category: o.category, title: o.title, description: o.description,
       discountType: o.discountType, discountValue: String(Number(o.discountValue)), freeItemName: o.freeItemName,
+      gender: o.gender ?? "all",
       days: o.days, timeFrom: o.timeFrom, timeTo: o.timeTo,
       startsAt: o.startsAt ? o.startsAt.slice(0, 10) : "", endsAt: o.endsAt ? o.endsAt.slice(0, 10) : "", active: o.active,
     });
@@ -1379,8 +1452,9 @@ function OffersTab({ colors }: { colors: ReturnType<typeof useColors> }) {
         title: form.title.trim(),
         description: form.description,
         discountType: form.discountType,
-        discountValue: ["bogo", "free_item"].includes(form.discountType) ? 0 : Number(form.discountValue) || 0,
+        discountValue: ["bogo", "free_item", "nothing"].includes(form.discountType) ? 0 : Number(form.discountValue) || 0,
         freeItemName: form.freeItemName,
+        gender: form.gender,
         days: form.days,
         timeFrom: form.timeFrom,
         timeTo: form.timeTo,
@@ -1424,6 +1498,7 @@ function OffersTab({ colors }: { colors: ReturnType<typeof useColors> }) {
   const filtered = (offers ?? []).filter((o) => o.category === tab);
   const foodCount = (offers ?? []).filter((o) => o.category === "food").length;
   const drinkCount = (offers ?? []).filter((o) => o.category === "drink").length;
+  const exclusiveCount = (offers ?? []).filter((o) => o.category === "exclusive").length;
   const AMBER = "#f59e0b";
 
   if (isLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
@@ -1454,9 +1529,9 @@ function OffersTab({ colors }: { colors: ReturnType<typeof useColors> }) {
         Live menu discounts shown to customers on the booking page during the days &amp; times you set.
       </Text>
 
-      {/* Food / Drink switch */}
+      {/* Food / Drink / Exclusive switch */}
       <View style={{ flexDirection: "row", gap: 8 }}>
-        {([["food", `Food (${foodCount})`], ["drink", `Drinks (${drinkCount})`]] as const).map(([val, label]) => (
+        {([["food", `Food (${foodCount})`], ["drink", `Drinks (${drinkCount})`], ["exclusive", `Exclusive (${exclusiveCount})`]] as const).map(([val, label]) => (
           <TouchableOpacity key={val} onPress={() => setTab(val)}
             style={{ flex: 1, paddingVertical: 9, borderRadius: 12, borderWidth: 1, alignItems: "center", backgroundColor: tab === val ? AMBER + "22" : colors.muted, borderColor: tab === val ? AMBER : colors.border }}>
             <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: tab === val ? AMBER : colors.mutedForeground }}>{label}</Text>
@@ -1467,12 +1542,12 @@ function OffersTab({ colors }: { colors: ReturnType<typeof useColors> }) {
       <TouchableOpacity onPress={openCreate}
         style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 13, borderWidth: 1, borderStyle: "dashed", borderColor: colors.primary, backgroundColor: colors.primary + "10" }}>
         <Ionicons name="add" size={18} color={colors.primary} />
-        <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>New {tab === "food" ? "Food" : "Drink"} Offer</Text>
+        <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>New {tab === "food" ? "Food" : tab === "drink" ? "Drink" : "Exclusive"} Offer</Text>
       </TouchableOpacity>
 
       {filtered.length === 0 && (
         <View style={{ alignItems: "center", padding: 32, gap: 10 }}>
-          <Ionicons name={tab === "food" ? "restaurant-outline" : "wine-outline"} size={40} color={colors.mutedForeground} />
+          <Ionicons name={tab === "food" ? "restaurant-outline" : tab === "drink" ? "wine-outline" : "sparkles-outline"} size={40} color={colors.mutedForeground} />
           <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>No {tab} offers yet.</Text>
         </View>
       )}
@@ -1516,10 +1591,22 @@ function OffersTab({ colors }: { colors: ReturnType<typeof useColors> }) {
               <View style={{ gap: 6 }}>
                 <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>CATEGORY</Text>
                 <View style={{ flexDirection: "row", gap: 8 }}>
-                  {([["food", "Food"], ["drink", "Drink"]] as const).map(([val, label]) => (
+                  {([["food", "Food"], ["drink", "Drink"], ["exclusive", "Exclusive"]] as const).map(([val, label]) => (
                     <TouchableOpacity key={val} onPress={() => setForm((p) => ({ ...p, category: val }))}
                       style={{ flex: 1, paddingVertical: 9, borderRadius: 12, borderWidth: 1, alignItems: "center", backgroundColor: form.category === val ? colors.primary : colors.muted, borderColor: form.category === val ? colors.primary : colors.border }}>
                       <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.category === val ? colors.primaryForeground : colors.mutedForeground }}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              {/* Gender */}
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>WHO IS THIS FOR</Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {([["all", "All Guests"], ["female", "Girls Only"], ["male", "Men Only"]] as const).map(([val, label]) => (
+                    <TouchableOpacity key={val} onPress={() => setForm((p) => ({ ...p, gender: val }))}
+                      style={{ flex: 1, paddingVertical: 9, borderRadius: 12, borderWidth: 1, alignItems: "center", backgroundColor: form.gender === val ? colors.primary : colors.muted, borderColor: form.gender === val ? colors.primary : colors.border }}>
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: form.gender === val ? colors.primaryForeground : colors.mutedForeground }}>{label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -1538,7 +1625,7 @@ function OffersTab({ colors }: { colors: ReturnType<typeof useColors> }) {
               <View style={{ gap: 6 }}>
                 <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>DISCOUNT TYPE</Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                  {([["percent", "Percentage"], ["fixed", "Fixed ₹"], ["bogo", "Buy 1 Get 1"], ["free_item", "Free Item"]] as const).map(([val, label]) => (
+                  {([["percent", "Percentage"], ["fixed", "Fixed ₹"], ["bogo", "Buy 1 Get 1"], ["free_item", "Free Item"], ["nothing", "Custom"]] as const).map(([val, label]) => (
                     <TouchableOpacity key={val} onPress={() => setForm((p) => ({ ...p, discountType: val }))}
                       style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, backgroundColor: form.discountType === val ? colors.primary : colors.muted, borderColor: form.discountType === val ? colors.primary : colors.border }}>
                       <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.discountType === val ? colors.primaryForeground : colors.mutedForeground }}>{label}</Text>
@@ -1833,6 +1920,11 @@ export default function VendorDashboardScreen() {
   // approved AND has at least one event/pub listed. Mirrors the web behaviour
   // in artifacts/royvento/src/pages/vendor-dashboard.tsx.
   const ALLOWED_LOCKED_TABS: ReadonlySet<DashTab> = new Set<DashTab>(["profile", "events"]);
+  // Tabs hidden for Event/Game Organizer category partners — those tabs are
+  // pub-specific (table listings, calendar of blocked dates, drink plans,
+  // venue reviews) and don't apply outside the Pub/Club vertical.
+  const ORGANISER_HIDDEN_TABS: ReadonlySet<DashTab> = new Set<DashTab>(["events", "calendar", "drinkplans", "reviews"]);
+  const isOrganiserCategory = (category: string) => category === "Event Organizer" || category === "Game Organizer";
 
   const BOOKING_PAGE_LIMIT = 20;
   const [bookingItems, setBookingItems] = useState<VendorBookingItem[]>([]);
@@ -1869,16 +1961,23 @@ export default function VendorDashboardScreen() {
   const [eventPage, setEventPage] = useState(1);
   const [eventTotal, setEventTotal] = useState(0);
   const hasPubListing = eventItems.some((e: VendorEvent & { type?: string }) => e.type === "pub");
+  // Mirrors web's hasApprovedEvent — unlocking tabs requires an actually-approved
+  // listing, not merely "a listing exists" (a pending/rejected-only partner
+  // should still be locked to Profile).
+  const hasApprovedEvent = eventItems.some((e: VendorEvent & { approvalStatus?: string }) => e.approvalStatus === "approved");
 
-  const isApprovedAndListed = vendor?.status === "approved" && eventTotal > 0;
+  const isApprovedAndListed = vendor?.status === "approved" && hasApprovedEvent;
   // If the dashboard becomes locked while the manager is on a hidden tab
   // (e.g. their pub gets unlisted), bounce them back to Profile so they
   // never see an empty / forbidden panel.
   useEffect(() => {
-    if (!isApprovedAndListed && !ALLOWED_LOCKED_TABS.has(activeTab)) {
+    if (
+      (!isApprovedAndListed && !ALLOWED_LOCKED_TABS.has(activeTab))
+      || (isOrganiserCategory(vendor?.category ?? "") && ORGANISER_HIDDEN_TABS.has(activeTab))
+    ) {
       setActiveTab("profile");
     }
-  }, [isApprovedAndListed, activeTab]);
+  }, [isApprovedAndListed, activeTab, vendor?.category]);
   const [eventLoading, setEventLoading] = useState(false);
   const [eventFetching, setEventFetching] = useState(false);
 
@@ -2146,6 +2245,12 @@ export default function VendorDashboardScreen() {
   const [profMenuUrl, setProfMenuUrl] = useState("");
   const [profMenuUrls, setProfMenuUrls] = useState<string[]>([]);
   const [uploadingMenu, setUploadingMenu] = useState(false);
+  const [profCuisines, setProfCuisines] = useState<string[]>([]);
+  const [profCuisineDraft, setProfCuisineDraft] = useState("");
+  const [profFacilities, setProfFacilities] = useState<string[]>([]);
+  const [profLanguages, setProfLanguages] = useState<string[]>([]);
+  const [profLanguageDraft, setProfLanguageDraft] = useState("");
+  const [profFaqs, setProfFaqs] = useState<{ question: string; answer: string }[]>([]);
   const [profAddress, setProfAddress] = useState("");
   const [profAddressQuery, setProfAddressQuery] = useState("");
   const [addrSuggestions, setAddrSuggestions] = useState<{ place_id: string; description: string; types: string[] }[]>([]);
@@ -2209,6 +2314,11 @@ export default function VendorDashboardScreen() {
           : existingUrls;
       setProfMenuUrls(mergedUrls);
       setProfMenuUrl("");
+      const vAny = vendor as unknown as { cuisines?: string[]; facilities?: string[]; languages?: string[]; faqs?: { question: string; answer: string }[] };
+      setProfCuisines(Array.isArray(vAny.cuisines) ? vAny.cuisines : []);
+      setProfFacilities(Array.isArray(vAny.facilities) ? vAny.facilities : []);
+      setProfLanguages(Array.isArray(vAny.languages) ? vAny.languages : []);
+      setProfFaqs(Array.isArray(vAny.faqs) ? vAny.faqs : []);
     }
   }, [vendor?.id]);
 
@@ -2303,6 +2413,10 @@ export default function VendorDashboardScreen() {
           danceFloor: profDanceFloor || null,
           danceFloorPhotos: profDanceFloorPhotos,
           menuUrls: profMenuUrls,
+          cuisines: profCuisines,
+          facilities: profFacilities,
+          languages: profLanguages,
+          faqs: profFaqs.filter((f) => f.question.trim() || f.answer.trim()),
         }),
       });
       qc.invalidateQueries({ queryKey: getGetMyVendorQueryKey() });
@@ -3209,6 +3323,137 @@ export default function VendorDashboardScreen() {
           )}
         </View>
 
+        {/* More venue info — shown on the venue's public profile */}
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>MORE VENUE INFO</Text>
+
+        <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Cuisines</Text>
+          {profCuisines.length > 0 && (
+            <View style={styles.chipRow}>
+              {profCuisines.map((v) => (
+                <TouchableOpacity key={v} style={[styles.chip, { borderColor: colors.primary + "40", backgroundColor: colors.primary + "12" }]} onPress={() => setProfCuisines((prev) => prev.filter((x) => x !== v))}>
+                  <Text style={{ fontSize: 12, color: colors.primary, fontFamily: "Inter_500Medium" }}>{v} ✕</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          <View style={{ flexDirection: "row", gap: 8, marginTop: profCuisines.length > 0 ? 8 : 0 }}>
+            <TextInput
+              style={[styles.fieldInput, { flex: 1, color: colors.foreground }]}
+              value={profCuisineDraft}
+              onChangeText={setProfCuisineDraft}
+              placeholder="e.g. North Indian, Chinese"
+              placeholderTextColor={colors.mutedForeground}
+              onSubmitEditing={() => {
+                const t = profCuisineDraft.trim();
+                if (t && !profCuisines.some((v) => v.toLowerCase() === t.toLowerCase())) setProfCuisines((prev) => [...prev, t]);
+                setProfCuisineDraft("");
+              }}
+            />
+            <TouchableOpacity
+              style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 14, justifyContent: "center" }}
+              onPress={() => {
+                const t = profCuisineDraft.trim();
+                if (t && !profCuisines.some((v) => v.toLowerCase() === t.toLowerCase())) setProfCuisines((prev) => [...prev, t]);
+                setProfCuisineDraft("");
+              }}
+            >
+              <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_500Medium" }}>Add</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>Available facilities</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {FACILITY_OPTIONS.map((f) => {
+              const on = profFacilities.includes(f);
+              return (
+                <TouchableOpacity
+                  key={f}
+                  onPress={() => setProfFacilities((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]))}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 10, borderWidth: 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primary + "12" : colors.muted, paddingHorizontal: 10, paddingVertical: 8 }}
+                >
+                  {on ? <Ionicons name="checkmark-circle" size={13} color={colors.primary} /> : <View style={{ width: 13, height: 13, borderRadius: 3, borderWidth: 1, borderColor: colors.border }} />}
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: on ? colors.primary : colors.mutedForeground }}>{f}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Languages</Text>
+          {profLanguages.length > 0 && (
+            <View style={styles.chipRow}>
+              {profLanguages.map((v) => (
+                <TouchableOpacity key={v} style={[styles.chip, { borderColor: colors.primary + "40", backgroundColor: colors.primary + "12" }]} onPress={() => setProfLanguages((prev) => prev.filter((x) => x !== v))}>
+                  <Text style={{ fontSize: 12, color: colors.primary, fontFamily: "Inter_500Medium" }}>{v} ✕</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          <View style={{ flexDirection: "row", gap: 8, marginTop: profLanguages.length > 0 ? 8 : 0 }}>
+            <TextInput
+              style={[styles.fieldInput, { flex: 1, color: colors.foreground }]}
+              value={profLanguageDraft}
+              onChangeText={setProfLanguageDraft}
+              placeholder="e.g. English, Hindi"
+              placeholderTextColor={colors.mutedForeground}
+              onSubmitEditing={() => {
+                const t = profLanguageDraft.trim();
+                if (t && !profLanguages.some((v) => v.toLowerCase() === t.toLowerCase())) setProfLanguages((prev) => [...prev, t]);
+                setProfLanguageDraft("");
+              }}
+            />
+            <TouchableOpacity
+              style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 14, justifyContent: "center" }}
+              onPress={() => {
+                const t = profLanguageDraft.trim();
+                if (t && !profLanguages.some((v) => v.toLowerCase() === t.toLowerCase())) setProfLanguages((prev) => [...prev, t]);
+                setProfLanguageDraft("");
+              }}
+            >
+              <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_500Medium" }}>Add</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={{ gap: 10 }}>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginLeft: 4 }]}>Frequently asked questions</Text>
+          {profFaqs.map((f, idx) => (
+            <View key={idx} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+                <TextInput
+                  style={[styles.fieldInput, { flex: 1, color: colors.foreground }]}
+                  value={f.question}
+                  onChangeText={(v) => setProfFaqs((prev) => prev.map((x, i) => (i === idx ? { ...x, question: v } : x)))}
+                  placeholder="Question"
+                  placeholderTextColor={colors.mutedForeground}
+                />
+                <TouchableOpacity onPress={() => setProfFaqs((prev) => prev.filter((_, i) => i !== idx))} style={{ padding: 4 }}>
+                  <Ionicons name="trash-outline" size={16} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={[styles.fieldInput, styles.textArea, { color: colors.foreground, marginTop: 8 }]}
+                value={f.answer}
+                onChangeText={(v) => setProfFaqs((prev) => prev.map((x, i) => (i === idx ? { ...x, answer: v } : x)))}
+                placeholder="Answer"
+                placeholderTextColor={colors.mutedForeground}
+                multiline
+              />
+            </View>
+          ))}
+          <TouchableOpacity
+            style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, borderWidth: 1, borderStyle: "dashed", borderColor: colors.primary + "60", paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.muted + "30" }}
+            onPress={() => setProfFaqs((prev) => [...prev, { question: "", answer: "" }])}
+          >
+            <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
+            <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: colors.primary }}>Add FAQ</Text>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity
           style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: listingSaving ? 0.6 : 1 }]}
           onPress={saveListing}
@@ -3267,6 +3512,25 @@ export default function VendorDashboardScreen() {
               </View>
             )}
           </View>
+
+          {/* Always accessible — a partner needs to set their location before
+              their first listing exists, not just after (mirrors web's
+              ProfileEditor, where Location is required and always shown). */}
+          <TouchableOpacity
+            onPress={() => setShowVenueDetailsModal(true)}
+            style={{ flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, paddingHorizontal: 14, paddingVertical: 12 }}
+          >
+            <Ionicons name="location-outline" size={16} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: colors.foreground }}>
+                Venue Details {!profLocation.city.trim() ? <Text style={{ color: "#ef4444" }}>*</Text> : null}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular", marginTop: 2 }}>
+                {profLocation.city.trim() ? `${profLocation.city}, ${profLocation.state}` : "Set your location, hours, menu & more"}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
 
           <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
@@ -4515,7 +4779,9 @@ export default function VendorDashboardScreen() {
             { key: "managers",      icon: "person-add-outline",       label: "Managers" },
             { key: "banking",       icon: "card-outline",             label: "Banking" },
             { key: "reviews",       icon: "star-outline",             label: "Reviews" },
-          ] as const).filter((t) => isApprovedAndListed || ALLOWED_LOCKED_TABS.has(t.key))).map((t) => (
+          ] as const)
+            .filter((t) => !(isOrganiserCategory(vendor?.category ?? "") && ORGANISER_HIDDEN_TABS.has(t.key)))
+            .filter((t) => isApprovedAndListed || ALLOWED_LOCKED_TABS.has(t.key))).map((t) => (
             <TouchableOpacity
               key={t.key}
               onPress={() => setActiveTab(t.key)}

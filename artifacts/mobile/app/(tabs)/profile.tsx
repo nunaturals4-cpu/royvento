@@ -55,6 +55,13 @@ interface Invitation {
   createdAt: string;
 }
 
+interface OrgInvitation {
+  id: number;
+  organizerName: string;
+  permissions: { scan: boolean; attendance: boolean; reports: boolean };
+  createdAt: string;
+}
+
 interface Coupon {
   id: number;
   code: string;
@@ -195,6 +202,19 @@ export default function ProfileScreen() {
     enabled: !!user,
   });
 
+  const orgInvitationsQuery = useQuery<OrgInvitation[]>({
+    queryKey: ["organizer-manager-invitations"],
+    queryFn: () => customFetch<OrgInvitation[]>("/api/organizer-manager/invitations"),
+    enabled: !!user,
+  });
+
+  const vendorRequestQuery = useQuery<{ request: { id: number; status: string; businessName: string; category: string } | null }>({
+    queryKey: ["vendor-request-me"],
+    queryFn: () => customFetch("/api/vendor-requests/me"),
+    enabled: !!user && user.role === "user",
+  });
+  const vendorRequest = vendorRequestQuery.data?.request ?? null;
+
   const pointsHistoryQuery = useQuery<PointsHistory>({
     queryKey: ["points-history-me"],
     queryFn: () => customFetch<PointsHistory>("/api/users/me/points-history"),
@@ -207,6 +227,8 @@ export default function ProfileScreen() {
 
   const [actingInv, setActingInv] = useState<number | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [actingOrgInv, setActingOrgInv] = useState<number | null>(null);
+  const [orgInvitations, setOrgInvitations] = useState<OrgInvitation[]>([]);
   const [linkCopied, setLinkCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -217,6 +239,10 @@ export default function ProfileScreen() {
   React.useEffect(() => {
     if (invitationsQuery.data) setInvitations(invitationsQuery.data);
   }, [invitationsQuery.data]);
+
+  React.useEffect(() => {
+    if (orgInvitationsQuery.data) setOrgInvitations(orgInvitationsQuery.data);
+  }, [orgInvitationsQuery.data]);
 
   const respondToInvitation = async (id: number, action: "accept" | "reject") => {
     setActingInv(id);
@@ -231,6 +257,22 @@ export default function ProfileScreen() {
       Alert.alert(t("common.error"), t("bookings.invitation_error"));
     } finally {
       setActingInv(null);
+    }
+  };
+
+  const respondToOrgInvitation = async (id: number, action: "accept" | "reject") => {
+    setActingOrgInv(id);
+    try {
+      await customFetch(`/api/organizer-manager/invitations/${id}/${action}`, { method: "POST" });
+      setOrgInvitations((prev) => prev.filter((inv) => inv.id !== id));
+      Alert.alert(
+        action === "accept" ? "You're now an Event Manager!" : t("profile.invitation_declined"),
+        action === "accept" ? "Scan from the organizer's dashboard." : "",
+      );
+    } catch {
+      Alert.alert(t("common.error"), t("bookings.invitation_error"));
+    } finally {
+      setActingOrgInv(null);
     }
   };
 
@@ -505,6 +547,56 @@ export default function ProfileScreen() {
         </View>
       )}
 
+      {/* Event Manager (Organizer) Invitations */}
+      {orgInvitations.length > 0 && (
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.primary + "60" }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <Ionicons name="easel-outline" size={18} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Event Manager Invitations</Text>
+          </View>
+          {orgInvitations.map((inv) => {
+            const perms = [
+              inv.permissions?.scan ? "scan" : null,
+              inv.permissions?.attendance ? "attendance" : null,
+              inv.permissions?.reports ? "reports" : null,
+            ].filter(Boolean).join(" · ");
+            return (
+              <View
+                key={inv.id}
+                style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, marginTop: 4 }}
+              >
+                <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground, marginBottom: 2 }}>
+                  {inv.organizerName}
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.mutedForeground, marginBottom: 10 }}>
+                  {perms ? `Can: ${perms}` : "Invited as event manager"}
+                </Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TouchableOpacity
+                    style={[styles.quickBtn, { flex: 1, backgroundColor: colors.primary, borderColor: colors.primary, flexDirection: "row", justifyContent: "center", paddingVertical: 10 }]}
+                    onPress={() => respondToOrgInvitation(inv.id, "accept")}
+                    disabled={actingOrgInv === inv.id}
+                  >
+                    {actingOrgInv === inv.id ? (
+                      <ActivityIndicator size="small" color={colors.primaryForeground} />
+                    ) : (
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.primaryForeground }}>{t("profile.invitation_accept")}</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.quickBtn, { flex: 1, backgroundColor: colors.muted, borderColor: colors.border, flexDirection: "row", justifyContent: "center", paddingVertical: 10 }]}
+                    onPress={() => respondToOrgInvitation(inv.id, "reject")}
+                    disabled={actingOrgInv === inv.id}
+                  >
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>{t("profile.invitation_decline")}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
       {/* Welcome Perks */}
       {discountInfo?.isNewUser && (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.primary + "60" }]}>
@@ -663,6 +755,44 @@ export default function ProfileScreen() {
               </View>
             </View>
           ))}
+        </View>
+      ) : null}
+
+      {/* Become a Partner — inline application status */}
+      {user.role === "user" ? (
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <Ionicons name="sparkles-outline" size={18} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Become a partner</Text>
+          </View>
+          {vendorRequest?.status === "pending" ? (
+            <>
+              <Text style={{ fontSize: 13, color: colors.mutedForeground }}>Your request is awaiting admin review.</Text>
+              <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 8 }}>
+                Submitted as <Text style={{ fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{vendorRequest.businessName}</Text> ({vendorRequest.category}).
+              </Text>
+            </>
+          ) : vendorRequest?.status === "rejected" ? (
+            <>
+              <Text style={{ fontSize: 13, color: colors.mutedForeground }}>Your previous request was declined. You can submit a new one.</Text>
+              <TouchableOpacity
+                style={[styles.quickBtn, { marginTop: 12, backgroundColor: colors.muted, borderColor: colors.border, alignItems: "center" }]}
+                onPress={() => router.push("/become-vendor")}
+              >
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>Apply again</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={{ fontSize: 13, color: colors.mutedForeground }}>List your venue, events, or games on Royvento.</Text>
+              <TouchableOpacity
+                style={[styles.quickBtn, { marginTop: 12, backgroundColor: colors.primary, borderColor: colors.primary, alignItems: "center" }]}
+                onPress={() => router.push("/become-vendor")}
+              >
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.primaryForeground }}>Apply now</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       ) : null}
 

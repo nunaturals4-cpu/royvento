@@ -29,6 +29,7 @@ interface EventCardProps {
   location?: string;
   price?: number | string;
   category?: string;
+  vendorCategory?: string;
   type?: string;
   style?: object;
   compact?: boolean;
@@ -39,7 +40,10 @@ interface EventCardProps {
   hasDrinkPlans?: boolean;
   vendorCrowdLevel?: string | null;
   directBooking?: boolean;
+  approvedAt?: string | null;
 }
+
+const NEW_BADGE_WINDOW_MS = 15 * 24 * 60 * 60 * 1000;
 
 export function EventCard({
   id,
@@ -49,6 +53,7 @@ export function EventCard({
   location,
   price,
   category,
+  vendorCategory,
   type,
   style,
   compact,
@@ -59,6 +64,7 @@ export function EventCard({
   hasDrinkPlans,
   vendorCrowdLevel,
   directBooking,
+  approvedAt,
 }: EventCardProps) {
   const colors = useColors();
   const { t } = useLanguage();
@@ -77,10 +83,29 @@ export function EventCard({
   const isFreeToday = hasFreeEntry && freeDays.includes(todayAbbr);
   const freeLabel = isFreeToday ? t("events.free_entry_today") : t("events.free_some_days");
 
-  // Show "★ Popular" if explicitly marked popular,
-  // else show "★ New" for events with no ratings yet.
+  // "New" badge: shown for 15 days after an admin approves the listing, then
+  // it disappears automatically. Mirrors web's approvedAt-driven logic.
   const showPopular = !!popular;
-  const showNew = !popular && rating !== undefined && rating === 0 && !reviewCount;
+  const showNew = !popular && (() => {
+    if (!approvedAt) return false;
+    const approvedMs = new Date(approvedAt).getTime();
+    if (Number.isNaN(approvedMs)) return false;
+    return Date.now() - approvedMs <= NEW_BADGE_WINDOW_MS;
+  })();
+
+  // Tag chips — venue category / vibe, mirrors web's bodyTags.
+  const bodyTags: string[] = [];
+  if (vendorCategory) bodyTags.push(vendorCategory);
+  if (category && category !== vendorCategory) bodyTags.push(category);
+
+  const targetId = vendorId ?? id;
+  // Mirrors the established mobile convention (see directBooking below, and
+  // partner/[id].tsx's own "Book a Table" CTA): booking always lands on the
+  // event/pub's own detail screen with the form auto-opened, not a separate
+  // partner-page tab (mobile has no tabbed venue-detail layout yet).
+  const bookNow = () => {
+    router.push({ pathname: "/event/[id]", params: { id: String(id), book: "1" } } as never);
+  };
 
   return (
     <Pressable
@@ -90,7 +115,6 @@ export function EventCard({
           // detail screen with the booking form auto-opened (Task #575).
           router.push({ pathname: "/event/[id]", params: { id: String(id), book: "1" } } as never);
         } else if (type === "pub") {
-          const targetId = vendorId ?? id;
           router.push(`/partner/${targetId}` as never);
         } else {
           router.push(`/event/${id}`);
@@ -196,7 +220,7 @@ export function EventCard({
             </Text>
           </View>
         ) : null}
-        {priceNum > 0 ? (
+        {compact && priceNum > 0 ? (
           <Text style={[styles.price, { color: colors.primary }]}>
             {formatPrice(priceNum)}
           </Text>
@@ -208,6 +232,33 @@ export function EventCard({
               {freeLabel}
             </Text>
           </View>
+        ) : null}
+
+        {!compact && bodyTags.length > 0 ? (
+          <View style={styles.tagRow}>
+            {bodyTags.slice(0, 3).map((tag) => (
+              <View key={tag} style={[styles.tagChip, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                <Text style={[styles.tagChipText, { color: colors.foreground }]}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {!compact ? (
+          <View style={[styles.priceRow, { borderTopColor: colors.border }]}>
+            <Text style={[styles.priceRowLabel, { color: colors.mutedForeground }]}>Entry</Text>
+            <Text style={[styles.priceRowValue, { color: colors.foreground }]}>{formatPrice(priceNum)}</Text>
+          </View>
+        ) : null}
+
+        {!compact ? (
+          <Pressable
+            onPress={(e) => { e.stopPropagation(); bookNow(); }}
+            style={({ pressed }) => [styles.bookBtn, { backgroundColor: colors.primary }, pressed && { opacity: 0.85 }]}
+          >
+            <Ionicons name="calendar-outline" size={13} color={colors.primaryForeground} />
+            <Text style={[styles.bookBtnText, { color: colors.primaryForeground }]}>Book now</Text>
+          </Pressable>
         ) : null}
       </View>
     </Pressable>
@@ -282,6 +333,51 @@ const styles = StyleSheet.create({
   info: {
     padding: 10,
     gap: 4,
+  },
+  tagRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+    marginTop: 2,
+  },
+  tagChip: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  tagChipText: {
+    fontSize: 9,
+    fontFamily: "Inter_600SemiBold",
+  },
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    marginTop: 6,
+    paddingTop: 6,
+  },
+  priceRowLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+  },
+  priceRowValue: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+  },
+  bookBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 20,
+    paddingVertical: 8,
+    marginTop: 6,
+  },
+  bookBtnText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
   },
   infoCompact: {
     flex: 1,

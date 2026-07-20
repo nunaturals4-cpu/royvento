@@ -60,7 +60,23 @@ interface EventVendor {
   openDays?: string[];
   address?: string | null;
   dayHours?: Record<string, { open: string; close: string } | null> | null;
+  cuisines?: string[] | null;
+  facilities?: string[] | null;
+  languages?: string[] | null;
+  faqs?: { question: string; answer?: string }[] | null;
 }
+
+/* Standard Terms & Conditions shown on every pub profile by default — mirrors web event-detail.tsx. */
+const DEFAULT_PUB_TERMS: string[] = [
+  "Please carry a valid ID proof along with you.",
+  "No refunds on purchased ticket are possible, even in case of any rescheduling.",
+  "Security procedures, including frisking remain the right of the management.",
+  "No dangerous or potentially hazardous objects including but not limited to weapons, knives, guns, fireworks, helmets, lazer devices, bottles, musical instruments will be allowed in the venue and may be ejected with or without the owner from the venue.",
+  "The sponsors/performers/organizers are not responsible for any injury or damage occurring due to the event. Any claims regarding the same would be settled in courts in Mumbai.",
+  "People in an inebriated state may not be allowed entry.",
+  "Organizers hold the right to deny late entry to the event.",
+  "Venue rules apply.",
+];
 
 function fmtTime(t: string): string {
   if (!t) return "";
@@ -193,10 +209,19 @@ export default function EventDetailScreen() {
 
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("online");
   const [hoursExpanded, setHoursExpanded] = useState(false);
+  const [faqExpanded, setFaqExpanded] = useState(false);
+  const [termsExpanded, setTermsExpanded] = useState(false);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [confirmedAge, setConfirmedAge] = useState(false);
   const [couponInput, setCouponInput] = useState("");
-  const [couponState, setCouponState] = useState<{ code: string; discountPercent: number } | null>(null);
+  const [couponState, setCouponState] = useState<{
+    code: string;
+    discountPercent?: number;
+    discountType?: "percent" | "fixed";
+    discountValue?: number;
+    isVendorCoupon?: boolean;
+    applicableTo?: string;
+  } | null>(null);
   const [couponError, setCouponError] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
   const [pointsInput, setPointsInput] = useState("0");
@@ -205,8 +230,11 @@ export default function EventDetailScreen() {
   const [ticketWomen, setTicketWomen] = useState(0);
   const [ticketMen, setTicketMen] = useState(0);
   const [ticketCouple, setTicketCouple] = useState(0);
-  const [pubMode, setPubMode] = useState<"ticket" | "event" | "vip_table">("ticket");
+  const [pubMode, setPubMode] = useState<"ticket" | "event" | "vip_table" | "cover_charge" | "event_booking">("ticket");
   const [vipPackageId, setVipPackageId] = useState("");
+  const [coverChargePlanId, setCoverChargePlanId] = useState("");
+  const [coverChargeQty, setCoverChargeQty] = useState("1");
+  const [selectedAnnouncementId, setSelectedAnnouncementId] = useState("");
   const [occasion, setOccasion] = useState("farewell");
   const [expandedDrinkPlans, setExpandedDrinkPlans] = useState<Set<number>>(new Set());
   const [personName, setPersonName] = useState("");
@@ -280,13 +308,31 @@ export default function EventDetailScreen() {
     setCouponLoading(true);
     setCouponError("");
     setCouponState(null);
+    const code = couponInput.trim().toUpperCase();
     try {
-      const result = await customFetch<{ valid: boolean; discountPercent: number }>("/api/coupons/validate", {
+      const result = await customFetch<{
+        valid: boolean;
+        discountPercent?: number;
+        discountType?: "percent" | "fixed";
+        discountValue?: number;
+        isVendorCoupon?: boolean;
+        applicableTo?: string;
+      }>("/api/coupons/validate", {
         method: "POST",
-        body: JSON.stringify({ code: couponInput.trim().toUpperCase() }),
+        body: JSON.stringify({ code, vendorId }),
       });
       if (result.valid) {
-        setCouponState({ code: couponInput.trim().toUpperCase(), discountPercent: result.discountPercent });
+        if (result.isVendorCoupon) {
+          setCouponState({
+            code,
+            discountType: result.discountType,
+            discountValue: result.discountValue,
+            isVendorCoupon: true,
+            applicableTo: result.applicableTo,
+          });
+        } else {
+          setCouponState({ code, discountPercent: result.discountPercent });
+        }
       } else {
         setCouponError(t("events.coupon_invalid"));
       }
@@ -307,7 +353,7 @@ export default function EventDetailScreen() {
     enabled: isPub && !!eventCity,
     select: (data) => data.filter((e: any) => e.id !== eventId).slice(0, 4),
   });
-  const { data: eventAnnouncements = [] } = useQuery<{ id: number; title: string; body: string; announceDate: string; announceTime: string; imageUrl: string }[]>({
+  const { data: eventAnnouncements = [] } = useQuery<{ id: number; title: string; body: string; announceDate: string; announceTime: string; imageUrl: string; price?: number }[]>({
     queryKey: ["event-announcements", eventId],
     queryFn: () => customFetch(`/api/events/${eventId}/announcements`),
     enabled: !!eventId,
@@ -322,6 +368,17 @@ export default function EventDetailScreen() {
   const vipTablePlans = (drinkPlans as unknown as { id: number; type: string; productName?: string; price: number; peoplePerPackage?: number | null }[]).filter((p) => p.type === "vip_table");
   const hasVipTablePackages = vipTablePlans.length > 0;
   const selectedVipTablePlan = vipTablePlans.find((p) => String(p.id) === vipPackageId);
+
+  // Cover-charge packages: partner-created drink plans of type "cover_charge".
+  // Only show the Cover Charges option when at least one exists.
+  const coverChargePlans = (drinkPlans as unknown as { id: number; type: string; productName?: string; price: number; description?: string }[]).filter((p) => p.type === "cover_charge");
+  const hasCoverChargePlans = coverChargePlans.length > 0;
+  const selectedCoverChargePlan = coverChargePlans.find((p) => String(p.id) === coverChargePlanId);
+
+  // Event Ticket booking: pick one of the venue's own announcements/events.
+  const hasEventAnnouncements = eventAnnouncements.length > 0;
+  const selectedAnnouncement = eventAnnouncements.find((a) => String(a.id) === selectedAnnouncementId);
+  const eventBookingPerPerson = Number(selectedAnnouncement?.price ?? 0);
 
   const basePriceWomen = isPub ? parseFloat(String((event as unknown as { priceWomen?: unknown })?.priceWomen ?? 0)) : 0;
   const basePriceMen = isPub ? parseFloat(String((event as unknown as { priceMen?: unknown })?.priceMen ?? 0)) : 0;
@@ -369,6 +426,10 @@ export default function EventDetailScreen() {
   } else if (isPub && pubMode === "vip_table") {
     // Flat package price — NOT multiplied by guests, mirrors web/backend.
     subtotal = Number(selectedVipTablePlan?.price ?? 0) / 100;
+  } else if (isPub && pubMode === "cover_charge") {
+    subtotal = (Number(selectedCoverChargePlan?.price ?? 0) / 100) * Math.max(1, parseInt(coverChargeQty) || 1);
+  } else if (isPub && pubMode === "event_booking") {
+    subtotal = eventBookingPerPerson * Math.max(1, parseInt(guests) || 1);
   } else if (isPub && ferAllGendersFreeMobile) {
     subtotal = 0;
   } else {
@@ -391,13 +452,37 @@ export default function EventDetailScreen() {
     }
   }, [bookingIsFullyFreeMobile, couponState, couponInput]);
 
+  // Which booking kind is currently selected — used to gate a coupon by its
+  // applicableTo target. Mirrors the server check and web's currentBookingKind.
+  const currentBookingKind = !isPub
+    ? "event"
+    : pubMode === "ticket"
+      ? "ticket"
+      : pubMode === "vip_table"
+        ? "vip_table"
+        : pubMode === "cover_charge"
+          ? "cover_charge"
+          : pubMode === "event_booking"
+            ? "event_booking"
+            : "event";
+  const couponMatchesMode = !couponState?.applicableTo
+    || couponState.applicableTo === "both"
+    || couponState.applicableTo === currentBookingKind;
+  const couponDiscount = (() => {
+    if (!couponState || !couponMatchesMode) return 0;
+    if (couponState.isVendorCoupon) {
+      return couponState.discountType === "fixed"
+        ? Math.min(Math.round(couponState.discountValue ?? 0), subtotal)
+        : Math.round(subtotal * ((couponState.discountValue ?? 0) / 100));
+    }
+    return Math.round(subtotal * ((couponState.discountPercent ?? 0) / 100));
+  })();
   const newUserPercent = discountInfo?.isNewUser && !couponState ? (discountInfo.bookingDiscountPercent || 0) : 0;
-  const couponPercent = couponState?.discountPercent ?? 0;
-  const discount = couponState
-    ? Math.round(subtotal * (couponPercent / 100))
-    : Math.round(subtotal * (newUserPercent / 100));
-  const POINTS_RUPEE_RATE = 0.10; // 100 pts = ₹10
-  const pointsCap = Math.max(0, subtotal - discount);
+  const newUserDiscount = newUserPercent > 0 ? Math.round(subtotal * (newUserPercent / 100)) : 0;
+  const discount = Math.max(couponDiscount, newUserDiscount);
+  const POINTS_RUPEE_RATE = 0.05; // 100 pts = ₹5
+  const maxPointsDiscount = Math.floor(subtotal * 0.02); // 2% of booking value
+  const pointsCap = Math.min(Math.max(0, subtotal - discount), maxPointsDiscount);
   const pointsAvail = Math.min(discountInfo?.points ?? 0, Math.floor(pointsCap / POINTS_RUPEE_RATE));
   const pointsApplied = Math.min(parseInt(pointsInput) || 0, pointsAvail);
   const finalTotal = Math.max(0, subtotal - discount - pointsApplied * POINTS_RUPEE_RATE);
@@ -454,14 +539,26 @@ export default function EventDetailScreen() {
     if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) {
       errs.ticketWomen = t("events.add_tickets_desc");
     }
-    if (isPub && (pubMode === "event" || pubMode === "vip_table") && (!parseInt(guests) || parseInt(guests) < 10)) {
-      errs.guests = t("events.min_guests_desc");
+    if (isPub && (pubMode === "event" || pubMode === "vip_table") && !parseInt(guests)) {
+      errs.guests = t("events.required_field");
     }
     if (isPub && pubMode === "vip_table" && !vipPackageId) {
       errs.vipPackageId = "Please select a VIP table package";
     }
-    if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "vip_table") && !arrivalTime.trim()) {
+    if (isPub && pubMode === "cover_charge" && !coverChargePlanId) {
+      errs.coverChargePlanId = "Please select a cover charge package";
+    }
+    if (isPub && pubMode === "event_booking" && !selectedAnnouncementId) {
+      errs.selectedAnnouncementId = "Please select an event to book";
+    }
+    if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "vip_table" || pubMode === "cover_charge") && !arrivalTime.trim()) {
       errs.arrivalTime = t("events.required_field");
+    } else if (isPub && (pubMode === "ticket" || pubMode === "event" || pubMode === "vip_table" || pubMode === "cover_charge") && arrivalTime.trim() && bookingDate === today) {
+      const nowIst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+      const [h, m] = arrivalTime.split(":").map(Number);
+      if ((h ?? 0) * 60 + (m ?? 0) <= nowIst.getHours() * 60 + nowIst.getMinutes()) {
+        errs.arrivalTime = "Please select a future arrival time for today's booking";
+      }
     }
     if (isPub && !personName.trim()) errs.personName = t("events.required_field");
     if (!phone.trim()) errs.phone = t("events.required_field");
@@ -500,6 +597,16 @@ export default function EventDetailScreen() {
         payload.ticketMen = ticketMen;
         payload.ticketCouple = ticketCouple;
         payload.guests = ticketWomen + ticketMen + ticketCouple * 2;
+      } else if (pubMode === "cover_charge") {
+        payload.guests = Math.max(1, parseInt(coverChargeQty) || 1);
+        payload.notes = occasion;
+        payload.selectedPubEvent = "";
+        payload.coverChargePlanId = coverChargePlanId ? Number(coverChargePlanId) : undefined;
+      } else if (pubMode === "event_booking") {
+        payload.guests = Math.max(1, parseInt(guests) || 1);
+        payload.notes = occasion;
+        payload.selectedPubEvent = selectedAnnouncement?.title ?? "";
+        payload.announcementId = selectedAnnouncementId ? Number(selectedAnnouncementId) : undefined;
       } else {
         payload.guests = parseInt(guests) || 10;
         payload.notes = occasion;
@@ -840,6 +947,91 @@ export default function EventDetailScreen() {
             </View>
           ) : null}
 
+          {/* Cuisines, Languages & Available facilities */}
+          {isPub && (() => {
+            const cuisines = (vendor?.cuisines ?? []).filter(Boolean);
+            const facilities = (vendor?.facilities ?? []).filter(Boolean);
+            const langs = (vendor?.languages ?? []).filter(Boolean);
+            if (cuisines.length === 0 && facilities.length === 0 && langs.length === 0) return null;
+            return (
+              <View style={{ gap: 20 }}>
+                {cuisines.length > 0 ? (
+                  <View>
+                    <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Cuisines</Text>
+                    <Text style={[styles.aboutBodyText, { color: colors.mutedForeground }]}>{cuisines.join(", ")}</Text>
+                  </View>
+                ) : null}
+                {langs.length > 0 ? (
+                  <View>
+                    <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Languages</Text>
+                    <Text style={[styles.aboutBodyText, { color: colors.mutedForeground }]}>{langs.join(", ")}</Text>
+                  </View>
+                ) : null}
+                {facilities.length > 0 ? (
+                  <View>
+                    <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Available facilities</Text>
+                    <View style={styles.facilitiesGrid}>
+                      {facilities.map((f) => (
+                        <View key={f} style={styles.facilityRow}>
+                          <Text style={{ color: colors.primary, fontSize: 12 }}>✦</Text>
+                          <Text style={[styles.facilityText, { color: colors.foreground }]} numberOfLines={1}>{f}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })()}
+
+          {/* More — FAQ + Terms (collapsible rows), mirrors web's default 8-item pub terms */}
+          {isPub ? (() => {
+            const faqs = (vendor?.faqs ?? []).filter((f) => f?.question);
+            return (
+              <View>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>More</Text>
+                <View style={[styles.moreCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  {faqs.length > 0 ? (
+                    <View style={[styles.moreRow, { borderBottomColor: colors.border }]}>
+                      <Pressable style={styles.moreRowHeader} onPress={() => setFaqExpanded((v) => !v)}>
+                        <Ionicons name="help-circle-outline" size={16} color={colors.primary} />
+                        <Text style={[styles.moreRowTitle, { color: colors.foreground }]}>Frequently asked questions</Text>
+                        <Ionicons name={faqExpanded ? "chevron-up" : "chevron-down"} size={14} color={colors.mutedForeground} />
+                      </Pressable>
+                      {faqExpanded ? (
+                        <View style={styles.moreRowBody}>
+                          {faqs.map((f, i) => (
+                            <View key={i} style={{ marginBottom: 12 }}>
+                              <Text style={[styles.faqQuestion, { color: colors.foreground }]}>{f.question}</Text>
+                              {f.answer ? <Text style={[styles.faqAnswer, { color: colors.mutedForeground }]}>{f.answer}</Text> : null}
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
+                  <View style={styles.moreRowLast}>
+                    <Pressable style={styles.moreRowHeader} onPress={() => setTermsExpanded((v) => !v)}>
+                      <Ionicons name="document-text-outline" size={16} color={colors.primary} />
+                      <Text style={[styles.moreRowTitle, { color: colors.foreground }]}>Terms and Conditions</Text>
+                      <Ionicons name={termsExpanded ? "chevron-up" : "chevron-down"} size={14} color={colors.mutedForeground} />
+                    </Pressable>
+                    {termsExpanded ? (
+                      <View style={styles.moreRowBody}>
+                        {DEFAULT_PUB_TERMS.map((term, i) => (
+                          <View key={i} style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+                            <Text style={{ color: colors.primary }}>•</Text>
+                            <Text style={[styles.faqAnswer, { color: colors.mutedForeground, flex: 1 }]}>{term}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+            );
+          })() : null}
+
           {/* Description */}
           {event.description ? (
             <View style={{ gap: 6 }}>
@@ -1051,7 +1243,7 @@ export default function EventDetailScreen() {
                 <View style={styles.field}>
                   <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.booking_type")}</Text>
                   <View style={styles.modeRow}>
-                    {(["ticket", "event", ...(hasVipTablePackages ? ["vip_table" as const] : [])] as const).map((m) => (
+                    {(["ticket", "event", ...(hasCoverChargePlans ? ["cover_charge" as const] : []), ...(hasVipTablePackages ? ["vip_table" as const] : []), ...(hasEventAnnouncements ? ["event_booking" as const] : [])] as const).map((m) => (
                       <Pressable
                         key={m}
                         onPress={() => setPubMode(m)}
@@ -1061,12 +1253,12 @@ export default function EventDetailScreen() {
                         ]}
                       >
                         <Ionicons
-                          name={m === "ticket" ? "ticket-outline" : m === "vip_table" ? "diamond-outline" : "people-outline"}
+                          name={m === "ticket" ? "ticket-outline" : m === "vip_table" ? "diamond-outline" : m === "cover_charge" ? "pricetag-outline" : m === "event_booking" ? "calendar-outline" : "people-outline"}
                           size={14}
                           color={pubMode === m ? colors.primary : colors.mutedForeground}
                         />
                         <Text style={[styles.modeBtnText, { color: pubMode === m ? colors.primary : colors.mutedForeground }]}>
-                          {m === "ticket" ? t("events.buy_tickets") : m === "vip_table" ? "VIP Table Booking" : t("events.table_booking")}
+                          {m === "ticket" ? t("events.buy_tickets") : m === "vip_table" ? "VIP Table Booking" : m === "cover_charge" ? "Cover Charges" : m === "event_booking" ? "Event Ticket" : t("events.table_booking")}
                         </Text>
                       </Pressable>
                     ))}
@@ -1142,6 +1334,120 @@ export default function EventDetailScreen() {
                   </View>
                 )}
 
+                {/* Cover charge package picker + quantity — cover_charge mode */}
+                {pubMode === "cover_charge" && (
+                  <>
+                    <View style={styles.field}>
+                      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Select Cover Charge Package <Text style={{ color: "#f87171", fontSize: 11 }}>*</Text></Text>
+                      {fieldErrors.coverChargePlanId ? (
+                        <Text style={{ color: "#f87171", fontSize: 11, marginBottom: 6 }}>{fieldErrors.coverChargePlanId}</Text>
+                      ) : null}
+                      <View style={{ gap: 8 }}>
+                        {coverChargePlans.map((p) => {
+                          const plan = p as unknown as { id: number; productName?: string; price: number; description?: string };
+                          const active = String(plan.id) === coverChargePlanId;
+                          return (
+                            <Pressable
+                              key={plan.id}
+                              onPress={() => { setCoverChargePlanId(String(plan.id)); clearFieldError("coverChargePlanId"); }}
+                              style={{
+                                borderRadius: 12, borderWidth: 1, padding: 12,
+                                borderColor: active ? colors.primary : colors.border,
+                                backgroundColor: active ? colors.primary + "18" : colors.muted,
+                                flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8,
+                              }}
+                            >
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{plan.productName || "Package"}</Text>
+                                {plan.description ? (
+                                  <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 }}>
+                                    {plan.description}
+                                  </Text>
+                                ) : null}
+                              </View>
+                              <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: colors.foreground }}>₹{Number(plan.price / 100).toLocaleString("en-IN")}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                    <View style={styles.field}>
+                      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Quantity</Text>
+                      <TickerCounter
+                        label="Packages"
+                        value={Math.max(1, parseInt(coverChargeQty) || 1)}
+                        onChange={(v) => setCoverChargeQty(String(Math.max(1, v)))}
+                        color={colors.foreground}
+                        mutedColor={colors.mutedForeground}
+                      />
+                    </View>
+                  </>
+                )}
+
+                {/* Event picker + guests + live price preview — event_booking mode */}
+                {pubMode === "event_booking" && (
+                  <>
+                    <View style={styles.field}>
+                      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Select Event <Text style={{ color: "#f87171", fontSize: 11 }}>*</Text></Text>
+                      {fieldErrors.selectedAnnouncementId ? (
+                        <Text style={{ color: "#f87171", fontSize: 11, marginBottom: 6 }}>{fieldErrors.selectedAnnouncementId}</Text>
+                      ) : null}
+                      <View style={{ gap: 8 }}>
+                        {eventAnnouncements.map((a) => {
+                          const active = String(a.id) === selectedAnnouncementId;
+                          return (
+                            <Pressable
+                              key={a.id}
+                              onPress={() => { setSelectedAnnouncementId(String(a.id)); clearFieldError("selectedAnnouncementId"); }}
+                              style={{
+                                borderRadius: 12, borderWidth: 1, padding: 12,
+                                borderColor: active ? colors.primary : colors.border,
+                                backgroundColor: active ? colors.primary + "18" : colors.muted,
+                                flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8,
+                              }}
+                            >
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{a.title}</Text>
+                                {(a.announceDate || a.announceTime) ? (
+                                  <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 }}>
+                                    {a.announceDate}{a.announceTime ? ` · ${a.announceTime}` : ""}
+                                  </Text>
+                                ) : null}
+                              </View>
+                              <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: colors.foreground }}>{formatINR(Number(a.price ?? 0))}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                    {selectedAnnouncementId && selectedAnnouncement ? (
+                      <View style={styles.field}>
+                        <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.guests_field")}</Text>
+                        <TickerCounter
+                          label="Guests"
+                          value={Math.max(1, parseInt(guests) || 1)}
+                          onChange={(v) => setGuests(String(Math.max(1, v)))}
+                          color={colors.foreground}
+                          mutedColor={colors.mutedForeground}
+                        />
+                        <View style={[styles.eventBookingPreview, { borderColor: colors.primary + "30", backgroundColor: colors.primary + "0D" }]}>
+                          {selectedAnnouncement.announceTime ? (
+                            <Text style={[styles.eventBookingPreviewText, { color: colors.primary }]}>Event time: {selectedAnnouncement.announceTime}</Text>
+                          ) : null}
+                          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                            <Text style={[styles.eventBookingPreviewText, { color: colors.primary }]}>
+                              {formatINR(eventBookingPerPerson)} × {Math.max(1, parseInt(guests) || 1)} guest{Math.max(1, parseInt(guests) || 1) === 1 ? "" : "s"}
+                            </Text>
+                            <Text style={[styles.eventBookingPreviewText, { color: colors.primary, fontFamily: "Inter_700Bold" }]}>
+                              {formatINR(eventBookingPerPerson * Math.max(1, parseInt(guests) || 1))}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    ) : null}
+                  </>
+                )}
+
                 {/* Occasion + guests — event / VIP table modes */}
                 {(pubMode === "event" || pubMode === "vip_table") && (
                   <>
@@ -1178,7 +1484,7 @@ export default function EventDetailScreen() {
                   </>
                 )}
 
-                {(pubMode === "ticket" || pubMode === "event" || pubMode === "vip_table") && (
+                {(pubMode === "ticket" || pubMode === "event" || pubMode === "vip_table" || pubMode === "cover_charge") && (
                   <View style={styles.field}>
                     <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.arrival_time")} <Text style={{ color: "#f87171", fontSize: 11 }}>*</Text></Text>
                     <TextInput
@@ -1268,9 +1574,18 @@ export default function EventDetailScreen() {
               {couponState && (
                 <View style={styles.couponSuccess}>
                   <Ionicons name="checkmark-circle" size={14} color="#22c55e" />
-                  <Text style={[styles.couponSuccessText, { color: "#22c55e" }]}>{t("events.coupon_pct_off", { pct: couponState.discountPercent })}</Text>
+                  <Text style={[styles.couponSuccessText, { color: "#22c55e" }]}>
+                    {couponState.isVendorCoupon
+                      ? (couponState.discountType === "fixed" ? `₹${couponState.discountValue} off` : `${couponState.discountValue}% off`)
+                      : t("events.coupon_pct_off", { pct: couponState.discountPercent })}
+                  </Text>
                 </View>
               )}
+              {couponState?.isVendorCoupon && !couponMatchesMode ? (
+                <Text style={[styles.couponErrorText, { color: "#f59e0b" }]}>
+                  This coupon is not valid for the selected booking type.
+                </Text>
+              ) : null}
               {couponError ? <Text style={[styles.couponErrorText, { color: "#ef4444" }]}>{couponError}</Text> : null}
             </View>}
 
@@ -1282,7 +1597,7 @@ export default function EventDetailScreen() {
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
                     <Ionicons name="diamond-outline" size={14} color={colors.primary} />
                     <Text style={[styles.pointsAvail, { color: colors.foreground }]}>
-                      {t("events.pts_available", { n: discountInfo!.points })} (≈{formatINR(discountInfo!.points * 0.10)})
+                      {t("events.pts_available", { n: discountInfo!.points })} (≈{formatINR(discountInfo!.points * POINTS_RUPEE_RATE)})
                     </Text>
                   </View>
                   <View style={styles.couponRow}>
@@ -1357,7 +1672,11 @@ export default function EventDetailScreen() {
                 {discount > 0 && (
                   <View style={styles.summaryRow}>
                     <Text style={[styles.summaryLabel, { color: "#22c55e" }]}>
-                      {couponState ? t("events.discount_coupon_pct", { pct: couponState.discountPercent }) : t("events.new_user_pct", { pct: newUserPercent })}
+                      {couponState && couponMatchesMode
+                        ? (couponState.isVendorCoupon
+                            ? (couponState.discountType === "fixed" ? `₹${couponState.discountValue} off` : `${couponState.discountValue}% off`)
+                            : t("events.discount_coupon_pct", { pct: couponState.discountPercent }))
+                        : t("events.new_user_pct", { pct: newUserPercent })}
                     </Text>
                     <Text style={[styles.summaryVal, { color: "#22c55e" }]}>−{formatINR(discount)}</Text>
                   </View>
@@ -1687,8 +2006,22 @@ const styles = StyleSheet.create({
   freeEntryLine: { fontSize: 13, fontFamily: "Inter_400Regular" },
   freeEntryNotice: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 4 },
   freeEntryNoticeText: { fontSize: 13, fontFamily: "Inter_600SemiBold", flex: 1 },
-  sectionTitle: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.3, marginBottom: 8 },
   description: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
+  aboutBodyText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20, marginTop: 4 },
+  eventBookingPreview: { borderRadius: 12, borderWidth: 1, padding: 12, gap: 4, marginTop: 8 },
+  eventBookingPreviewText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  facilitiesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 6 },
+  facilityRow: { flexDirection: "row", alignItems: "center", gap: 6, width: "47%" },
+  facilityText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
+  moreCard: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
+  moreRow: { borderBottomWidth: 1 },
+  moreRowLast: {},
+  moreRowHeader: { flexDirection: "row", alignItems: "center", gap: 10, padding: 16 },
+  moreRowTitle: { flex: 1, fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  moreRowBody: { paddingHorizontal: 16, paddingBottom: 16 },
+  faqQuestion: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  faqAnswer: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18, marginTop: 2 },
   gallery: { flexDirection: "row", paddingHorizontal: 20, gap: 10 },
   galleryImg: { width: 120, height: 90, borderRadius: 12, borderWidth: 1 },
   vendorRow: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },

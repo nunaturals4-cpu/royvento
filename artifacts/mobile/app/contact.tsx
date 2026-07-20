@@ -141,9 +141,40 @@ export default function ContactScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>Support Hours</Text>
-                <Text style={[styles.infoValue, { color: colors.foreground }]}>Mon–Sat, 10 AM – 8 PM IST</Text>
+                <Text style={[styles.infoValue, { color: colors.foreground }]}>Mon–Sat, 10am–7pm IST</Text>
               </View>
             </View>
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            <View style={styles.infoRow}>
+              <View style={[styles.infoIcon, { backgroundColor: colors.primary + "20" }]}>
+                <Ionicons name="location-outline" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>Find Us</Text>
+                <Text style={[styles.infoValue, { color: colors.foreground }]}>Kolkata, West Bengal</Text>
+                <Text style={[styles.infoLabel, { color: colors.mutedForeground, marginTop: 1 }]}>India</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* What we can help with */}
+          <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>We'd love to hear from you</Text>
+            {[
+              { title: "Support", desc: "Issues with bookings, payments or your account" },
+              { title: "Partnerships", desc: "List your venue or explore business opportunities" },
+              { title: "Feedback", desc: "Tell us how we can improve Royvento for you" },
+            ].map((c) => (
+              <View key={c.title} style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+                <View style={[styles.blurbDot, { backgroundColor: colors.primary }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{c.title}</Text>
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 1 }}>{c.desc}</Text>
+                </View>
+              </View>
+            ))}
           </View>
 
           {/* Contact Form */}
@@ -223,6 +254,7 @@ const styles = StyleSheet.create({
   infoLabel: { fontSize: 11, fontFamily: "Inter_400Regular" },
   infoValue: { fontSize: 14, fontFamily: "Inter_500Medium", marginTop: 2 },
   divider: { height: 1, marginVertical: 10 },
+  blurbDot: { width: 6, height: 6, borderRadius: 3, marginTop: 5 },
   formCard: { borderRadius: 18, borderWidth: 1, padding: 16, gap: 14 },
   field: { gap: 6 },
   fieldLabel: { fontSize: 12, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.4 },

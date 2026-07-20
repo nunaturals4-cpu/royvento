@@ -65,6 +65,8 @@ interface ExtendedBooking {
   ticketCouple?: number;
   approvedBy?: string;
   finalPrice?: number;
+  totalPrice?: number;
+  baseFee?: number;
   paymentMethod?: string;
   cancellationAllowed?: boolean;
   checkedIn?: boolean;
@@ -74,6 +76,9 @@ interface ExtendedBooking {
   pointsUsed?: number;
   eventCity?: string;
   selectedPubEvent?: string;
+  rejectionReason?: string | null;
+  kind?: string;
+  createdAt?: string;
   freeEntryRules?: {
     enabled?: boolean;
     genders?: string[];
@@ -81,6 +86,14 @@ interface ExtendedBooking {
     beforeTime?: string | null;
   } | null;
 }
+
+const BOOKING_TYPE_BADGE: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
+  ticket: { label: "Ticket", icon: "ticket-outline", color: "#8b5cf6" },
+  event: { label: "Table", icon: "restaurant-outline", color: "#3b82f6" },
+  cover_charge: { label: "Cover Charge", icon: "ticket-outline", color: "#3b82f6" },
+  vip_table: { label: "VIP Table", icon: "diamond-outline", color: "#d4a853" },
+  event_booking: { label: "Event Ticket", icon: "ticket-outline", color: "#a855f7" },
+};
 
 export default function BookingsScreen() {
   const colors = useColors();
@@ -451,6 +464,32 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                   <Text style={[styles.viewEventText, { color: colors.primary }]}>View Event</Text>
                 </TouchableOpacity>
 
+                {/* Booking-type badges + booked-on timestamp — visible collapsed, mirrors web */}
+                <View style={styles.typeBadgeRow}>
+                  {bx.eventType_ === "pub" && (
+                    <View style={[styles.typeBadge, { backgroundColor: "#ef444420" }]}>
+                      <Ionicons name="wine-outline" size={10} color="#ef4444" />
+                      <Text style={[styles.typeBadgeText, { color: "#ef4444" }]}>Pub</Text>
+                    </View>
+                  )}
+                  {bx.kind === "organizer" ? (
+                    <View style={[styles.typeBadge, { backgroundColor: colors.primary + "20" }]}>
+                      <Ionicons name="ticket-outline" size={10} color={colors.primary} />
+                      <Text style={[styles.typeBadgeText, { color: colors.primary }]}>Event Ticket</Text>
+                    </View>
+                  ) : bx.pubMode && BOOKING_TYPE_BADGE[bx.pubMode] ? (
+                    <View style={[styles.typeBadge, { backgroundColor: BOOKING_TYPE_BADGE[bx.pubMode]!.color + "20" }]}>
+                      <Ionicons name={BOOKING_TYPE_BADGE[bx.pubMode]!.icon} size={10} color={BOOKING_TYPE_BADGE[bx.pubMode]!.color} />
+                      <Text style={[styles.typeBadgeText, { color: BOOKING_TYPE_BADGE[bx.pubMode]!.color }]}>{BOOKING_TYPE_BADGE[bx.pubMode]!.label}</Text>
+                    </View>
+                  ) : null}
+                  {bx.createdAt ? (
+                    <Text style={[styles.bookedOnText, { color: colors.mutedForeground }]}>
+                      Booked on {new Date(bx.createdAt).toLocaleDateString()}
+                    </Text>
+                  ) : null}
+                </View>
+
                 <View style={styles.cardTop}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={2}>
@@ -471,8 +510,34 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                         {b.guests} guest{b.guests !== 1 ? "s" : ""}
                       </Text>
                     </View>
+                    {bx.couponCode ? (
+                      <View style={styles.metaRow}>
+                        <Ionicons name="pricetag-outline" size={13} color="#22c55e" />
+                        <Text style={[styles.meta, { color: "#22c55e" }]}>Coupon applied: {bx.couponCode}</Text>
+                      </View>
+                    ) : null}
+                    {(bx.pointsUsed ?? 0) > 0 ? (
+                      <View style={styles.metaRow}>
+                        <Text style={{ color: colors.primary, fontSize: 13 }}>⬢</Text>
+                        <Text style={[styles.meta, { color: colors.primary }]}>{bx.pointsUsed} pts used</Text>
+                      </View>
+                    ) : null}
+                    {status === "cancelled" && bx.rejectionReason ? (
+                      <View style={[styles.rejectionBox, { backgroundColor: "#ef444415", borderColor: "#ef444440" }]}>
+                        <Text style={styles.rejectionLabel}>Cancellation reason</Text>
+                        <Text style={styles.rejectionText}>{bx.rejectionReason}</Text>
+                      </View>
+                    ) : null}
                   </View>
                   <View style={{ alignItems: "flex-end", gap: 8 }}>
+                    {(bx.finalPrice ?? bx.totalPrice) != null ? (
+                      <View style={{ alignItems: "flex-end" }}>
+                        <Text style={[styles.collapsedPriceLabel, { color: colors.mutedForeground }]}>Total</Text>
+                        <Text style={[styles.collapsedPriceValue, { color: colors.foreground }]}>
+                          ₹{Number((bx.finalPrice ?? bx.totalPrice ?? 0) + (bx.baseFee ?? 0)).toLocaleString("en-IN")}
+                        </Text>
+                      </View>
+                    ) : null}
                     <View style={[styles.statusBadge, { backgroundColor: meta.bg }]}>
                       <Text style={[styles.statusText, { color: meta.text }]}>{statusLabel}</Text>
                     </View>
@@ -611,24 +676,24 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                 {/* Action bar for confirmed bookings */}
                 {isExpanded && status === "confirmed" && (
                   <View style={[styles.actionBar, { borderTopColor: colors.border }]}>
-                    {/* Share Ticket — only for pub ticket mode */}
-                    {bx.pubMode === "ticket" && (
-                      <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: "#d4a85318", borderColor: "rgba(212,168,83,0.35)" }]}
-                        disabled={sharingId === b.id}
-                        onPress={() => handleShareTicket(b)}
-                        activeOpacity={0.75}
-                      >
-                        {sharingId === b.id ? (
-                          <ActivityIndicator size="small" color="#d4a853" />
-                        ) : (
-                          <Ionicons name="share-outline" size={15} color="#d4a853" />
-                        )}
-                        <Text style={[styles.actionBtnText, { color: "#d4a853" }]}>
-                          {sharingId === b.id ? t("common.loading") : t("bookings.download_ticket")}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
+                    {/* Share Ticket — available for every confirmed booking type
+                        (ticket, table, VIP table, cover charge, event, organizer),
+                        mirrors web which doesn't restrict this to ticket mode. */}
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: "#d4a85318", borderColor: "rgba(212,168,83,0.35)" }]}
+                      disabled={sharingId === b.id}
+                      onPress={() => handleShareTicket(b)}
+                      activeOpacity={0.75}
+                    >
+                      {sharingId === b.id ? (
+                        <ActivityIndicator size="small" color="#d4a853" />
+                      ) : (
+                        <Ionicons name="share-outline" size={15} color="#d4a853" />
+                      )}
+                      <Text style={[styles.actionBtnText, { color: "#d4a853" }]}>
+                        {sharingId === b.id ? t("common.loading") : t("bookings.download_ticket")}
+                      </Text>
+                    </TouchableOpacity>
 
                     {/* Cancel Booking */}
                     {bx.checkedIn ? (
@@ -818,6 +883,15 @@ const styles = StyleSheet.create({
   eventBannerPlaceholder: { alignItems: "center", justifyContent: "center" },
   viewEventBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 16, paddingVertical: 6 },
   viewEventText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  typeBadgeRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", paddingHorizontal: 16, paddingTop: 10 },
+  typeBadge: { flexDirection: "row", alignItems: "center", gap: 3, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
+  typeBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  bookedOnText: { fontSize: 10, fontFamily: "Inter_400Regular" },
+  collapsedPriceLabel: { fontSize: 10, fontFamily: "Inter_400Regular" },
+  collapsedPriceValue: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  rejectionBox: { borderWidth: 1, borderRadius: 10, padding: 8, marginTop: 4 },
+  rejectionLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#ef4444", marginBottom: 1 },
+  rejectionText: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#fca5a5" },
   cardTop: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 4, flexDirection: "row", alignItems: "flex-start", gap: 12 },
   cardTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", marginBottom: 2 },
   bookingRef: { fontSize: 11, fontFamily: "Inter_400Regular", marginBottom: 6, opacity: 0.7 },

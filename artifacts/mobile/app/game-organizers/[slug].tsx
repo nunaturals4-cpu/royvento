@@ -5,15 +5,18 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Modal,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -51,7 +54,12 @@ interface Review { id: number; userId: number; rating: number; comment: string; 
 interface Stats { totalGames: number; totalPackages: number; avgRating: number; reviewCount: number; }
 interface ProfilePayload { organizer: GameOrganizer; games: PublicGame[]; packages: PublicPackage[]; reviews: Review[]; stats: Stats; }
 
+interface EventCoupon { code: string; discountType: string; discountValue: string; gameId: number | null; }
+
 type Bookable = { kind: "game"; game: PublicGame } | { kind: "package"; pkg: PublicPackage };
+
+const WEB_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com"}`;
+const POINTS_RUPEE_RATE = 0.05;
 
 function formatINR(v: number) {
   return v > 0 ? `₹${Math.round(v).toLocaleString("en-IN")}` : "Free";
@@ -99,7 +107,21 @@ export default function GameOrganizerProfileScreen() {
     );
   }
 
-  const { organizer, games, packages, stats } = data;
+  const { organizer, games, packages, reviews, stats } = data;
+  const gallery = [...(organizer.galleryImages ?? []), ...games.flatMap((g) => g.images || [])].slice(0, 12);
+
+  async function handleShare() {
+    try { await Share.share({ title: organizer.name, message: `Check out ${organizer.name} on Royvento!\n\n${WEB_BASE}/game-organizers/${organizer.slug}` }); }
+    catch { /* share dismissed or failed — no-op */ }
+  }
+  function openSocial(href: string) {
+    Linking.openURL(/^https?:\/\//.test(href) ? href : `https://${href}`);
+  }
+  function openMaps() {
+    if (organizer.mapsUrl) { Linking.openURL(organizer.mapsUrl); return; }
+    const q = encodeURIComponent([organizer.address, organizer.city, organizer.state].filter(Boolean).join(", "));
+    if (q) Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${q}`);
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -115,6 +137,9 @@ export default function GameOrganizerProfileScreen() {
           <LinearGradient colors={["rgba(0,0,0,0.35)", "rgba(0,0,0,0.55)", colors.background]} style={StyleSheet.absoluteFill} />
           <Pressable style={[styles.backBtn, { top: topPadding + 8 }]} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={22} color="#fff" />
+          </Pressable>
+          <Pressable style={[styles.shareBtn, { top: topPadding + 8 }]} onPress={handleShare}>
+            <Ionicons name="share-social-outline" size={20} color="#fff" />
           </Pressable>
         </View>
 
@@ -155,6 +180,23 @@ export default function GameOrganizerProfileScreen() {
 
         {!!organizer.description && (
           <Text style={[styles.description, { color: colors.mutedForeground }]}>{organizer.description}</Text>
+        )}
+
+        {(!!organizer.website || !!organizer.instagram || !!organizer.facebook || !!organizer.youtube || !!organizer.supportEmail) && (
+          <View style={[styles.section, { marginTop: 20 }]}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Connect</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {!!organizer.website && <SocialChip icon="globe-outline" label="Website" onPress={() => openSocial(organizer.website)} colors={colors} />}
+              {!!organizer.instagram && <SocialChip icon="logo-instagram" label="Instagram" onPress={() => openSocial(organizer.instagram)} colors={colors} />}
+              {!!organizer.facebook && <SocialChip icon="logo-facebook" label="Facebook" onPress={() => openSocial(organizer.facebook)} colors={colors} />}
+              {!!organizer.youtube && <SocialChip icon="logo-youtube" label="YouTube" onPress={() => openSocial(organizer.youtube)} colors={colors} />}
+            </View>
+            {!!organizer.supportEmail && (
+              <Pressable onPress={() => Linking.openURL(`mailto:${organizer.supportEmail}`)}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13, marginTop: 10 }}>{organizer.supportEmail}</Text>
+              </Pressable>
+            )}
+          </View>
         )}
 
         {/* Games */}
@@ -214,12 +256,63 @@ export default function GameOrganizerProfileScreen() {
           </View>
         )}
 
+        {gallery.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Gallery</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              {gallery.map((src, i) => (
+                <View key={i} style={styles.galleryThumb}>
+                  <Image source={{ uri: resolveImageUrl(src) }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {(!!organizer.address || !!organizer.mapsUrl) && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Location</Text>
+            <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.metaText, { color: colors.foreground }]}>{[organizer.address, organizer.city, organizer.state].filter(Boolean).join(", ") || "India"}</Text>
+              <Pressable onPress={openMaps} style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 }}>
+                <Text style={{ color: colors.primary, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>Open in Maps</Text>
+                <Ionicons name="arrow-forward" size={13} color={colors.primary} />
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {reviews.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Reviews & ratings</Text>
+            {reviews.map((r) => (
+              <View key={r.id} style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={{ flexDirection: "row", gap: 2, marginBottom: 4 }}>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Ionicons key={i} name={i < r.rating ? "star" : "star-outline"} size={13} color="#f59e0b" />
+                  ))}
+                </View>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>{r.comment || "—"}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         <MobileFooter />
         <View style={{ height: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }} />
       </ScrollView>
 
       <BookingModal slug={slug!} bookable={booking} onClose={() => setBooking(null)} />
     </View>
+  );
+}
+
+function SocialChip({ icon, label, onPress, colors }: { icon: React.ComponentProps<typeof Ionicons>["name"]; label: string; onPress: () => void; colors: ReturnType<typeof useColors> }) {
+  return (
+    <Pressable onPress={onPress} style={{ flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 }}>
+      <Ionicons name={icon} size={14} color={colors.mutedForeground} />
+      <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -259,6 +352,9 @@ function BookingModal({ slug, bookable, onClose }: { slug: string; bookable: Boo
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [coupon, setCoupon] = useState("");
+  const [useCoins, setUseCoins] = useState(false);
+  const [coupons, setCoupons] = useState<EventCoupon[]>([]);
+  const [points, setPoints] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState<{ ticketCode: string; total: number } | null>(null);
 
@@ -266,6 +362,15 @@ function BookingModal({ slug, bookable, onClose }: { slug: string; bookable: Boo
   const pkg = bookable?.kind === "package" ? bookable.pkg : null;
   const isGame = !!game;
   const isHourly = game?.pricingModel === "hourly";
+  const itemId = game?.id ?? pkg?.id ?? 0;
+
+  useEffect(() => {
+    if (!bookable) return;
+    setPersons(1); setHours(game?.minHours || 1); setQuantity(1); setDate(""); setTime(""); setCoupon(""); setUseCoins(false); setConfirmation(null);
+    customFetch<EventCoupon[]>(`/api/game-organizers/${slug}/coupons`).then(setCoupons).catch(() => setCoupons([]));
+    customFetch<{ points: number }>("/api/users/me/discounts").then((d) => setPoints(d.points ?? 0)).catch(() => setPoints(0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookable, slug]);
 
   const subtotal = useMemo(() => {
     if (game) return game.pricingModel === "hourly" ? (Number(game.hourlyRate) || 0) * hours : (Number(game.price) || 0) * persons;
@@ -274,6 +379,22 @@ function BookingModal({ slug, bookable, onClose }: { slug: string; bookable: Boo
   }, [game, pkg, persons, hours, quantity]);
 
   const maxPersons = game?.capacity && game.capacity > 0 ? game.capacity : 50;
+
+  const applicableCoupons = coupons.filter((c) => c.gameId == null || (isGame && c.gameId === itemId));
+  const matchedCoupon = applicableCoupons.find((c) => c.code === coupon.trim().toUpperCase());
+  const couponDiscount = matchedCoupon
+    ? (matchedCoupon.discountType === "fixed"
+        ? Math.min(Math.round(Number(matchedCoupon.discountValue)), subtotal)
+        : Math.round(subtotal * (Number(matchedCoupon.discountValue) / 100)))
+    : 0;
+  const maxPointsDiscount = Math.floor(subtotal * 0.02);
+  const pointsCap = Math.min(Math.max(0, subtotal - couponDiscount), maxPointsDiscount);
+  const maxPoints = Math.floor(pointsCap / POINTS_RUPEE_RATE);
+  const redeemable = Math.min(points, maxPoints);
+  const pointsApplied = useCoins ? redeemable : 0;
+  const pointsValue = pointsApplied * POINTS_RUPEE_RATE;
+  const total = Math.max(0, subtotal - couponDiscount - pointsValue);
+  const savings = couponDiscount + pointsValue;
 
   async function submit() {
     if (!bookable) return;
@@ -288,7 +409,7 @@ function BookingModal({ slug, bookable, onClose }: { slug: string; bookable: Boo
           packageId: isGame ? null : pkg!.id,
           persons, hours: isHourly ? hours : 0, quantity,
           date: date || undefined, time: time || undefined,
-          name: name.trim(), phone: phone.trim(), couponCode: coupon.trim(), pointsToUse: 0,
+          name: name.trim(), phone: phone.trim(), couponCode: coupon.trim(), pointsToUse: pointsApplied,
         }),
       });
       setConfirmation({ ticketCode: res.ticketCode, total: res.total });
@@ -301,7 +422,7 @@ function BookingModal({ slug, bookable, onClose }: { slug: string; bookable: Boo
 
   function close() {
     setConfirmation(null);
-    setPersons(1); setHours(1); setQuantity(1); setDate(""); setTime(""); setCoupon("");
+    setPersons(1); setHours(1); setQuantity(1); setDate(""); setTime(""); setCoupon(""); setUseCoins(false);
     onClose();
   }
 
@@ -346,11 +467,72 @@ function BookingModal({ slug, bookable, onClose }: { slug: string; bookable: Boo
                 <Field label="Time (optional)"><Input value={time} onChangeText={setTime} placeholder="e.g. 19:00" /></Field>
                 <Field label="Your name"><Input value={name} onChangeText={setName} placeholder="Full name" /></Field>
                 <Field label="Phone"><Input value={phone} onChangeText={setPhone} placeholder="Phone number" keyboardType="phone-pad" /></Field>
-                <Field label="Coupon (optional)"><Input value={coupon} onChangeText={setCoupon} placeholder="Coupon code" autoCapitalize="characters" /></Field>
 
-                <View style={[styles.totalRow, { borderTopColor: colors.border }]}>
-                  <Text style={[styles.metaText, { color: colors.mutedForeground }]}>Estimated total</Text>
-                  <Text style={[styles.itemPrice, { color: colors.foreground }]}>{formatINR(subtotal)}</Text>
+                {subtotal > 0 && (
+                  <Field label="Coupon (optional)">
+                    <Input value={coupon} onChangeText={(v) => setCoupon(v.toUpperCase())} placeholder="Enter or tap below" autoCapitalize="characters" />
+                    {applicableCoupons.length > 0 && (
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                        {applicableCoupons.map((c) => {
+                          const on = coupon === c.code;
+                          return (
+                            <Pressable key={c.code} onPress={() => setCoupon(on ? "" : c.code)} style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: on ? "#10b981" : colors.border, backgroundColor: on ? "#10b98122" : "transparent" }}>
+                              <Text style={{ color: on ? "#10b981" : colors.mutedForeground, fontSize: 11, fontFamily: "Inter_600SemiBold" }}>
+                                {c.code} · {c.discountType === "fixed" ? formatINR(Number(c.discountValue)) : `${Number(c.discountValue)}%`} off
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </Field>
+                )}
+
+                {subtotal > 0 && points > 0 && (
+                  <Pressable
+                    disabled={redeemable <= 0}
+                    onPress={() => setUseCoins((v) => !v)}
+                    style={[styles.coinsRow, { borderColor: useCoins ? colors.primary : colors.border, backgroundColor: useCoins ? colors.primary + "18" : "transparent", opacity: redeemable <= 0 ? 0.6 : 1 }]}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
+                      <Text style={{ fontSize: 16 }}>⬢</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>Royvento Coins</Text>
+                        <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
+                          {points} available{redeemable > 0 ? ` · redeem ${redeemable} for −${formatINR(redeemable * POINTS_RUPEE_RATE)}` : " · spend more to unlock"}
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch value={useCoins} onValueChange={setUseCoins} disabled={redeemable <= 0} trackColor={{ true: colors.primary }} />
+                  </Pressable>
+                )}
+
+                <View style={[styles.breakdownBox, { borderColor: colors.border }]}>
+                  {savings > 0 && (
+                    <>
+                      <View style={styles.breakdownRow}>
+                        <Text style={[styles.metaText, { color: colors.mutedForeground }]}>Subtotal</Text>
+                        <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{formatINR(subtotal)}</Text>
+                      </View>
+                      {couponDiscount > 0 && (
+                        <View style={styles.breakdownRow}>
+                          <Text style={{ color: "#10b981", fontSize: 13 }}>{matchedCoupon?.code}</Text>
+                          <Text style={{ color: "#10b981", fontSize: 13 }}>−{formatINR(couponDiscount)}</Text>
+                        </View>
+                      )}
+                      {pointsValue > 0 && (
+                        <View style={styles.breakdownRow}>
+                          <Text style={{ color: "#f59e0b", fontSize: 13 }}>⬢ Coins ×{pointsApplied}</Text>
+                          <Text style={{ color: "#f59e0b", fontSize: 13 }}>−{formatINR(pointsValue)}</Text>
+                        </View>
+                      )}
+                    </>
+                  )}
+                  <View style={[styles.totalRow, { borderTopColor: colors.border }]}>
+                    <Text style={[styles.metaText, { color: colors.mutedForeground }]}>Total payable</Text>
+                    <Text style={[styles.itemPrice, { color: colors.foreground }]}>{formatINR(total)}</Text>
+                  </View>
+                  {savings > 0 && <Text style={{ color: "#10b981cc", fontSize: 11, textAlign: "right" }}>You save {formatINR(savings)}</Text>}
                 </View>
               </ScrollView>
               <Pressable disabled={submitting} onPress={submit} style={[styles.submitBtn, { backgroundColor: colors.primary, opacity: submitting ? 0.7 : 1 }]}>
@@ -390,6 +572,7 @@ const styles = StyleSheet.create({
   backInline: { marginTop: 16, borderWidth: 1, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
   cover: { height: 200, position: "relative" },
   backBtn: { position: "absolute", left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
+  shareBtn: { position: "absolute", right: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
   identity: { paddingHorizontal: 20, marginTop: -34, gap: 6 },
   logo: { width: 72, height: 72, borderRadius: 18, borderWidth: 2 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },
@@ -420,6 +603,11 @@ const styles = StyleSheet.create({
   stepBtn: { width: 38, height: 38, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   stepValue: { fontSize: 16, fontFamily: "Inter_700Bold", minWidth: 24, textAlign: "center" },
   totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderTopWidth: 1, paddingTop: 12, marginTop: 4 },
+  galleryThumb: { width: "31.5%", aspectRatio: 1, borderRadius: 10, overflow: "hidden" },
+  infoCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 8 },
+  coinsRow: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 12 },
+  breakdownBox: { borderRadius: 14, borderWidth: 1, padding: 12, gap: 6, marginBottom: 4 },
+  breakdownRow: { flexDirection: "row", justifyContent: "space-between" },
   submitBtn: { borderRadius: 14, paddingVertical: 14, alignItems: "center", marginTop: 4 },
   submitBtnText: { fontSize: 15, fontFamily: "Inter_700Bold" },
   codeBox: { borderWidth: 1, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 24, alignItems: "center", gap: 4, marginVertical: 8 },

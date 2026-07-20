@@ -20,12 +20,13 @@ interface Category {
 }
 
 const CATEGORIES: Category[] = [
-  { label: "Pubs & Bars", sub: "Find nearby pubs", icon: "wine-outline", img: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=600&q=70", go: () => router.push({ pathname: "/(tabs)/explore", params: { type: "pub" } } as never) },
-  { label: "Nightclubs", sub: "Dance the night away", icon: "musical-notes-outline", img: "https://images.unsplash.com/photo-1493676304819-0d7a8d026dcf?w=600&q=70", go: () => router.push({ pathname: "/(tabs)/explore", params: { type: "pub" } } as never) },
-  { label: "Date Night", sub: "Romantic spots for two", icon: "heart-outline", img: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=70", go: () => router.push("/tonight-plans" as never) },
+  { label: "Pubs & Bars", sub: "Find nearby pubs", icon: "wine-outline", img: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=600&q=70", go: () => router.push({ pathname: "/(tabs)/pubs", params: { category: "Pub" } } as never) },
+  { label: "Nightclubs", sub: "Dance the night away", icon: "musical-notes-outline", img: "https://images.unsplash.com/photo-1493676304819-0d7a8d026dcf?w=600&q=70", go: () => router.push({ pathname: "/(tabs)/pubs", params: { category: "Club" } } as never) },
+  { label: "Date Night", sub: "Romantic spots for two", icon: "heart-outline", img: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=70", go: () => router.push({ pathname: "/(tabs)/pubs", params: { category: "DateNight" } } as never) },
+  { label: "Live Events", sub: "Concerts & gigs", icon: "mic-outline", img: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=70", go: () => router.push("/events" as never) },
+  { label: "Private Party", sub: "Host your own party", icon: "balloon-outline", img: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&q=70", go: () => router.push("/private-parties" as never) },
+  { label: "Solo Groups", sub: "Meet new people", icon: "people-outline", img: "https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600&q=70", go: () => router.push("/solo-connect" as never) },
   { label: "Games & Sports", sub: "Play & compete", icon: "game-controller-outline", img: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&q=70", go: () => router.push("/games-and-sports" as never) },
-  { label: "Live Events", sub: "Concerts & gigs", icon: "mic-outline", img: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=70", go: () => router.push("/(tabs)/explore" as never) },
-  { label: "Ladies Nights", sub: "Special offers", icon: "sparkles-outline", img: "https://images.unsplash.com/photo-1545128485-c400e7702796?w=600&q=70", go: () => router.push("/(tabs)/deals" as never) },
 ];
 
 export function PopularCategories() {

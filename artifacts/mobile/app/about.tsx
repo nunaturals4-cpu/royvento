@@ -54,6 +54,9 @@ export default function AboutScreen() {
   const isPartner = !!user && ["vendor", "organizer", "game_organizer", "admin"].includes(user.role);
   const partnerHref = isPartner ? "/vendor/dashboard" : "/become-vendor";
   const partnerLabel = isPartner ? "Go to Dashboard" : "Become a Partner";
+  const primaryCta = user
+    ? { href: "/(tabs)/pubs", label: "Explore Royvento" }
+    : { href: "/(auth)/register", label: "Get Started" };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -166,6 +169,50 @@ export default function AboutScreen() {
           ))}
         </Section>
 
+        {/* How it works */}
+        <View style={{ paddingHorizontal: 20, marginTop: 28, gap: 16 }}>
+          {[
+            {
+              kicker: "For Users",
+              steps: [
+                "Discover pubs, events, games and parties in your city.",
+                "Book tickets or tables in a few taps with secure checkout.",
+                "Show up, enjoy, and earn loyalty rewards along the way.",
+              ],
+              ctaLabel: "Start Exploring",
+              ctaHref: "/(tabs)/pubs",
+            },
+            {
+              kicker: "For Partners",
+              steps: [
+                "Sign up and list your venue, events or experiences.",
+                "Get verified and go live to a ready-to-book audience.",
+                "Accept bookings, track performance and get paid on time.",
+              ],
+              ctaLabel: partnerLabel,
+              ctaHref: partnerHref,
+            },
+          ].map((block) => (
+            <View key={block.kicker} style={[styles.howCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+              <Text style={[styles.kicker, { color: colors.mutedForeground, marginBottom: 12 }]}>{block.kicker}</Text>
+              <View style={{ gap: 10 }}>
+                {block.steps.map((step, i) => (
+                  <View key={i} style={{ flexDirection: "row", gap: 10 }}>
+                    <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
+                    <Text style={[styles.howStep, { color: colors.mutedForeground }]}>{step}</Text>
+                  </View>
+                ))}
+              </View>
+              <TouchableOpacity
+                style={[styles.howCta, { borderColor: colors.border }]}
+                onPress={() => router.push(block.ctaHref as never)}
+              >
+                <Text style={[styles.howCtaText, { color: colors.foreground }]}>{block.ctaLabel}</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+
         {/* FAQ */}
         <Section colors={colors} kicker="FAQ" title="Questions, answered.">
           {FAQS.map((f, i) => {
@@ -186,6 +233,33 @@ export default function AboutScreen() {
             );
           })}
         </Section>
+
+        {/* Final CTA */}
+        <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
+          <View style={[styles.finalCta, { borderColor: colors.primary + "40", backgroundColor: colors.card }]}>
+            <Text style={[styles.finalCtaTitle, { color: colors.foreground }]}>
+              Your next great night out — or your next big listing — starts here.
+            </Text>
+            <Text style={[styles.finalCtaSub, { color: colors.mutedForeground }]}>
+              Join thousands of people discovering, booking and hosting on Royvento. It's free to get started.
+            </Text>
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+              <TouchableOpacity
+                style={[styles.finalCtaBtn, { backgroundColor: colors.primary }]}
+                onPress={() => router.push(primaryCta.href as never)}
+              >
+                <Text style={[styles.finalCtaBtnText, { color: colors.primaryForeground }]}>{primaryCta.label}</Text>
+                <Ionicons name="arrow-forward" size={14} color={colors.primaryForeground} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.finalCtaBtnOutline, { borderColor: colors.border }]}
+                onPress={() => router.push("/contact")}
+              >
+                <Text style={[styles.finalCtaBtnOutlineText, { color: colors.foreground }]}>Contact Us</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
 
         <MobileFooter />
       </ScrollView>
@@ -232,4 +306,15 @@ const styles = StyleSheet.create({
   faq: { borderRadius: 14, borderWidth: 1, padding: 16 },
   faqQ: { fontSize: 14.5, fontFamily: "Inter_600SemiBold" },
   faqA: { fontSize: 13.5, fontFamily: "Inter_400Regular", lineHeight: 21, marginTop: 10 },
+  howCard: { borderRadius: 16, borderWidth: 1, padding: 18 },
+  howStep: { flex: 1, fontSize: 13.5, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  howCta: { borderRadius: 12, borderWidth: 1, paddingVertical: 11, alignItems: "center", marginTop: 16 },
+  howCtaText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  finalCta: { borderRadius: 18, borderWidth: 1, padding: 22, alignItems: "center" },
+  finalCtaTitle: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "center", lineHeight: 27 },
+  finalCtaSub: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 19, marginTop: 8 },
+  finalCtaBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 12, paddingHorizontal: 18, paddingVertical: 12 },
+  finalCtaBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  finalCtaBtnOutline: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 18, paddingVertical: 12 },
+  finalCtaBtnOutlineText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
 });

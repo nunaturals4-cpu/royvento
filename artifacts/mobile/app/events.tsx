@@ -45,11 +45,14 @@ const EVENT_CATEGORIES: { label: string; icon: React.ComponentProps<typeof Ionic
   { label: "Standup Shows", icon: "happy-outline", img: "https://images.unsplash.com/photo-1585699324551-f6c309eedeca?w=600&q=70" },
 ];
 
+const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
+
 export default function EventsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const [eventTypeFilter, setEventTypeFilter] = useState("");
+  const [genreFilter, setGenreFilter] = useState("");
 
   const { data: organizerEvents = [] } = useQuery<OrganizerEventCard[]>({
     queryKey: ["organizer-events"],
@@ -69,8 +72,8 @@ export default function EventsScreen() {
   }, [announcements]);
 
   const filteredAnnouncements = useMemo(
-    () => announcements.filter((a) => !eventTypeFilter || a.eventType === eventTypeFilter),
-    [announcements, eventTypeFilter]
+    () => announcements.filter((a) => (!eventTypeFilter || a.eventType === eventTypeFilter) && (!genreFilter || a.genre === genreFilter)),
+    [announcements, eventTypeFilter, genreFilter]
   );
 
   return (
@@ -184,6 +187,20 @@ export default function EventsScreen() {
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>What's On{eventTypeFilter ? ` · ${eventTypeFilter}` : ""}</Text>
           </View>
         </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.genreRow}>
+          {["", ...ANN_GENRES].map((g) => {
+            const active = genreFilter === g;
+            return (
+              <Pressable
+                key={g || "all"}
+                onPress={() => setGenreFilter((prev) => (prev === g ? "" : g))}
+                style={[styles.genreChip, { borderColor: active ? "#f59e0b" : colors.border, backgroundColor: active ? "#f59e0b20" : colors.muted }]}
+              >
+                <Text style={[styles.genreChipText, { color: active ? "#f59e0b" : colors.mutedForeground }]}>{g || "All"}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
         {filteredAnnouncements.length === 0 ? (
           <View style={{ paddingHorizontal: 20, paddingVertical: 24 }}>
             <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>
@@ -236,6 +253,9 @@ const styles = StyleSheet.create({
   sub: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19, marginTop: 4 },
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 22, paddingBottom: 12 },
   sectionTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  genreRow: { flexDirection: "row", gap: 8, paddingHorizontal: 20, paddingBottom: 14 },
+  genreChip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  genreChipText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   grid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 16, gap: 12 },
   tile: { width: "47%", flexGrow: 1, height: 120, borderRadius: 16, borderWidth: 1, overflow: "hidden", justifyContent: "flex-end", padding: 12 },
   tileIcon: { position: "absolute", top: 12, left: 12, width: 32, height: 32, borderRadius: 10, borderWidth: 1, backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center" },

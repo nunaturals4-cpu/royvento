@@ -33,6 +33,17 @@ import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/context/LanguageContext";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
+
+const DEAL_DAYS = [
+  { key: "", label: "All Days" },
+  { key: "Mon", label: "Monday" },
+  { key: "Tue", label: "Tuesday" },
+  { key: "Wed", label: "Wednesday" },
+  { key: "Thu", label: "Thursday" },
+  { key: "Fri", label: "Friday" },
+  { key: "Sat", label: "Saturday" },
+  { key: "Sun", label: "Sunday" },
+] as const;
 const ANNOUNCEMENT_CARD_WIDTH = SCREEN_WIDTH - 40;
 
 const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
@@ -344,6 +355,7 @@ export default function DealsScreen() {
   const [annGenreFilter, setAnnGenreFilter] = useState("");
   const [annEventTypeFilter, setAnnEventTypeFilter] = useState("");
   const [dealGenderFilter, setDealGenderFilter] = useState<"" | "female" | "other">("");
+  const [dealDayFilter, setDealDayFilter] = useState("");
 
   const {
     data: drinkOffers = [],
@@ -384,7 +396,7 @@ export default function DealsScreen() {
     return true;
   });
 
-  const { freeVendors, ticketVendors, coverChargeVendors, vipTableVendors } = splitVendorsByPlanType(drinkOffers as VendorDrinkOffer[], dealGenderFilter);
+  const { freeVendors, ticketVendors, coverChargeVendors, vipTableVendors } = splitVendorsByPlanType(drinkOffers as VendorDrinkOffer[], dealGenderFilter, dealDayFilter);
   const totalDeals = freeVendors.length + ticketVendors.length + coverChargeVendors.length + vipTableVendors.length;
 
   return (
@@ -498,6 +510,46 @@ export default function DealsScreen() {
                       }}
                     >
                       {opt.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Day-of-week filter */}
+            <View style={{ gap: 8, marginBottom: 6, paddingHorizontal: 20 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name="calendar-outline" size={13} color={colors.mutedForeground} />
+                <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>
+                  Day
+                </Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 6, paddingBottom: 2 }}
+              >
+                {DEAL_DAYS.map((d) => (
+                  <Pressable
+                    key={d.key || "all"}
+                    onPress={() => setDealDayFilter(d.key === dealDayFilter ? "" : d.key)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 5,
+                      borderRadius: 20,
+                      borderWidth: 1,
+                      borderColor: dealDayFilter === d.key ? colors.primary : colors.border,
+                      backgroundColor: dealDayFilter === d.key ? colors.primary + "18" : colors.card,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontFamily: "Inter_500Medium",
+                        color: dealDayFilter === d.key ? colors.primary : colors.mutedForeground,
+                      }}
+                    >
+                      {d.label}
                     </Text>
                   </Pressable>
                 ))}

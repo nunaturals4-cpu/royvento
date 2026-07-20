@@ -44,11 +44,20 @@ interface Organizer {
   supportEmail: string; supportPhone: string; city: string; state: string;
   verified: boolean; status: string;
 }
+interface Artist { name: string; role: string; imageUrl: string; bio: string; socials: string; }
+interface ScheduleItem { time: string; title: string; desc: string; }
+interface Policies { dressCode: string; entryRules: string; agePolicy: string; refundPolicy: string; cancellationPolicy: string; }
+interface Faq { q: string; a: string; }
 interface OrganizerEvent {
-  id: number; title: string; slug: string; category: string; shortDescription: string; description: string;
-  coverImageUrl: string; venueName: string; address: string; city: string; state: string;
+  id: number; title: string; slug: string; category: string; subcategory: string; shortDescription: string; description: string;
+  tags: string[]; coverImageUrl: string; bannerUrl: string; mobileBannerUrl: string; galleryImages: string[]; promoVideos: string[];
+  venueName: string; address: string; mapsUrl: string; country: string; city: string; state: string;
   startDate: string | null; endDate: string | null; startTime: string; endTime: string; isMultiDay: boolean;
+  happeningTonight?: boolean; startingSoon?: boolean; lastMinuteDeal?: boolean; dealLabel?: string;
+  artists: Artist[] | null; highlights: string[] | null; schedule: ScheduleItem[] | null;
+  policies: Policies | null; faqs: Faq[] | null;
   capacity: number; ageRestriction: string; language: string; approvalStatus: string; rejectionReason: string;
+  venueId?: number | null; venueApprovalStatus?: string; venueRejectionReason?: string;
 }
 interface TicketTier {
   id: number; type: string; name: string; description: string; price: string;
@@ -80,17 +89,20 @@ interface ManagerRow {
   manager: { id: number; name: string; email: string } | null;
 }
 interface RevenuePayload {
-  events: { id: number; title: string; ticketsSold: number; revenue: string; net: string }[];
+  events: { id: number; title: string; commissionPct: string; ticketsSold: number; attended: number; revenue: string; commission: string; net: string }[];
   totals: { revenue: string; commission: string; gatewayFee: string; net: string };
   commissionOwed: string;
 }
 interface BankingPayload {
   banking: { accountHolderName: string; bankName: string; accountNumber: string; ifscCode: string } | null;
+  settlements: { id: number; amount: string; status: string; adminNote: string; createdAt: string }[];
   commissionOwed: string;
 }
 
-const EVENT_CATEGORIES = ["Concert", "Festival", "Comedy", "Conference", "Workshop", "Sports", "Theatre", "Exhibition", "Party", "Other"];
+const EVENT_CATEGORIES = ["Ladies Night", "DJ Night", "Live Music", "Karaoke", "Theme Party", "Pool Party", "Open Mics", "Standup Shows", "Concert", "Festival", "Sports", "Other"];
+const HIGHLIGHT_OPTIONS = ["Free Drinks", "VIP Access", "Complimentary Entry", "Food Included", "Meet & Greet", "Special Benefits"];
 const TICKET_TYPES = ["free", "paid", "early_bird", "vip", "couple", "group", "student"];
+const EMPTY_POLICIES: Policies = { dressCode: "", entryRules: "", agePolicy: "", refundPolicy: "", cancellationPolicy: "" };
 
 function inr(v: string | number) {
   const n = typeof v === "string" ? parseFloat(v) : v;
@@ -288,7 +300,15 @@ function EventsTab({ colors, insets }: { colors: Pal; insets: { bottom: number }
             {e.coverImageUrl ? <Image source={{ uri: resolveImageUrl(e.coverImageUrl) }} style={styles.thumb} contentFit="cover" /> : <View style={[styles.thumb, { backgroundColor: colors.muted }]} />}
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{e.title}</Text>
-              <StatusPill colors={colors} status={e.approvalStatus} />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <StatusPill colors={colors} status={e.approvalStatus} />
+                {!!e.venueId && (
+                  <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
+                    <Ionicons name="location-outline" size={11} color={colors.mutedForeground} />{" "}
+                    {e.venueApprovalStatus === "approved" ? "Venue approved" : e.venueApprovalStatus === "rejected" ? "Venue declined" : "Awaiting venue approval"}
+                  </Text>
+                )}
+              </View>
               {e.approvalStatus === "rejected" && !!e.rejectionReason && (
                 <Text style={{ color: colors.redLight, fontSize: 11, marginTop: 4 }}>{e.rejectionReason}</Text>
               )}
@@ -305,24 +325,44 @@ function EventsTab({ colors, insets }: { colors: Pal; insets: { bottom: number }
   );
 }
 
+interface VenueOption { id: number; businessName: string; category: string; country: string; city: string; state: string; address: string | null; }
+
 function EventEditor({ colors, insets, event, onDone }: { colors: Pal; insets: { bottom: number }; event: OrganizerEvent | null; onDone: () => void }) {
   const isEdit = !!event;
   const [f, setF] = useState({
-    title: event?.title ?? "", category: event?.category ?? "Concert", shortDescription: event?.shortDescription ?? "",
-    description: event?.description ?? "", venueName: event?.venueName ?? "", address: event?.address ?? "",
-    city: event?.city ?? "", state: event?.state ?? "", startDate: event?.startDate ?? "", endDate: event?.endDate ?? "",
+    title: event?.title ?? "", category: event?.category ?? "Concert", subcategory: event?.subcategory ?? "",
+    shortDescription: event?.shortDescription ?? "", description: event?.description ?? "",
+    tags: event?.tags ?? ([] as string[]), language: event?.language ?? "", ageRestriction: event?.ageRestriction ?? "",
+    coverImageUrl: event?.coverImageUrl ?? "", bannerUrl: event?.bannerUrl ?? "",
+    galleryImages: event?.galleryImages ?? ([] as string[]), promoVideos: event?.promoVideos ?? ([] as string[]),
+    venueName: event?.venueName ?? "", address: event?.address ?? "", mapsUrl: event?.mapsUrl ?? "",
+    country: event?.country ?? "India", city: event?.city ?? "", state: event?.state ?? "",
+    capacity: String(event?.capacity ?? ""),
+    startDate: event?.startDate ?? "", endDate: event?.endDate ?? "",
     startTime: event?.startTime ?? "", endTime: event?.endTime ?? "", isMultiDay: event?.isMultiDay ?? false,
-    capacity: String(event?.capacity ?? ""), ageRestriction: event?.ageRestriction ?? "", language: event?.language ?? "",
-    coverImageUrl: event?.coverImageUrl ?? "",
+    happeningTonight: event?.happeningTonight ?? true, startingSoon: event?.startingSoon ?? true,
+    lastMinuteDeal: event?.lastMinuteDeal ?? false, dealLabel: event?.dealLabel ?? "",
+    artists: event?.artists ?? ([] as Artist[]), highlights: event?.highlights ?? ([] as string[]),
+    schedule: event?.schedule ?? ([] as ScheduleItem[]), policies: event?.policies ?? { ...EMPTY_POLICIES },
+    faqs: event?.faqs ?? ([] as Faq[]),
+    venueId: event?.venueId ?? (null as number | null),
   });
   const [saving, setSaving] = useState(false);
-  const upd = (k: keyof typeof f, v: string | boolean) => setF((p) => ({ ...p, [k]: v }));
+  const upd = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
 
-  async function pickCover() {
+  async function pickImage(key: "coverImageUrl" | "bannerUrl") {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
     if (res.canceled || !res.assets[0]) return;
-    try { const url = await uploadImageToStorage(res.assets[0].uri, res.assets[0].mimeType ?? undefined); upd("coverImageUrl", url); }
+    try { const url = await uploadImageToStorage(res.assets[0].uri, res.assets[0].mimeType ?? undefined); upd(key, url); }
     catch { Alert.alert("Upload failed"); }
+  }
+  async function addGalleryImages() {
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8, allowsMultipleSelection: true });
+    if (res.canceled || !res.assets.length) return;
+    for (const a of res.assets) {
+      try { const url = await uploadImageToStorage(a.uri, a.mimeType ?? undefined); setF((p) => ({ ...p, galleryImages: [...p.galleryImages, url] })); }
+      catch { Alert.alert("Upload failed"); }
+    }
   }
 
   async function save() {
@@ -341,39 +381,237 @@ function EventEditor({ colors, insets, event, onDone }: { colors: Pal; insets: {
   return (
     <ScrollView contentContainerStyle={[{ padding: 16 }, useBottomPad(insets)]}>
       <BackRow colors={colors} label={isEdit ? "Edit event" : "Create event"} onBack={onDone} />
-      <Pressable onPress={pickCover} style={[styles.coverPick, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+
+      <Pressable onPress={() => pickImage("coverImageUrl")} style={[styles.coverPick, { borderColor: colors.border, backgroundColor: colors.muted }]}>
         {f.coverImageUrl ? <Image source={{ uri: resolveImageUrl(f.coverImageUrl) }} style={StyleSheet.absoluteFill} contentFit="cover" /> : (
           <><Ionicons name="image-outline" size={26} color={colors.mutedForeground} /><Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 4 }}>Add cover image</Text></>
         )}
       </Pressable>
       <Field colors={colors} label="Event name *"><Inp colors={colors} value={f.title} onChangeText={(v) => upd("title", v)} placeholder="Event title" /></Field>
+      <Field colors={colors} label="Host venue (pub / club / bar / lounge)">
+        <VenuePicker colors={colors} value={f.venueId} onSelect={(v) => {
+          if (!v) { upd("venueId", null); return; }
+          setF((p) => ({ ...p, venueId: v.id, venueName: v.businessName, address: v.address || p.address, country: v.country || p.country, city: v.city || p.city, state: v.state || p.state }));
+        }} />
+        <Text style={{ color: f.venueId ? colors.primary : colors.mutedForeground, fontSize: 11, marginTop: 6 }}>
+          {f.venueId ? "Sent to this venue for approval before going public. Once approved, it also shows on the venue's page." : "Optional. Pick a venue to host the event there — the venue partner approves it."}
+        </Text>
+      </Field>
       <Field colors={colors} label="Category"><Chips colors={colors} options={EVENT_CATEGORIES} value={f.category} onChange={(v) => upd("category", v)} /></Field>
+      <Field colors={colors} label="Subcategory"><Inp colors={colors} value={f.subcategory} onChangeText={(v) => upd("subcategory", v)} placeholder="Optional" /></Field>
       <Field colors={colors} label="Short description"><Inp colors={colors} value={f.shortDescription} onChangeText={(v) => upd("shortDescription", v)} placeholder="One-liner" /></Field>
       <Field colors={colors} label="Description"><Inp colors={colors} value={f.description} onChangeText={(v) => upd("description", v)} placeholder="Full details" multiline /></Field>
-      <Field colors={colors} label="Venue"><Inp colors={colors} value={f.venueName} onChangeText={(v) => upd("venueName", v)} placeholder="Venue name" /></Field>
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <Field colors={colors} label="Language" flex><Inp colors={colors} value={f.language} onChangeText={(v) => upd("language", v)} placeholder="Hindi, English" /></Field>
+        <Field colors={colors} label="Age limit" flex><Inp colors={colors} value={f.ageRestriction} onChangeText={(v) => upd("ageRestriction", v)} placeholder="e.g. 18+" /></Field>
+      </View>
+      <TagEditor colors={colors} tags={f.tags} onChange={(t) => upd("tags", t)} />
+
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Media</Text>
+      <Field colors={colors} label="Event banner">
+        <Pressable onPress={() => pickImage("bannerUrl")} style={[styles.coverPick, { height: 90, marginBottom: 0, borderColor: colors.border, backgroundColor: colors.muted }]}>
+          {f.bannerUrl ? <Image source={{ uri: resolveImageUrl(f.bannerUrl) }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <Ionicons name="image-outline" size={22} color={colors.mutedForeground} />}
+        </Pressable>
+      </Field>
+      <GalleryEditor colors={colors} images={f.galleryImages} onAdd={addGalleryImages} onRemove={(i) => setF((p) => ({ ...p, galleryImages: p.galleryImages.filter((_, j) => j !== i) }))} />
+      <Field colors={colors} label="Promo video URLs (comma separated)"><Inp colors={colors} value={f.promoVideos.join(", ")} onChangeText={(v) => upd("promoVideos", v.split(",").map((s) => s.trim()).filter(Boolean))} placeholder="https://youtube.com/..." /></Field>
+
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Venue</Text>
+      <Field colors={colors} label="Venue name"><Inp colors={colors} value={f.venueName} onChangeText={(v) => upd("venueName", v)} placeholder="Venue name" /></Field>
       <Field colors={colors} label="Address"><Inp colors={colors} value={f.address} onChangeText={(v) => upd("address", v)} placeholder="Address" /></Field>
+      <Field colors={colors} label="Google Maps URL"><Inp colors={colors} value={f.mapsUrl} onChangeText={(v) => upd("mapsUrl", v)} placeholder="https://maps.google.com/..." /></Field>
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <Field colors={colors} label="Country" flex><Inp colors={colors} value={f.country} onChangeText={(v) => upd("country", v)} placeholder="India" /></Field>
+        <Field colors={colors} label="Capacity" flex><Inp colors={colors} value={f.capacity} onChangeText={(v) => upd("capacity", v)} placeholder="0" keyboardType="number-pad" /></Field>
+      </View>
       <View style={{ flexDirection: "row", gap: 10 }}>
         <Field colors={colors} label="City" flex><Inp colors={colors} value={f.city} onChangeText={(v) => upd("city", v)} placeholder="City" /></Field>
         <Field colors={colors} label="State" flex><Inp colors={colors} value={f.state} onChangeText={(v) => upd("state", v)} placeholder="State" /></Field>
       </View>
+
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Date & time</Text>
+      <View style={styles.switchRow}>
+        <Text style={{ color: colors.foreground }}>Multi-day event</Text>
+        <Switch value={f.isMultiDay} onValueChange={(v) => upd("isMultiDay", v)} trackColor={{ true: colors.primary }} />
+      </View>
       <View style={{ flexDirection: "row", gap: 10 }}>
         <Field colors={colors} label="Start date" flex><Inp colors={colors} value={f.startDate} onChangeText={(v) => upd("startDate", v)} placeholder="YYYY-MM-DD" /></Field>
-        <Field colors={colors} label="End date" flex><Inp colors={colors} value={f.endDate} onChangeText={(v) => upd("endDate", v)} placeholder="YYYY-MM-DD" /></Field>
+        {f.isMultiDay && <Field colors={colors} label="End date" flex><Inp colors={colors} value={f.endDate} onChangeText={(v) => upd("endDate", v)} placeholder="YYYY-MM-DD" /></Field>}
       </View>
       <View style={{ flexDirection: "row", gap: 10 }}>
         <Field colors={colors} label="Start time" flex><Inp colors={colors} value={f.startTime} onChangeText={(v) => upd("startTime", v)} placeholder="HH:MM" /></Field>
         <Field colors={colors} label="End time" flex><Inp colors={colors} value={f.endTime} onChangeText={(v) => upd("endTime", v)} placeholder="HH:MM" /></Field>
       </View>
-      <View style={{ flexDirection: "row", gap: 10 }}>
-        <Field colors={colors} label="Capacity" flex><Inp colors={colors} value={f.capacity} onChangeText={(v) => upd("capacity", v)} placeholder="0" keyboardType="number-pad" /></Field>
-        <Field colors={colors} label="Age limit" flex><Inp colors={colors} value={f.ageRestriction} onChangeText={(v) => upd("ageRestriction", v)} placeholder="e.g. 18+" /></Field>
+
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Happening Tonight visibility</Text>
+      <Text style={{ color: colors.mutedForeground, fontSize: 12, marginBottom: 8 }}>Controls how this listing appears in Royvento's real-time discovery feed.</Text>
+      <View style={styles.switchRow}>
+        <Text style={{ color: colors.foreground }}>Show in Happening Tonight</Text>
+        <Switch value={f.happeningTonight} onValueChange={(v) => upd("happeningTonight", v)} trackColor={{ true: colors.primary }} />
       </View>
       <View style={styles.switchRow}>
-        <Text style={{ color: colors.foreground }}>Multi-day event</Text>
-        <Switch value={f.isMultiDay} onValueChange={(v) => upd("isMultiDay", v)} trackColor={{ true: colors.primary }} />
+        <Text style={{ color: colors.foreground }}>Show in Starting Soon</Text>
+        <Switch value={f.startingSoon} onValueChange={(v) => upd("startingSoon", v)} trackColor={{ true: colors.primary }} />
       </View>
+      <View style={styles.switchRow}>
+        <Text style={{ color: colors.foreground }}>Last-Minute Deal</Text>
+        <Switch value={f.lastMinuteDeal} onValueChange={(v) => upd("lastMinuteDeal", v)} trackColor={{ true: colors.primary }} />
+      </View>
+      {f.lastMinuteDeal && (
+        <Field colors={colors} label="Deal label"><Inp colors={colors} value={f.dealLabel} onChangeText={(v) => upd("dealLabel", v)} placeholder="e.g. Free entry before 9 PM" /></Field>
+      )}
+
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Artists & performers</Text>
+      <RepeatableArtists colors={colors} artists={f.artists} onChange={(a) => upd("artists", a)} />
+
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Event highlights</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {HIGHLIGHT_OPTIONS.map((h) => {
+          const on = f.highlights.includes(h);
+          return (
+            <Pressable key={h} onPress={() => upd("highlights", on ? f.highlights.filter((x) => x !== h) : [...f.highlights, h])}
+              style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primary + "22" : "transparent" }}>
+              <Text style={{ color: on ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>{h}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Schedule / timeline</Text>
+      <RepeatableSchedule colors={colors} items={f.schedule} onChange={(s) => upd("schedule", s)} />
+
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Policies</Text>
+      {([
+        ["dressCode", "Dress code"], ["entryRules", "Entry rules"], ["agePolicy", "Age policy"],
+        ["refundPolicy", "Refund policy"], ["cancellationPolicy", "Cancellation policy"],
+      ] as const).map(([k, label]) => (
+        <Field key={k} colors={colors} label={label}>
+          <Inp colors={colors} value={f.policies[k]} onChangeText={(v) => upd("policies", { ...f.policies, [k]: v })} multiline />
+        </Field>
+      ))}
+
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>FAQ</Text>
+      <RepeatableFaqs colors={colors} faqs={f.faqs} onChange={(q) => upd("faqs", q)} />
+
       <PrimaryBtn colors={colors} label={saving ? "Saving…" : isEdit ? "Save changes" : "Create event"} onPress={save} disabled={saving} />
     </ScrollView>
+  );
+}
+
+function VenuePicker({ colors, value, onSelect }: { colors: Pal; value: number | null; onSelect: (v: VenueOption | null) => void }) {
+  const [venues, setVenues] = useState<VenueOption[]>([]);
+  useEffect(() => { customFetch<VenueOption[]>("/api/organizer/host-venues").then(setVenues).catch(() => setVenues([])); }, []);
+  const selected = venues.find((v) => v.id === value) ?? null;
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View style={{ flexDirection: "row", gap: 6 }}>
+        <Pressable onPress={() => onSelect(null)} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: !selected ? colors.primary : colors.border, backgroundColor: !selected ? colors.primary + "22" : "transparent" }}>
+          <Text style={{ color: !selected ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>No venue — standalone</Text>
+        </Pressable>
+        {venues.map((v) => (
+          <Pressable key={v.id} onPress={() => onSelect(v)} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: selected?.id === v.id ? colors.primary : colors.border, backgroundColor: selected?.id === v.id ? colors.primary + "22" : "transparent" }}>
+            <Text style={{ color: selected?.id === v.id ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }} numberOfLines={1}>{v.businessName}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+function TagEditor({ colors, tags, onChange }: { colors: Pal; tags: string[]; onChange: (t: string[]) => void }) {
+  const [draft, setDraft] = useState("");
+  function add() {
+    const t = draft.trim();
+    if (t && !tags.some((x) => x.toLowerCase() === t.toLowerCase())) onChange([...tags, t]);
+    setDraft("");
+  }
+  return (
+    <Field colors={colors} label="Tags">
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: tags.length ? 8 : 0 }}>
+        {tags.map((t, i) => (
+          <Pressable key={i} onPress={() => onChange(tags.filter((_, j) => j !== i))} style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: colors.muted }}>
+            <Text style={{ color: colors.foreground, fontSize: 12 }}>{t}</Text>
+            <Ionicons name="close" size={12} color={colors.mutedForeground} />
+          </Pressable>
+        ))}
+      </View>
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        <Inp colors={colors} value={draft} onChangeText={setDraft} placeholder="Add a tag" onSubmitEditing={add} />
+        <TouchableOpacity onPress={add} style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 14, justifyContent: "center" }}>
+          <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_500Medium" }}>Add</Text>
+        </TouchableOpacity>
+      </View>
+    </Field>
+  );
+}
+
+function GalleryEditor({ colors, images, onAdd, onRemove }: { colors: Pal; images: string[]; onAdd: () => void; onRemove: (i: number) => void }) {
+  return (
+    <Field colors={colors} label="Gallery images">
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {images.map((src, i) => (
+          <Pressable key={i} onPress={() => onRemove(i)} style={{ width: 72, height: 72, borderRadius: 10, overflow: "hidden" }}>
+            <Image source={{ uri: resolveImageUrl(src) }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            <View style={{ position: "absolute", top: 2, right: 2, backgroundColor: "#000000aa", borderRadius: 999, padding: 2 }}>
+              <Ionicons name="close" size={11} color="#fff" />
+            </View>
+          </Pressable>
+        ))}
+        <Pressable onPress={onAdd} style={{ width: 72, height: 72, borderRadius: 10, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
+          <Ionicons name="add" size={20} color={colors.mutedForeground} />
+        </Pressable>
+      </View>
+    </Field>
+  );
+}
+
+function RepeatableArtists({ colors, artists, onChange }: { colors: Pal; artists: Artist[]; onChange: (a: Artist[]) => void }) {
+  const blank: Artist = { name: "", role: "", imageUrl: "", bio: "", socials: "" };
+  return (
+    <View style={{ gap: 10 }}>
+      {artists.map((a, i) => (
+        <View key={i} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Field colors={colors} label="Name"><Inp colors={colors} value={a.name} onChangeText={(v) => onChange(artists.map((x, j) => (j === i ? { ...x, name: v } : x)))} placeholder="Artist / DJ name" /></Field>
+          <Field colors={colors} label="Role"><Inp colors={colors} value={a.role} onChangeText={(v) => onChange(artists.map((x, j) => (j === i ? { ...x, role: v } : x)))} placeholder="DJ, Performer…" /></Field>
+          <Field colors={colors} label="Bio"><Inp colors={colors} value={a.bio} onChangeText={(v) => onChange(artists.map((x, j) => (j === i ? { ...x, bio: v } : x)))} placeholder="Short bio" multiline /></Field>
+          <SmallBtn colors={colors} icon="trash-outline" label="Remove" danger onPress={() => onChange(artists.filter((_, j) => j !== i))} />
+        </View>
+      ))}
+      <SecondaryBtn colors={colors} label="+ Add artist" onPress={() => onChange([...artists, blank])} />
+    </View>
+  );
+}
+
+function RepeatableSchedule({ colors, items, onChange }: { colors: Pal; items: ScheduleItem[]; onChange: (s: ScheduleItem[]) => void }) {
+  const blank: ScheduleItem = { time: "", title: "", desc: "" };
+  return (
+    <View style={{ gap: 10 }}>
+      {items.map((s, i) => (
+        <View key={i} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Field colors={colors} label="Time"><Inp colors={colors} value={s.time} onChangeText={(v) => onChange(items.map((x, j) => (j === i ? { ...x, time: v } : x)))} placeholder="e.g. 9:00 PM" /></Field>
+          <Field colors={colors} label="Title"><Inp colors={colors} value={s.title} onChangeText={(v) => onChange(items.map((x, j) => (j === i ? { ...x, title: v } : x)))} placeholder="Slot title" /></Field>
+          <Field colors={colors} label="Description"><Inp colors={colors} value={s.desc} onChangeText={(v) => onChange(items.map((x, j) => (j === i ? { ...x, desc: v } : x)))} placeholder="Description" /></Field>
+          <SmallBtn colors={colors} icon="trash-outline" label="Remove" danger onPress={() => onChange(items.filter((_, j) => j !== i))} />
+        </View>
+      ))}
+      <SecondaryBtn colors={colors} label="+ Add slot" onPress={() => onChange([...items, blank])} />
+    </View>
+  );
+}
+
+function RepeatableFaqs({ colors, faqs, onChange }: { colors: Pal; faqs: Faq[]; onChange: (q: Faq[]) => void }) {
+  const blank: Faq = { q: "", a: "" };
+  return (
+    <View style={{ gap: 10 }}>
+      {faqs.map((q, i) => (
+        <View key={i} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Field colors={colors} label="Question"><Inp colors={colors} value={q.q} onChangeText={(v) => onChange(faqs.map((x, j) => (j === i ? { ...x, q: v } : x)))} placeholder="Question" /></Field>
+          <Field colors={colors} label="Answer"><Inp colors={colors} value={q.a} onChangeText={(v) => onChange(faqs.map((x, j) => (j === i ? { ...x, a: v } : x)))} placeholder="Answer" multiline /></Field>
+          <SmallBtn colors={colors} icon="trash-outline" label="Remove" danger onPress={() => onChange(faqs.filter((_, j) => j !== i))} />
+        </View>
+      ))}
+      <SecondaryBtn colors={colors} label="+ Add FAQ" onPress={() => onChange([...faqs, blank])} />
+    </View>
   );
 }
 
@@ -542,18 +780,27 @@ function BookingsTab({ colors, insets }: { colors: Pal; insets: { bottom: number
 // ─── Coupons ──────────────────────────────────────────────────────────────────
 function CouponsTab({ colors, insets }: { colors: Pal; insets: { bottom: number } }) {
   const [rows, setRows] = useState<Coupon[]>([]);
+  const [events, setEvents] = useState<OrganizerEvent[]>([]);
   const [code, setCode] = useState("");
   const [discountType, setDiscountType] = useState("percent");
   const [discountValue, setDiscountValue] = useState("10");
+  const [eventId, setEventId] = useState<string | null>(null);
+  const [maxUses, setMaxUses] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
   const load = useCallback(() => { customFetch<Coupon[]>("/api/organizer/coupons").then(setRows).catch(() => setRows([])); }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); customFetch<OrganizerEvent[]>("/api/organizer/events").then(setEvents).catch(() => {}); }, [load]);
 
   async function create() {
     if (!code.trim()) { Alert.alert("Enter a code"); return; }
     try {
       await customFetch("/api/organizer/coupons", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: code.trim(), discountType, discountValue: Number(discountValue), eventId: null, maxUses: null, expiresAt: null }) });
-      setCode(""); setDiscountValue("10"); load();
+        body: JSON.stringify({
+          code: code.trim(), discountType, discountValue: Number(discountValue),
+          eventId: eventId ? Number(eventId) : null,
+          maxUses: maxUses.trim() ? Math.max(1, parseInt(maxUses) || 1) : null,
+          expiresAt: expiresAt.trim() ? new Date(`${expiresAt.trim()}T23:59:59`).toISOString() : null,
+        }) });
+      setCode(""); setDiscountValue("10"); setEventId(null); setMaxUses(""); setExpiresAt(""); load();
     } catch (e) { Alert.alert("Create failed", (e as Error).message); }
   }
   async function toggle(c: Coupon) { try { await customFetch(`/api/organizer/coupons/${c.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active: !c.active }) }); load(); } catch {} }
@@ -567,6 +814,24 @@ function CouponsTab({ colors, insets }: { colors: Pal; insets: { bottom: number 
           <Field colors={colors} label="Type" flex><Chips colors={colors} options={["percent", "fixed"]} value={discountType} onChange={setDiscountType} /></Field>
           <Field colors={colors} label="Value" flex><Inp colors={colors} value={discountValue} onChangeText={setDiscountValue} placeholder="10" keyboardType="number-pad" /></Field>
         </View>
+        <Field colors={colors} label="Applies to">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ flexDirection: "row", gap: 6 }}>
+              <Pressable onPress={() => setEventId(null)} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: eventId === null ? colors.primary : colors.border, backgroundColor: eventId === null ? colors.primary + "22" : "transparent" }}>
+                <Text style={{ color: eventId === null ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>All events</Text>
+              </Pressable>
+              {events.map((e) => (
+                <Pressable key={e.id} onPress={() => setEventId(String(e.id))} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: eventId === String(e.id) ? colors.primary : colors.border, backgroundColor: eventId === String(e.id) ? colors.primary + "22" : "transparent" }}>
+                  <Text style={{ color: eventId === String(e.id) ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }} numberOfLines={1}>{e.title}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </ScrollView>
+        </Field>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <Field colors={colors} label="Max uses (optional)" flex><Inp colors={colors} value={maxUses} onChangeText={(v) => setMaxUses(v.replace(/[^0-9]/g, ""))} placeholder="Unlimited" keyboardType="number-pad" /></Field>
+          <Field colors={colors} label="Expires (YYYY-MM-DD)" flex><Inp colors={colors} value={expiresAt} onChangeText={setExpiresAt} placeholder="Never" /></Field>
+        </View>
         <PrimaryBtn colors={colors} label="Create coupon" onPress={create} />
       </View>
       {rows.map((c) => (
@@ -576,6 +841,10 @@ function CouponsTab({ colors, insets }: { colors: Pal; insets: { bottom: number 
             <Switch value={c.active} onValueChange={() => toggle(c)} trackColor={{ true: colors.primary }} />
           </View>
           <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{c.discountType === "fixed" ? inr(c.discountValue) : `${c.discountValue}%`} off · used {c.usedCount}{c.maxUses ? `/${c.maxUses}` : ""}</Text>
+          <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>
+            {c.eventId ? (events.find((e) => e.id === c.eventId)?.title ?? "One event") : "All events"}
+            {c.expiresAt ? ` · expires ${new Date(c.expiresAt).toLocaleDateString()}` : " · no expiry"}
+          </Text>
           <View style={styles.rowActions}><SmallBtn colors={colors} icon="trash-outline" label="Delete" danger onPress={() => remove(c)} /></View>
         </View>
       ))}
@@ -696,9 +965,19 @@ function PromoteTab({ colors, insets }: { colors: Pal; insets: { bottom: number 
 }
 
 // ─── Managers ─────────────────────────────────────────────────────────────────
+function PermToggleRow({ colors, label, checked, onChange }: { colors: Pal; label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      <Switch value={checked} onValueChange={onChange} trackColor={{ true: colors.primary }} />
+      <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_500Medium" }}>{label}</Text>
+    </View>
+  );
+}
+
 function ManagersTab({ colors, insets }: { colors: Pal; insets: { bottom: number } }) {
   const [rows, setRows] = useState<ManagerRow[]>([]);
   const [email, setEmail] = useState("");
+  const [invitePerms, setInvitePerms] = useState({ scan: true, attendance: true, reports: false });
   const load = useCallback(() => { customFetch<ManagerRow[]>("/api/organizer/managers").then(setRows).catch(() => setRows([])); }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -706,22 +985,42 @@ function ManagersTab({ colors, insets }: { colors: Pal; insets: { bottom: number
     if (!email.trim()) { Alert.alert("Enter an email"); return; }
     try {
       await customFetch("/api/organizer/managers/invite", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), permissions: { scan: true, attendance: true, reports: false } }) });
+        body: JSON.stringify({ email: email.trim(), permissions: invitePerms }) });
       setEmail(""); load();
     } catch (e) { Alert.alert("Invite failed", (e as Error).message); }
   }
   async function remove(id: number) { try { await customFetch(`/api/organizer/managers/${id}`, { method: "DELETE" }); load(); } catch {} }
+  async function togglePerm(row: ManagerRow, key: keyof ManagerRow["permissions"], val: boolean) {
+    const next = { ...row.permissions, [key]: val };
+    setRows((rs) => rs.map((r) => (r.id === row.id ? { ...r, permissions: next } : r)));
+    try {
+      await customFetch(`/api/organizer/managers/${row.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ permissions: next }) });
+    } catch (e) {
+      Alert.alert("Update failed", (e as Error).message);
+      load();
+    }
+  }
 
   return (
     <ScrollView contentContainerStyle={[{ padding: 16 }, useBottomPad(insets)]}>
       <View style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Field colors={colors} label="Invite manager by email"><Inp colors={colors} value={email} onChangeText={setEmail} placeholder="name@email.com" keyboardType="email-address" autoCapitalize="none" /></Field>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14, marginBottom: 8 }}>
+          <PermToggleRow colors={colors} label="Scan tickets" checked={invitePerms.scan} onChange={(v) => setInvitePerms((p) => ({ ...p, scan: v }))} />
+          <PermToggleRow colors={colors} label="Mark attendance" checked={invitePerms.attendance} onChange={(v) => setInvitePerms((p) => ({ ...p, attendance: v }))} />
+          <PermToggleRow colors={colors} label="View reports" checked={invitePerms.reports} onChange={(v) => setInvitePerms((p) => ({ ...p, reports: v }))} />
+        </View>
         <PrimaryBtn colors={colors} label="Send invite" onPress={invite} />
       </View>
       {rows.length === 0 ? <Text style={[styles.empty, { color: colors.mutedForeground }]}>No managers yet.</Text> : rows.map((m) => (
         <View key={m.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.rowTitle, { color: colors.foreground }]}>{m.manager?.name ?? m.invitedEmail}</Text>
           <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{m.invitedEmail} · {m.status}</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
+            <PermToggleRow colors={colors} label="Scan" checked={m.permissions.scan} onChange={(v) => togglePerm(m, "scan", v)} />
+            <PermToggleRow colors={colors} label="Attendance" checked={m.permissions.attendance} onChange={(v) => togglePerm(m, "attendance", v)} />
+            <PermToggleRow colors={colors} label="Reports" checked={m.permissions.reports} onChange={(v) => togglePerm(m, "reports", v)} />
+          </View>
           <View style={styles.rowActions}><SmallBtn colors={colors} icon="trash-outline" label="Remove" danger onPress={() => remove(m.id)} /></View>
         </View>
       ))}
@@ -732,15 +1031,16 @@ function ManagersTab({ colors, insets }: { colors: Pal; insets: { bottom: number
 // ─── Earnings + Banking ───────────────────────────────────────────────────────
 function EarningsTab({ colors, insets }: { colors: Pal; insets: { bottom: number } }) {
   const [rev, setRev] = useState<RevenuePayload | null>(null);
+  const [bank, setBank] = useState<BankingPayload | null>(null);
   const [form, setForm] = useState({ accountHolderName: "", bankName: "", accountNumber: "", ifscCode: "" });
   const load = useCallback(() => {
     customFetch<RevenuePayload>("/api/organizer/revenue").then(setRev).catch(() => {});
-    customFetch<BankingPayload>("/api/organizer/banking").then((b) => { if (b.banking) setForm(b.banking); }).catch(() => {});
+    customFetch<BankingPayload>("/api/organizer/banking").then((b) => { setBank(b); if (b.banking) setForm(b.banking); }).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
 
   async function saveBanking() {
-    try { await customFetch("/api/organizer/banking", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); Alert.alert("Banking details saved"); }
+    try { await customFetch("/api/organizer/banking", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); Alert.alert("Banking details saved"); load(); }
     catch (e) { Alert.alert("Save failed", (e as Error).message); }
   }
 
@@ -752,12 +1052,42 @@ function EarningsTab({ colors, insets }: { colors: Pal; insets: { bottom: number
         <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.statValue, { color: colors.foreground }]}>{inr(rev?.totals.commission ?? 0)}</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Commission</Text></View>
         <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.statValue, { color: colors.foreground }]}>{inr(rev?.commissionOwed ?? 0)}</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Owed</Text></View>
       </View>
+
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>By event</Text>
+      {!rev || rev.events.length === 0 ? (
+        <Text style={[styles.empty, { color: colors.mutedForeground }]}>No events yet.</Text>
+      ) : rev.events.map((e) => (
+        <View key={e.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{e.title}</Text>
+          <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{Number(e.commissionPct).toFixed(1)}% commission · {e.ticketsSold} sold · {e.attended} attended</Text>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+            <Text style={{ color: colors.foreground, fontSize: 12 }}>Revenue {inr(e.revenue)}</Text>
+            <Text style={{ color: "#f59e0b", fontSize: 12 }}>Comm. {inr(e.commission)}</Text>
+            <Text style={{ color: "#4ade80", fontSize: 12 }}>Net {inr(e.net)}</Text>
+          </View>
+        </View>
+      ))}
+
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Banking details</Text>
       <Field colors={colors} label="Account holder"><Inp colors={colors} value={form.accountHolderName} onChangeText={(v) => setForm({ ...form, accountHolderName: v })} placeholder="Full name" /></Field>
       <Field colors={colors} label="Bank name"><Inp colors={colors} value={form.bankName} onChangeText={(v) => setForm({ ...form, bankName: v })} placeholder="Bank" /></Field>
       <Field colors={colors} label="Account number"><Inp colors={colors} value={form.accountNumber} onChangeText={(v) => setForm({ ...form, accountNumber: v })} placeholder="Account no." keyboardType="number-pad" /></Field>
       <Field colors={colors} label="IFSC code"><Inp colors={colors} value={form.ifscCode} onChangeText={(v) => setForm({ ...form, ifscCode: v })} placeholder="IFSC" autoCapitalize="characters" /></Field>
       <PrimaryBtn colors={colors} label="Save banking details" onPress={saveBanking} />
+
+      {!!bank?.settlements.length && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Settlement history</Text>
+          {bank.settlements.map((s) => (
+            <View key={s.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{new Date(s.createdAt).toLocaleDateString()}{s.adminNote ? ` · ${s.adminNote}` : ""}</Text>
+                <Text style={{ color: "#4ade80", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{inr(s.amount)} settled</Text>
+              </View>
+            </View>
+          ))}
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -818,13 +1148,29 @@ function ScannerTab({ colors, insets }: { colors: Pal; insets: { bottom: number 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 function ProfileTab({ colors, insets }: { colors: Pal; insets: { bottom: number } }) {
   const [o, setO] = useState<Organizer | null>(null);
-  const [form, setForm] = useState({ name: "", description: "", supportEmail: "", supportPhone: "", website: "", instagram: "", facebook: "", youtube: "", logoUrl: "", coverImageUrl: "" });
+  const [form, setForm] = useState({ name: "", description: "", supportEmail: "", supportPhone: "", website: "", instagram: "", facebook: "", youtube: "", logoUrl: "", coverImageUrl: "", city: "", state: "" });
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   useEffect(() => {
-    customFetch<Organizer>("/api/organizer/profile").then((d) => { setO(d); setForm({ name: d.name, description: d.description, supportEmail: d.supportEmail, supportPhone: d.supportPhone, website: d.website, instagram: d.instagram, facebook: d.facebook, youtube: d.youtube, logoUrl: d.logoUrl, coverImageUrl: d.coverImageUrl }); }).catch(() => {});
+    customFetch<Organizer>("/api/organizer/profile").then((d) => { setO(d); setForm({ name: d.name, description: d.description, supportEmail: d.supportEmail, supportPhone: d.supportPhone, website: d.website, instagram: d.instagram, facebook: d.facebook, youtube: d.youtube, logoUrl: d.logoUrl, coverImageUrl: d.coverImageUrl, city: d.city ?? "", state: d.state ?? "" }); }).catch(() => {});
   }, []);
   async function save() {
     try { await customFetch("/api/organizer/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); Alert.alert("Profile saved"); }
     catch (e) { Alert.alert("Save failed", (e as Error).message); }
+  }
+  async function pickAndUpload(kind: "logo" | "cover") {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: "images", allowsEditing: true, aspect: kind === "logo" ? [1, 1] : [16, 9], quality: 0.85 });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    const setUploading = kind === "logo" ? setUploadingLogo : setUploadingCover;
+    setUploading(true);
+    try {
+      const url = await uploadImageToStorage(result.assets[0].uri);
+      setForm((p) => ({ ...p, [kind === "logo" ? "logoUrl" : "coverImageUrl"]: url }));
+    } catch (e) {
+      Alert.alert("Upload failed", (e as Error).message);
+    } finally {
+      setUploading(false);
+    }
   }
   return (
     <ScrollView contentContainerStyle={[{ padding: 16 }, useBottomPad(insets)]}>
@@ -834,12 +1180,41 @@ function ProfileTab({ colors, insets }: { colors: Pal; insets: { bottom: number 
           {o.verified && <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}><Ionicons name="checkmark-circle" size={14} color="#f59e0b" /><Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Verified</Text></View>}
         </View>
       )}
+
+      <Field colors={colors} label="Logo">
+        <TouchableOpacity onPress={() => pickAndUpload("logo")} disabled={uploadingLogo} style={{ width: 72, height: 72, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.muted, alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+          {uploadingLogo ? <ActivityIndicator color={colors.primary} /> : form.logoUrl ? (
+            <Image source={{ uri: resolveImageUrl(form.logoUrl) }} style={{ width: "100%", height: "100%" }} />
+          ) : (
+            <Ionicons name="image-outline" size={22} color={colors.mutedForeground} />
+          )}
+        </TouchableOpacity>
+      </Field>
+      <Field colors={colors} label="Cover image">
+        <TouchableOpacity onPress={() => pickAndUpload("cover")} disabled={uploadingCover} style={{ width: "100%", height: 110, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.muted, alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+          {uploadingCover ? <ActivityIndicator color={colors.primary} /> : form.coverImageUrl ? (
+            <Image source={{ uri: resolveImageUrl(form.coverImageUrl) }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+          ) : (
+            <View style={{ alignItems: "center", gap: 4 }}>
+              <Ionicons name="image-outline" size={22} color={colors.mutedForeground} />
+              <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Tap to upload</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </Field>
+
       <Field colors={colors} label="Organizer name"><Inp colors={colors} value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} placeholder="Name" /></Field>
       <Field colors={colors} label="About"><Inp colors={colors} value={form.description} onChangeText={(v) => setForm({ ...form, description: v })} placeholder="Describe your brand" multiline /></Field>
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <Field colors={colors} label="City" flex><Inp colors={colors} value={form.city} onChangeText={(v) => setForm({ ...form, city: v })} placeholder="City" /></Field>
+        <Field colors={colors} label="State" flex><Inp colors={colors} value={form.state} onChangeText={(v) => setForm({ ...form, state: v })} placeholder="State" /></Field>
+      </View>
       <Field colors={colors} label="Support email"><Inp colors={colors} value={form.supportEmail} onChangeText={(v) => setForm({ ...form, supportEmail: v })} placeholder="email" keyboardType="email-address" autoCapitalize="none" /></Field>
       <Field colors={colors} label="Support phone"><Inp colors={colors} value={form.supportPhone} onChangeText={(v) => setForm({ ...form, supportPhone: v })} placeholder="phone" keyboardType="phone-pad" /></Field>
       <Field colors={colors} label="Website"><Inp colors={colors} value={form.website} onChangeText={(v) => setForm({ ...form, website: v })} placeholder="https://" autoCapitalize="none" /></Field>
       <Field colors={colors} label="Instagram"><Inp colors={colors} value={form.instagram} onChangeText={(v) => setForm({ ...form, instagram: v })} placeholder="@handle" autoCapitalize="none" /></Field>
+      <Field colors={colors} label="Facebook"><Inp colors={colors} value={form.facebook} onChangeText={(v) => setForm({ ...form, facebook: v })} placeholder="facebook.com/yourpage" autoCapitalize="none" /></Field>
+      <Field colors={colors} label="YouTube"><Inp colors={colors} value={form.youtube} onChangeText={(v) => setForm({ ...form, youtube: v })} placeholder="youtube.com/@yourchannel" autoCapitalize="none" /></Field>
       <PrimaryBtn colors={colors} label="Save profile" onPress={save} />
     </ScrollView>
   );

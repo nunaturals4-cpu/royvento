@@ -14,8 +14,10 @@ import {
   useUpdateReview,
 } from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { uploadImageToStorage } from "@/lib/uploadImage";
 import {
   ActivityIndicator,
   Alert,
@@ -37,7 +39,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 
-type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "announcements" | "reports" | "commissions" | "settlements" | "live-occupancy" | "reviews" | "plans" | "create-pub" | "event-organizers" | "game-organizers" | "solo-connect" | "private-parties";
+type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "announcements" | "reports" | "commissions" | "settlements" | "live-occupancy" | "reviews" | "plans" | "create-pub" | "venues" | "event-organizers" | "game-organizers" | "solo-connect" | "private-parties";
+
+const ANALYTICS_DATE_PRESETS: { key: string; label: string; days: number | null }[] = [
+  { key: "all", label: "All time", days: null },
+  { key: "today", label: "Today", days: 0 },
+  { key: "7d", label: "7 days", days: 7 },
+  { key: "30d", label: "30 days", days: 30 },
+  { key: "3m", label: "3 months", days: 90 },
+  { key: "6m", label: "6 months", days: 180 },
+];
 
 interface ContactMessage {
   id: number;
@@ -68,14 +79,19 @@ interface TopPub {
 
 interface CrmLead {
   id: number;
-  name?: string;
-  email?: string;
-  phone?: string;
-  vendorId?: number;
-  vendorName?: string;
-  eventTitle?: string;
-  source: string;
-  createdAt: string;
+  vendorId: number;
+  vendorName: string;
+  vendorCity: string;
+  viewerUserId: number | null;
+  viewerName: string;
+  viewerEmail: string;
+  viewedAt: string;
+  converted: boolean;
+}
+interface CrmSummary {
+  totalViews: number; allTimeTotalViews: number; knownLeads: number; anonymousVisitors: number;
+  conversions: number; conversionRate: number;
+  vendors: { vendorId: number; vendorName: string; vendorCity: string; totalViews: number; knownLeads: number; anonymousVisitors: number; conversions: number; conversionRate: number }[];
 }
 
 interface AdminVendor {
@@ -224,6 +240,10 @@ interface AdminEvent {
   vendorId: number;
   partnerName?: string;
   createdAt: string;
+  popular?: boolean;
+  featured?: boolean;
+  dateNight?: boolean;
+  hidden?: boolean;
 }
 
 interface AdminBooking {
@@ -545,6 +565,104 @@ interface CommissionReport {
   totals: { totalBookings: number; totalRevenue: number; totalCommission: number; collectedCommission: number; pendingCommission: number };
 }
 
+interface GameCommissionRow { id: number; name: string; organizerName: string; commissionPct: string; }
+function AdminOtherCommissionsPanel({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [partyType, setPartyType] = useState<"fixed" | "percentage">("percentage");
+  const [partyValue, setPartyValue] = useState("10");
+  const [savingParty, setSavingParty] = useState(false);
+  const [games, setGames] = useState<GameCommissionRow[]>([]);
+  const [packages, setPackages] = useState<GameCommissionRow[]>([]);
+  const [gameDrafts, setGameDrafts] = useState<Record<string, string>>({});
+  const [savingItem, setSavingItem] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    customFetch<{ commissionType: "fixed" | "percentage"; value: number }>("/api/admin/create-your-party/commission")
+      .then((c) => { setPartyType(c.commissionType); setPartyValue(String(c.value)); }).catch(() => {});
+    customFetch<GameCommissionRow[]>("/api/admin/games").then(setGames).catch(() => {});
+    customFetch<GameCommissionRow[]>("/api/admin/game-packages").then(setPackages).catch(() => {});
+  }, []);
+
+  async function saveParty() {
+    setSavingParty(true);
+    try {
+      await customFetch("/api/admin/create-your-party/commission", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commissionType: partyType, value: Number(partyValue) || 0 }) });
+      Alert.alert("Saved", "Party commission updated.");
+    } catch (e) { Alert.alert("Save failed", (e as Error).message); }
+    finally { setSavingParty(false); }
+  }
+
+  async function saveItemCommission(kind: "game" | "package", id: number) {
+    const key = `${kind}-${id}`;
+    const val = gameDrafts[key];
+    if (val === undefined) return;
+    setSavingItem(key);
+    try {
+      const path = kind === "game" ? `/api/admin/games/${id}/commission` : `/api/admin/game-packages/${id}/commission`;
+      await customFetch(path, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commissionPct: Number(val) || 0 }) });
+      const setter = kind === "game" ? setGames : setPackages;
+      setter((prev) => prev.map((r) => (r.id === id ? { ...r, commissionPct: val } : r)));
+    } catch (e) { Alert.alert("Save failed", (e as Error).message); }
+    finally { setSavingItem(null); }
+  }
+
+  return (
+    <View style={{ gap: 16 }}>
+      <View>
+        <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground, marginBottom: 8 }}>CREATE-YOUR-PARTY COMMISSION</Text>
+        <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 14, gap: 10 }}>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {(["percentage", "fixed"] as const).map((t) => (
+              <TouchableOpacity key={t} onPress={() => setPartyType(t)} style={{ flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", borderColor: partyType === t ? colors.primary : colors.border, backgroundColor: partyType === t ? colors.primary + "22" : "transparent" }}>
+                <Text style={{ color: partyType === t ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>{t === "percentage" ? "% of price" : "Fixed ₹"}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput
+            value={partyValue} onChangeText={setPartyValue} keyboardType="number-pad" placeholder="Value"
+            placeholderTextColor={colors.mutedForeground}
+            style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, color: colors.foreground, fontSize: 13, backgroundColor: colors.muted }}
+          />
+          <TouchableOpacity onPress={saveParty} disabled={savingParty} style={{ borderRadius: 10, paddingVertical: 11, alignItems: "center", backgroundColor: colors.primary, opacity: savingParty ? 0.7 : 1 }}>
+            <Text style={{ color: colors.primaryForeground, fontSize: 13, fontFamily: "Inter_700Bold" }}>{savingParty ? "Saving…" : "Save"}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View>
+        <TouchableOpacity onPress={() => setExpanded((v) => !v)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground }}>GAME ORGANIZER COMMISSION ({games.length + packages.length})</Text>
+          <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={16} color={colors.mutedForeground} />
+        </TouchableOpacity>
+        {expanded && (
+          <View style={{ gap: 8 }}>
+            {[...games.map((g) => ({ ...g, kind: "game" as const })), ...packages.map((p) => ({ ...p, kind: "package" as const }))].map((row) => {
+              const key = `${row.kind}-${row.id}`;
+              const draft = gameDrafts[key] ?? row.commissionPct;
+              return (
+                <View key={key} style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_600SemiBold" }} numberOfLines={1}>{row.name}</Text>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>{row.organizerName} · {row.kind}</Text>
+                  </View>
+                  <TextInput
+                    value={draft} onChangeText={(v) => setGameDrafts((p) => ({ ...p, [key]: v }))} keyboardType="number-pad"
+                    style={{ width: 56, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, color: colors.foreground, fontSize: 12, backgroundColor: colors.muted, textAlign: "center" }}
+                  />
+                  <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>%</Text>
+                  <TouchableOpacity onPress={() => saveItemCommission(row.kind, row.id)} disabled={savingItem === key} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.primary, opacity: savingItem === key ? 0.6 : 1 }}>
+                    <Text style={{ color: colors.primaryForeground, fontSize: 11, fontFamily: "Inter_600SemiBold" }}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
 function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
   const [vendors, setVendors] = useState<CommissionVendor[]>([]);
   const [rates, setRates] = useState<Record<number, CommissionRates>>({});
@@ -668,6 +786,8 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
 
   return (
     <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 100 }}>
+      <AdminOtherCommissionsPanel colors={colors} />
+
       {/* ── Commission Fees Section ── */}
       <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground }}>
         COMMISSION FEES PER PUB
@@ -1065,16 +1185,38 @@ function AdminBookingReportTab({ colors }: { colors: ReturnType<typeof useColors
 }
 
 // ─── AdminCrmLeadsTab ─────────────────────────────────────────────────────────
+const CRM_DATE_PRESETS = [
+  { key: "all", label: "All time", days: null as number | null },
+  { key: "today", label: "Today", days: 0 },
+  { key: "7d", label: "7 days", days: 7 },
+  { key: "30d", label: "30 days", days: 30 },
+];
+function crmPresetRange(days: number | null): { startDate?: string; endDate?: string } {
+  if (days === null) return {};
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  return { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) };
+}
 function AdminCrmLeadsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
   const [leads, setLeads] = useState<CrmLead[]>([]);
+  const [summary, setSummary] = useState<CrmSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [preset, setPreset] = useState("all");
+  const [leadType, setLeadType] = useState<"all" | "known" | "anonymous">("all");
 
   function loadLeads(p: number, append = false) {
     if (p === 1) setLoading(true); else setLoadingMore(true);
-    customFetch<{ leads: CrmLead[]; total: number; totalPages: number }>(`/api/admin/leads?page=${p}&limit=20`)
+    const { startDate, endDate } = crmPresetRange(CRM_DATE_PRESETS.find((x) => x.key === preset)?.days ?? null);
+    const q = new URLSearchParams({ page: String(p) });
+    if (startDate) q.set("startDate", startDate);
+    if (endDate) q.set("endDate", endDate);
+    if (leadType === "known") q.set("knownOnly", "true");
+    if (leadType === "anonymous") q.set("anonymousOnly", "true");
+    customFetch<{ leads: CrmLead[]; total: number; totalPages: number }>(`/api/admin/leads?${q.toString()}`)
       .then((r) => {
         setLeads(append ? (prev) => [...prev, ...(r.leads ?? [])] : (r.leads ?? []));
         setHasMore(p < r.totalPages);
@@ -1082,15 +1224,51 @@ function AdminCrmLeadsTab({ colors }: { colors: ReturnType<typeof useColors> }) 
       .catch(() => {})
       .finally(() => { setLoading(false); setLoadingMore(false); });
   }
+  function loadSummary() {
+    const { startDate, endDate } = crmPresetRange(CRM_DATE_PRESETS.find((x) => x.key === preset)?.days ?? null);
+    const q = new URLSearchParams();
+    if (startDate) q.set("startDate", startDate);
+    if (endDate) q.set("endDate", endDate);
+    customFetch<CrmSummary>(`/api/admin/leads/summary?${q.toString()}`).then(setSummary).catch(() => setSummary(null));
+  }
 
-  useEffect(() => { loadLeads(1); }, []);
-
-  if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+  useEffect(() => { setPage(1); loadLeads(1); loadSummary(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [preset, leadType]);
 
   return (
     <ScrollView contentContainerStyle={{ padding: 20, gap: 10, paddingBottom: 100 }}>
-      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground }}>{leads.length} LEADS</Text>
-      {leads.length === 0 ? (
+      <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+        {CRM_DATE_PRESETS.map((p) => (
+          <TouchableOpacity key={p.key} onPress={() => setPreset(p.key)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: preset === p.key ? colors.primary : colors.border, backgroundColor: preset === p.key ? colors.primary + "22" : "transparent" }}>
+            <Text style={{ color: preset === p.key ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>{p.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+        {([["all", "All leads"], ["known", "Known"], ["anonymous", "Anonymous"]] as const).map(([k, label]) => (
+          <TouchableOpacity key={k} onPress={() => setLeadType(k)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: leadType === k ? colors.primary : colors.border, backgroundColor: leadType === k ? colors.primary + "22" : "transparent" }}>
+            <Text style={{ color: leadType === k ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {summary && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+          {[
+            { label: "Total views", value: String(summary.totalViews) },
+            { label: "Known leads", value: String(summary.knownLeads) },
+            { label: "Anonymous", value: String(summary.anonymousVisitors) },
+            { label: "Conversions", value: `${summary.conversions} (${summary.conversionRate}%)` },
+          ].map((s) => (
+            <View key={s.label} style={{ flexGrow: 1, minWidth: "45%", borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 10 }}>
+              <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color: colors.foreground }}>{s.value}</Text>
+              <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground, textTransform: "uppercase" }}>{s.label}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground, marginTop: 8 }}>{leads.length} LEADS</Text>
+      {loading ? <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} /> : leads.length === 0 ? (
         <View style={{ alignItems: "center", padding: 32, gap: 12 }}>
           <Ionicons name="person-add-outline" size={40} color={colors.mutedForeground} />
           <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>No leads found.</Text>
@@ -1098,16 +1276,22 @@ function AdminCrmLeadsTab({ colors }: { colors: ReturnType<typeof useColors> }) 
       ) : leads.map((lead) => (
         <View key={lead.id} style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{lead.name || "Anonymous"}</Text>
-            <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.muted }}>
-              <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{lead.source}</Text>
+            <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{lead.viewerName || "Anonymous"}</Text>
+            <View style={{ flexDirection: "row", gap: 6 }}>
+              {lead.converted && (
+                <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: "#16a34a22" }}>
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#4ade80" }}>Converted</Text>
+                </View>
+              )}
+              <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.muted }}>
+                <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{lead.viewerUserId ? "Known" : "Anonymous"}</Text>
+              </View>
             </View>
           </View>
-          {lead.email && <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{lead.email}{lead.phone ? ` · ${lead.phone}` : ""}</Text>}
-          {lead.vendorName && <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.primary }}>{lead.vendorName}</Text>}
-          {lead.eventTitle && <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }} numberOfLines={1}>{lead.eventTitle}</Text>}
+          {!!lead.viewerEmail && <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{lead.viewerEmail}</Text>}
+          <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.primary }}>{lead.vendorName}{lead.vendorCity ? ` · ${lead.vendorCity}` : ""}</Text>
           <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
-            {new Date(lead.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+            {new Date(lead.viewedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
           </Text>
         </View>
       ))}
@@ -1120,6 +1304,138 @@ function AdminCrmLeadsTab({ colors }: { colors: ReturnType<typeof useColors> }) 
           {loadingMore ? <ActivityIndicator color={colors.primary} size="small" /> : <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Load more</Text>}
         </TouchableOpacity>
       )}
+    </ScrollView>
+  );
+}
+
+// ─── AdminVendorCouponsTab: moderate vendor_coupons (pub-level discount codes) ─
+interface VendorCouponRow {
+  id: number; vendorId: number; vendorName: string; code: string; discountType: string; discountValue: string;
+  applicableTo: string; audience: string; active: boolean; maxUses: number | null; usedCount: number; expiresAt: string | null;
+}
+const VENDOR_COUPON_APPLICABLE = ["both", "ticket", "event", "event_booking", "cover_charge", "vip_table"];
+const VENDOR_COUPON_AUDIENCE = ["all", "followers", "non_followers"];
+function AdminVendorCouponsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [rows, setRows] = useState<VendorCouponRow[]>([]);
+  const [vendors, setVendors] = useState<{ id: number; businessName: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [vendorId, setVendorId] = useState<number | null>(null);
+  const [code, setCode] = useState("");
+  const [discountType, setDiscountType] = useState("percent");
+  const [discountValue, setDiscountValue] = useState("10");
+  const [applicableTo, setApplicableTo] = useState("both");
+  const [audience, setAudience] = useState("all");
+  const [maxUses, setMaxUses] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      customFetch<VendorCouponRow[]>("/api/admin/vendor-coupons"),
+      customFetch<{ data: { id: number; businessName: string }[] }>("/api/admin/vendors?limit=200"),
+    ]).then(([c, v]) => { setRows(c); setVendors(v.data); }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function create() {
+    if (!vendorId) { Alert.alert("Pick a venue first"); return; }
+    setSaving(true);
+    try {
+      await customFetch("/api/admin/vendor-coupons", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+        vendorId, code: code.trim() || undefined, discountType, discountValue: Number(discountValue), applicableTo, audience,
+        maxUses: maxUses.trim() ? Math.max(1, parseInt(maxUses) || 1) : null,
+      }) });
+      setCode(""); setDiscountValue("10"); setMaxUses(""); load();
+    } catch (e) { Alert.alert("Create failed", (e as Error).message); }
+    finally { setSaving(false); }
+  }
+  async function toggle(c: VendorCouponRow) {
+    try { await customFetch(`/api/admin/vendor-coupons/${c.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active: !c.active }) }); load(); } catch {}
+  }
+  function remove(c: VendorCouponRow) {
+    Alert.alert("Delete coupon?", c.code, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => { try { await customFetch(`/api/admin/vendor-coupons/${c.id}`, { method: "DELETE" }); load(); } catch (e) { Alert.alert("Delete failed", (e as Error).message); } } },
+    ]);
+  }
+
+  if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 10, paddingBottom: 100 }}>
+      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground }}>CREATE VENDOR COUPON</Text>
+      <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.primary + "30", backgroundColor: colors.card, padding: 12, gap: 10 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            {vendors.map((v) => (
+              <TouchableOpacity key={v.id} onPress={() => setVendorId(v.id)} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: vendorId === v.id ? colors.primary : colors.border, backgroundColor: vendorId === v.id ? colors.primary + "22" : "transparent" }}>
+                <Text style={{ color: vendorId === v.id ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }} numberOfLines={1}>{v.businessName}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+        <TextInput
+          value={code} onChangeText={setCode} placeholder="Code (optional, auto-generated)" placeholderTextColor={colors.mutedForeground} autoCapitalize="characters"
+          style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, color: colors.foreground, fontSize: 13, backgroundColor: colors.muted }}
+        />
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {["percent", "fixed"].map((t) => (
+            <TouchableOpacity key={t} onPress={() => setDiscountType(t)} style={{ flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", borderColor: discountType === t ? colors.primary : colors.border, backgroundColor: discountType === t ? colors.primary + "22" : "transparent" }}>
+              <Text style={{ color: discountType === t ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>{t === "percent" ? "% off" : "₹ off"}</Text>
+            </TouchableOpacity>
+          ))}
+          <TextInput
+            value={discountValue} onChangeText={setDiscountValue} keyboardType="number-pad" placeholder="Value" placeholderTextColor={colors.mutedForeground}
+            style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, color: colors.foreground, fontSize: 13, backgroundColor: colors.muted }}
+          />
+        </View>
+        <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, textTransform: "uppercase" }}>Applies to</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            {VENDOR_COUPON_APPLICABLE.map((a) => (
+              <TouchableOpacity key={a} onPress={() => setApplicableTo(a)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: applicableTo === a ? colors.primary : colors.border, backgroundColor: applicableTo === a ? colors.primary + "22" : "transparent" }}>
+                <Text style={{ color: applicableTo === a ? colors.primary : colors.mutedForeground, fontSize: 11, fontFamily: "Inter_500Medium" }}>{a.replace(/_/g, " ")}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+        <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, textTransform: "uppercase" }}>Audience</Text>
+        <View style={{ flexDirection: "row", gap: 6 }}>
+          {VENDOR_COUPON_AUDIENCE.map((a) => (
+            <TouchableOpacity key={a} onPress={() => setAudience(a)} style={{ flex: 1, paddingVertical: 7, borderRadius: 999, borderWidth: 1, alignItems: "center", borderColor: audience === a ? colors.primary : colors.border, backgroundColor: audience === a ? colors.primary + "22" : "transparent" }}>
+              <Text style={{ color: audience === a ? colors.primary : colors.mutedForeground, fontSize: 11, fontFamily: "Inter_500Medium" }}>{a.replace(/_/g, " ")}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TextInput
+          value={maxUses} onChangeText={(v) => setMaxUses(v.replace(/[^0-9]/g, ""))} placeholder="Max uses (optional)" placeholderTextColor={colors.mutedForeground} keyboardType="number-pad"
+          style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, color: colors.foreground, fontSize: 13, backgroundColor: colors.muted }}
+        />
+        <TouchableOpacity onPress={create} disabled={saving} style={{ borderRadius: 10, paddingVertical: 12, alignItems: "center", backgroundColor: colors.primary, opacity: saving ? 0.7 : 1 }}>
+          <Text style={{ color: colors.primaryForeground, fontSize: 13, fontFamily: "Inter_700Bold" }}>{saving ? "Creating…" : "Create coupon"}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground, marginTop: 8 }}>{rows.length} VENDOR COUPONS</Text>
+      {rows.map((c) => (
+        <View key={c.id} style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{c.code}</Text>
+            <Switch value={c.active} onValueChange={() => toggle(c)} trackColor={{ true: colors.primary }} />
+          </View>
+          <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.primary }}>{c.vendorName}</Text>
+          <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+            {c.discountType === "fixed" ? `₹${c.discountValue}` : `${c.discountValue}%`} off · {c.applicableTo.replace(/_/g, " ")} · {c.audience.replace(/_/g, " ")}
+          </Text>
+          <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+            used {c.usedCount}{c.maxUses ? `/${c.maxUses}` : ""}{c.expiresAt ? ` · expires ${new Date(c.expiresAt).toLocaleDateString()}` : ""}
+          </Text>
+          <TouchableOpacity onPress={() => remove(c)} style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
+            <Ionicons name="trash-outline" size={13} color="#ef4444" />
+            <Text style={{ color: "#ef4444", fontSize: 11, fontFamily: "Inter_600SemiBold" }}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
     </ScrollView>
   );
 }
@@ -1241,9 +1557,18 @@ export default function AdminPanelScreen() {
   const [activeTab, setActiveTab] = useState<AdminTab>("analytics");
 
   // ─── ANALYTICS ─────────────────────────────────────────────────────────────
-  const analyticsQ = useGetAdminAnalytics({}, { query: { queryKey: getGetAdminAnalyticsQueryKey({}), enabled: activeTab === "analytics" } });
-  const leadsQ = useGetAdminLeadsSummary({}, { query: { queryKey: getGetAdminLeadsSummaryQueryKey({}), enabled: activeTab === "analytics" } });
-  const bookingsReportQ = useGetAdminBookingsReport({}, { query: { queryKey: getGetAdminBookingsReportQueryKey({}), enabled: activeTab === "analytics" } });
+  const [analyticsPreset, setAnalyticsPreset] = useState<string>("all");
+  const analyticsRange = useMemo(() => {
+    const preset = ANALYTICS_DATE_PRESETS.find((p) => p.key === analyticsPreset);
+    if (!preset || preset.days === null) return {};
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - preset.days);
+    return { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) };
+  }, [analyticsPreset]);
+  const analyticsQ = useGetAdminAnalytics(analyticsRange, { query: { queryKey: getGetAdminAnalyticsQueryKey(analyticsRange), enabled: activeTab === "analytics" } });
+  const leadsQ = useGetAdminLeadsSummary(analyticsRange, { query: { queryKey: getGetAdminLeadsSummaryQueryKey(analyticsRange), enabled: activeTab === "analytics" } });
+  const bookingsReportQ = useGetAdminBookingsReport(analyticsRange, { query: { queryKey: getGetAdminBookingsReportQueryKey(analyticsRange), enabled: activeTab === "analytics" } });
 
   // ─── VENDORS & VENDOR REQUESTS ──────────────────────────────────────────────
   const [vendors, setVendors] = useState<AdminVendor[]>([]);
@@ -1386,6 +1711,16 @@ export default function AdminPanelScreen() {
       .finally(() => setSubLoading(false));
   }, []);
 
+  function deleteSubscription(id: number) {
+    Alert.alert("Delete subscription?", "This cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+        try { await customFetch(`/api/admin/subscriptions/${id}`, { method: "DELETE" }); fetchSubscriptions(); }
+        catch (e) { Alert.alert("Delete failed", (e as Error).message); }
+      } },
+    ]);
+  }
+
   // ─── COUPONS ────────────────────────────────────────────────────────────────
   const [coupons, setCoupons] = useState<AdminCoupon[]>([]);
   const [couponLoading, setCouponLoading] = useState(false);
@@ -1422,6 +1757,18 @@ export default function AdminPanelScreen() {
   const [editingBlogId, setEditingBlogId] = useState<number | null>(null);
   const [blogForm, setBlogForm] = useState<BlogEditorForm>(EMPTY_BLOG_FORM);
   const [savingBlog, setSavingBlog] = useState(false);
+  const [uploadingBlogImage, setUploadingBlogImage] = useState(false);
+
+  async function pickBlogImage() {
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+    if (res.canceled || !res.assets[0]) return;
+    setUploadingBlogImage(true);
+    try {
+      const url = await uploadImageToStorage(res.assets[0].uri, res.assets[0].mimeType ?? undefined);
+      setBlogForm((p) => ({ ...p, imageUrl: url }));
+    } catch { Alert.alert("Upload failed"); }
+    finally { setUploadingBlogImage(false); }
+  }
 
   const openBlogEditor = useCallback((b: AdminBlog | null) => {
     if (b) {
@@ -1663,6 +2010,7 @@ export default function AdminPanelScreen() {
   }, []);
 
   // ─── COUPON GRANT FORM STATE ─────────────────────────────────────────────────
+  const [couponSubTab, setCouponSubTab] = useState<"user" | "vendor">("user");
   const [grantEmail, setGrantEmail] = useState("");
   const [grantDiscount, setGrantDiscount] = useState("10");
   const [grantLoading, setGrantLoading] = useState(false);
@@ -1687,6 +2035,35 @@ export default function AdminPanelScreen() {
 
   // ─── VENDOR STATUS EDIT ──────────────────────────────────────────────────────
   const [editVendorId, setEditVendorId] = useState<number | null>(null);
+
+  // ─── VENDOR FULL PROFILE EDIT ────────────────────────────────────────────────
+  const [editVendorProfileId, setEditVendorProfileId] = useState<number | null>(null);
+  const [vendorProfileForm, setVendorProfileForm] = useState({ businessName: "", category: "", description: "", country: "", state: "", city: "", address: "", mapLocation: "" });
+  const [savingVendorProfile, setSavingVendorProfile] = useState(false);
+
+  function openVendorProfileEdit(v: AdminVendor) {
+    setVendorProfileForm({ businessName: v.businessName, category: v.category, description: "", country: "", state: "", city: v.location ?? "", address: "", mapLocation: "" });
+    setEditVendorProfileId(v.id);
+  }
+  async function saveVendorProfile() {
+    if (editVendorProfileId === null) return;
+    setSavingVendorProfile(true);
+    try {
+      await customFetch(`/api/admin/vendors/${editVendorProfileId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessName: vendorProfileForm.businessName, category: vendorProfileForm.category, description: vendorProfileForm.description }),
+      });
+      if (vendorProfileForm.country || vendorProfileForm.state || vendorProfileForm.city || vendorProfileForm.address || vendorProfileForm.mapLocation) {
+        await customFetch(`/api/admin/vendors/${editVendorProfileId}/location`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ country: vendorProfileForm.country, state: vendorProfileForm.state, city: vendorProfileForm.city, address: vendorProfileForm.address, mapLocation: vendorProfileForm.mapLocation }),
+        });
+      }
+      setEditVendorProfileId(null);
+      fetchVendors();
+    } catch (e) { Alert.alert("Save failed", (e as Error).message); }
+    finally { setSavingVendorProfile(false); }
+  }
 
   useEffect(() => {
     if (activeTab === "vendors") fetchVendors();
@@ -1941,6 +2318,17 @@ export default function AdminPanelScreen() {
     }
   }
 
+  async function toggleEventFlag(e: AdminEvent, key: "popular" | "featured" | "dateNight" | "hidden") {
+    const next = !e[key];
+    setEvents((prev) => prev.map((row) => (row.id === e.id ? { ...row, [key]: next } : row)));
+    try {
+      await customFetch(`/api/admin/events/${e.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [key]: next }) });
+    } catch {
+      Alert.alert("Error", "Failed to update event.");
+      fetchEvents();
+    }
+  }
+
   // ─── BOOKING ACTIONS ────────────────────────────────────────────────────────
   async function approveBooking(id: number) {
     try {
@@ -2005,6 +2393,13 @@ export default function AdminPanelScreen() {
 
     return (
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]}>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+          {ANALYTICS_DATE_PRESETS.map((p) => (
+            <TouchableOpacity key={p.key} onPress={() => setAnalyticsPreset(p.key)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: analyticsPreset === p.key ? colors.primary : colors.border, backgroundColor: analyticsPreset === p.key ? colors.primary + "22" : "transparent" }}>
+              <Text style={{ color: analyticsPreset === p.key ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>{p.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>PLATFORM OVERVIEW</Text>
         <View style={styles.kpiGrid}>
           {kpis.map((k) => (
@@ -2242,6 +2637,44 @@ export default function AdminPanelScreen() {
           </View>
         )}
 
+        {editVendorProfileId !== null && (
+          <View style={[styles.rejectBox, { backgroundColor: colors.card, borderColor: colors.primary + "40", marginBottom: 8, gap: 8 }]}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Edit Profile</Text>
+            {([["businessName", "Business name"], ["category", "Category"], ["description", "Description"]] as const).map(([k, label]) => (
+              <TextInput
+                key={k}
+                value={vendorProfileForm[k]}
+                onChangeText={(v) => setVendorProfileForm((p) => ({ ...p, [k]: v }))}
+                placeholder={label}
+                placeholderTextColor={colors.mutedForeground}
+                multiline={k === "description"}
+                style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted, minHeight: k === "description" ? 60 : 0, paddingVertical: 10 }]}
+              />
+            ))}
+            <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, textTransform: "uppercase", marginTop: 4 }}>Location (optional)</Text>
+            {([["country", "Country"], ["state", "State"], ["city", "City"], ["address", "Address"], ["mapLocation", "Google Maps link"]] as const).map(([k, label]) => (
+              <TextInput
+                key={k}
+                value={vendorProfileForm[k]}
+                onChangeText={(v) => setVendorProfileForm((p) => ({ ...p, [k]: v }))}
+                placeholder={label}
+                placeholderTextColor={colors.mutedForeground}
+                style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted, minHeight: 0, paddingVertical: 10 }]}
+              />
+            ))}
+            <TouchableOpacity
+              style={[styles.actionBtnWide, { backgroundColor: colors.primary, borderColor: colors.primary, justifyContent: "center" }]}
+              onPress={saveVendorProfile}
+              disabled={savingVendorProfile}
+            >
+              <Text style={{ color: colors.primaryForeground, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>{savingVendorProfile ? "Saving…" : "Save profile"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setEditVendorProfileId(null)}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center" }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: pendingRequests.length > 0 ? 20 : 0 }]}>ALL PARTNERS ({vendors.length})</Text>
         {vendors.map((v) => {
           function statusColor(s: string) {
@@ -2274,6 +2707,13 @@ export default function AdminPanelScreen() {
                 >
                   <Ionicons name="create-outline" size={14} color={colors.foreground} />
                   <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_500Medium" }}>Status</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtnWide, { backgroundColor: colors.muted, borderColor: colors.border, flex: 1 }]}
+                  onPress={() => (editVendorProfileId === v.id ? setEditVendorProfileId(null) : openVendorProfileEdit(v))}
+                >
+                  <Ionicons name="business-outline" size={14} color={colors.foreground} />
+                  <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_500Medium" }}>Profile</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: "#ef444410", borderColor: "#ef444440" }]}
@@ -2607,6 +3047,16 @@ export default function AdminPanelScreen() {
                 <Ionicons name="trash-outline" size={14} color={colors.destructive} />
               </TouchableOpacity>
             </View>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 }}>
+              {([["popular", "Popular"], ["featured", "Featured"], ["dateNight", "Date Night"], ["hidden", "Hidden"]] as const).map(([key, label]) => {
+                const on = !!e[key];
+                return (
+                  <TouchableOpacity key={key} onPress={() => toggleEventFlag(e, key)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primary + "22" : "transparent" }}>
+                    <Text style={{ color: on ? colors.primary : colors.mutedForeground, fontSize: 11, fontFamily: "Inter_500Medium" }}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         ))}
       </ScrollView>
@@ -2639,6 +3089,10 @@ export default function AdminPanelScreen() {
                 <Text style={{ color: subStatusColor(s.status), fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{s.status}</Text>
               </View>
               <Text style={{ color: colors.mutedForeground, fontSize: 10, fontFamily: "Inter_400Regular" }}>Exp: {new Date(s.expiresAt).toLocaleDateString("en-IN")}</Text>
+              <TouchableOpacity onPress={() => deleteSubscription(s.id)} style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                <Ionicons name="trash-outline" size={13} color="#ef4444" />
+                <Text style={{ color: "#ef4444", fontSize: 11, fontFamily: "Inter_600SemiBold" }}>Delete</Text>
+              </TouchableOpacity>
             </View>
           </View>
         ))}
@@ -2651,9 +3105,32 @@ export default function AdminPanelScreen() {
     const activeCoupons = coupons.filter((c) => !c.used);
     const usedCoupons = coupons.filter((c) => c.used);
 
+    if (couponSubTab === "vendor") {
+      return (
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", gap: 8, padding: 16, paddingBottom: 0 }}>
+            {(["user", "vendor"] as const).map((t) => (
+              <TouchableOpacity key={t} onPress={() => setCouponSubTab(t)} style={{ flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", borderColor: couponSubTab === t ? colors.primary : colors.border, backgroundColor: couponSubTab === t ? colors.primary + "22" : "transparent" }}>
+                <Text style={{ color: couponSubTab === t ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{t === "user" ? "User coupons" : "Vendor coupons"}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <AdminVendorCouponsTab colors={colors} />
+        </View>
+      );
+    }
+
     return (
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={couponLoading} onRefresh={fetchCoupons} tintColor={colors.primary} />}>
         {couponLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
+
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
+          {(["user", "vendor"] as const).map((t) => (
+            <TouchableOpacity key={t} onPress={() => setCouponSubTab(t)} style={{ flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", borderColor: couponSubTab === t ? colors.primary : colors.border, backgroundColor: couponSubTab === t ? colors.primary + "22" : "transparent" }}>
+              <Text style={{ color: couponSubTab === t ? colors.primary : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{t === "user" ? "User coupons" : "Vendor coupons"}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {/* GRANT COUPON FORM */}
         <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>GRANT NEW COUPON</Text>
@@ -3440,6 +3917,7 @@ export default function AdminPanelScreen() {
     { key: "solo-connect" as AdminTab, icon: "shield-checkmark-outline" as const, label: "Solo Mod" },
     { key: "private-parties" as AdminTab, icon: "balloon-outline" as const, label: "Parties" },
     { key: "create-pub" as AdminTab, icon: "add-circle-outline" as const, label: "Create Pub" },
+    { key: "venues" as AdminTab, icon: "storefront-outline" as const, label: "Venues" },
   ];
 
   if (!user || user.role !== "admin") {
@@ -3514,6 +3992,7 @@ export default function AdminPanelScreen() {
       {activeTab === "solo-connect" && <AdminSoloModerationTab colors={colors} />}
       {activeTab === "private-parties" && <AdminPrivatePartiesTab colors={colors} />}
       {activeTab === "create-pub" && <AdminCreatePubTab colors={colors} />}
+      {activeTab === "venues" && <AdminVenuesTab colors={colors} />}
 
       {/* Blog editor sheet — full-screen modal so the long content textarea
           has room. Renders at the page root so it overlays the active tab. */}
@@ -3600,6 +4079,15 @@ export default function AdminPanelScreen() {
               placeholder="https://…"
               autoCapitalize="none"
             />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              {!!blogForm.imageUrl && (
+                <Image source={{ uri: resolveImageUrl(blogForm.imageUrl) }} style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: colors.muted }} />
+              )}
+              <TouchableOpacity onPress={pickBlogImage} disabled={uploadingBlogImage} style={{ flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 }}>
+                {uploadingBlogImage ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="image-outline" size={15} color={colors.foreground} />}
+                <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_500Medium" }}>{uploadingBlogImage ? "Uploading…" : "Upload image"}</Text>
+              </TouchableOpacity>
+            </View>
             <BlogEditorField
               label="Author"
               value={blogForm.authorName}
@@ -4010,6 +4498,295 @@ function AdminCreatePubTab({ colors }: { colors: AdminPal }) {
   );
 }
 
+// ─── Venues (assign admin-owned venues to partners + audit trail) ───────────
+interface AdminVenue {
+  id: number; businessName: string; category: string; city: string; state: string; country: string;
+  bannerImage: string; status: string; assignmentStatus: string; assignedAt: string | null;
+  pubId: number | null; eventCount: number; bookingCount: number;
+  ownerUserId: number | null; ownerEmail: string; ownerName: string; createdAt: string;
+}
+interface VenueAuditEntry {
+  id: number; action: string; actorAdminEmail: string;
+  partnerEmail: string; previousOwnerEmail: string; note: string; createdAt: string;
+}
+type LookupResult = {
+  user: { id: number; name: string; email: string; role: string; signInMethod: string };
+  vendor: { id: number; businessName: string; status: string; category: string; city: string; state: string } | null;
+  existingPub: { id: number; title: string } | null;
+  canCreate: boolean;
+  blockReason: string | null;
+};
+
+function AdminVenuesTab({ colors }: { colors: AdminPal }) {
+  const [venues, setVenues] = useState<AdminVenue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "unassigned" | "assigned">("all");
+  const [assignTarget, setAssignTarget] = useState<AdminVenue | null>(null);
+  const [historyTarget, setHistoryTarget] = useState<AdminVenue | null>(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    customFetch<{ data: AdminVenue[] }>("/api/admin/venues")
+      .then((r) => setVenues(asArray<AdminVenue>(r.data)))
+      .catch(() => Alert.alert("Failed to load venues"))
+      .finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const unassign = (v: AdminVenue) => {
+    Alert.alert(
+      "Unassign venue?",
+      `Unassign "${v.businessName}" from ${v.ownerEmail}? They will lose partner access to it (the venue and its history are kept).`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Unassign", style: "destructive", onPress: async () => {
+            try {
+              await customFetch(`/api/admin/venues/${v.id}/unassign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+              load();
+            } catch (e) { Alert.alert("Failed to unassign", (e as Error).message); }
+          },
+        },
+      ],
+    );
+  };
+
+  const unassignedCount = venues.filter((v) => v.assignmentStatus !== "assigned").length;
+  const shown = venues.filter((v) =>
+    filter === "all" ? true : filter === "unassigned" ? v.assignmentStatus !== "assigned" : v.assignmentStatus === "assigned");
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        {([
+          { id: "all" as const, label: `All (${venues.length})` },
+          { id: "unassigned" as const, label: `Unassigned (${unassignedCount})` },
+          { id: "assigned" as const, label: `Assigned (${venues.length - unassignedCount})` },
+        ]).map((f) => (
+          <TouchableOpacity
+            key={f.id}
+            onPress={() => setFilter(f.id)}
+            style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: filter === f.id ? colors.primary : colors.muted }}
+          >
+            <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: filter === f.id ? colors.primaryForeground : colors.mutedForeground }}>{f.label}</Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity onPress={load} style={{ marginLeft: "auto", padding: 6 }}>
+          <Ionicons name="refresh-outline" size={18} color={colors.mutedForeground} />
+        </TouchableOpacity>
+      </View>
+
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={{ marginTop: 30 }} />
+      ) : shown.length === 0 ? (
+        <ModEmpty colors={colors} label="No venues in this view." />
+      ) : shown.map((v) => {
+        const assigned = v.assignmentStatus === "assigned";
+        return (
+          <ModCard key={v.id} colors={colors}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", flex: 1 }} numberOfLines={1}>{v.businessName}</Text>
+              <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, backgroundColor: assigned ? "#22c55e20" : "#f59e0b20" }}>
+                <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: assigned ? "#22c55e" : "#f59e0b" }}>{assigned ? "Assigned" : "Unassigned"}</Text>
+              </View>
+            </View>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
+              {[v.city, v.state].filter(Boolean).join(", ") || "—"} · {v.category} · {v.eventCount} event{v.eventCount === 1 ? "" : "s"} · {v.bookingCount} booking{v.bookingCount === 1 ? "" : "s"}
+            </Text>
+            {assigned && !!v.ownerEmail && <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{v.ownerEmail}</Text>}
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+              <ModBtn colors={colors} label={assigned ? "Reassign" : "Assign Partner"} tone="primary" onPress={() => setAssignTarget(v)} />
+              {assigned && <ModBtn colors={colors} label="Unassign" tone="danger" onPress={() => unassign(v)} />}
+              <ModBtn colors={colors} label="History" onPress={() => setHistoryTarget(v)} />
+            </View>
+          </ModCard>
+        );
+      })}
+
+      {assignTarget && (
+        <AssignVenueModal
+          colors={colors}
+          venue={assignTarget}
+          onClose={() => setAssignTarget(null)}
+          onDone={() => { setAssignTarget(null); load(); }}
+        />
+      )}
+      {historyTarget && (
+        <VenueHistoryModal colors={colors} venue={historyTarget} onClose={() => setHistoryTarget(null)} />
+      )}
+    </ScrollView>
+  );
+}
+
+function AssignVenueModal({ colors, venue, onClose, onDone }: { colors: AdminPal; venue: AdminVenue; onClose: () => void; onDone: () => void }) {
+  const [email, setEmail] = useState("");
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [looking, setLooking] = useState(false);
+  const [lookup, setLookup] = useState<LookupResult | null>(null);
+  const [lookupErr, setLookupErr] = useState("");
+  const reassign = venue.assignmentStatus === "assigned";
+
+  useEffect(() => {
+    const e = email.trim();
+    setLookup(null); setLookupErr("");
+    if (!e || !e.includes("@")) { setLooking(false); return; }
+    let cancelled = false;
+    setLooking(true);
+    const t = setTimeout(() => {
+      customFetch<LookupResult>(`/api/admin/lookup-partner?email=${encodeURIComponent(e)}`)
+        .then((d) => { if (!cancelled) setLookup(d); })
+        .catch((err: unknown) => { if (!cancelled) setLookupErr((err as Error)?.message ?? "No account found for that email."); })
+        .finally(() => { if (!cancelled) setLooking(false); });
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [email]);
+
+  const ownedVenue = lookup?.vendor ?? null;
+  const ownsSameVenue = !!ownedVenue && ownedVenue.id === venue.id;
+  const blockedByOwnership = !!ownedVenue;
+
+  const submit = async () => {
+    const e = email.trim();
+    if (!e) { setError("Partner email is required."); return; }
+    if (blockedByOwnership) {
+      setError(ownsSameVenue
+        ? "This venue is already assigned to that partner."
+        : `${e} already manages "${ownedVenue?.businessName}". Each partner can own only one pub/club.`);
+      return;
+    }
+    setError(""); setSubmitting(true);
+    try {
+      await customFetch(`/api/admin/venues/${venue.id}/assign`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: e, note: note.trim() || undefined }),
+      });
+      onDone();
+    } catch (err) {
+      setError((err as Error)?.message ?? "Assignment failed.");
+    } finally { setSubmitting(false); }
+  };
+
+  const input = { backgroundColor: colors.muted, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, color: colors.foreground } as const;
+
+  return (
+    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: "#000000a0", justifyContent: "flex-end" }}>
+        <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12, maxHeight: "85%" }}>
+          <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 17 }}>
+            {reassign ? "Reassign" : "Assign"} "{venue.businessName}"
+          </Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12, lineHeight: 17 }}>
+            {reassign
+              ? `Currently owned by ${venue.ownerEmail}. Reassigning transfers the venue and all its history to a new partner; the previous owner loses access.`
+              : "Assign this venue to an existing partner account by email. All bookings, commission and reviews are preserved, and Managers / Attendance / Ads / Banking unlock for them."}
+          </Text>
+          <View style={{ gap: 6 }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>Partner email</Text>
+            <TextInput
+              value={email}
+              onChangeText={(v) => { setEmail(v); setError(""); }}
+              placeholder="partner@example.com"
+              placeholderTextColor={colors.mutedForeground}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              style={input}
+            />
+            {looking && <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Checking account…</Text>}
+            {!looking && blockedByOwnership && (
+              <View style={{ borderRadius: 10, borderWidth: 1, borderColor: "#f59e0b60", backgroundColor: "#f59e0b15", padding: 10 }}>
+                <Text style={{ color: "#f59e0b", fontSize: 11, lineHeight: 16 }}>
+                  {ownsSameVenue
+                    ? "This venue is already assigned to that partner."
+                    : `${email.trim()} already manages "${ownedVenue?.businessName}". Each partner can own only one pub/club — unassign that venue first.`}
+                </Text>
+              </View>
+            )}
+            {!looking && lookup && !blockedByOwnership && (
+              <View style={{ borderRadius: 10, borderWidth: 1, borderColor: "#22c55e50", backgroundColor: "#22c55e15", padding: 10 }}>
+                <Text style={{ color: "#22c55e", fontSize: 11 }}>{lookup.user.name} ({lookup.user.role}) — ready to {reassign ? "reassign" : "assign"}.</Text>
+              </View>
+            )}
+            {!looking && lookupErr && <Text style={{ color: "#f59e0bcc", fontSize: 11 }}>{lookupErr}</Text>}
+          </View>
+          <View style={{ gap: 6 }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>Note (optional)</Text>
+            <TextInput value={note} onChangeText={setNote} placeholder="Reason / reference" placeholderTextColor={colors.mutedForeground} style={input} />
+          </View>
+          {!!error && (
+            <View style={{ borderRadius: 10, borderWidth: 1, borderColor: "#ef444460", backgroundColor: "#ef444415", padding: 10 }}>
+              <Text style={{ color: "#ef4444", fontSize: 12 }}>{error}</Text>
+            </View>
+          )}
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+            <TouchableOpacity onPress={onClose} disabled={submitting} style={{ flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center" }}>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold" }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={submit}
+              disabled={submitting || !email.trim() || looking || blockedByOwnership}
+              style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", opacity: (submitting || !email.trim() || looking || blockedByOwnership) ? 0.6 : 1 }}
+            >
+              {submitting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : (
+                <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_700Bold" }}>{reassign ? "Reassign Venue" : "Assign Venue"}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function VenueHistoryModal({ colors, venue, onClose }: { colors: AdminPal; venue: AdminVenue; onClose: () => void }) {
+  const [entries, setEntries] = useState<VenueAuditEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    customFetch<{ data: VenueAuditEntry[] }>(`/api/admin/venues/${venue.id}/audit`)
+      .then((r) => setEntries(asArray<VenueAuditEntry>(r.data)))
+      .catch(() => setEntries([]))
+      .finally(() => setLoading(false));
+  }, [venue.id]);
+
+  const labelFor = (a: string) =>
+    a === "created" ? "Created" : a === "assigned" ? "Assigned" : a === "reassigned" ? "Reassigned" : a === "unassigned" ? "Unassigned" : a;
+
+  return (
+    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: "#000000a0", justifyContent: "flex-end" }}>
+        <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12, maxHeight: "80%" }}>
+          <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 17 }}>History — {venue.businessName}</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Audit trail of creation and partner assignments.</Text>
+          {loading ? (
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
+          ) : entries.length === 0 ? (
+            <ModEmpty colors={colors} label="No history recorded." />
+          ) : (
+            <ScrollView style={{ maxHeight: 380 }}>
+              {entries.map((e) => (
+                <View key={e.id} style={{ borderLeftWidth: 2, borderLeftColor: colors.primary, paddingLeft: 12, marginBottom: 14 }}>
+                  <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+                    {labelFor(e.action)}{e.partnerEmail ? ` → ${e.partnerEmail}` : ""}
+                  </Text>
+                  {!!e.previousOwnerEmail && <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Previous owner: {e.previousOwnerEmail}</Text>}
+                  {!!e.note && <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{e.note}</Text>}
+                  <Text style={{ color: colors.mutedForeground, fontSize: 10, marginTop: 2 }}>
+                    {new Date(e.createdAt).toLocaleString("en-IN")}{e.actorAdminEmail ? ` · by ${e.actorAdminEmail}` : ""}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+          <TouchableOpacity onPress={onClose} style={{ paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center" }}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold" }}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Event Organizers (verify/status + pending events) ──────────────────────
 function AdminEventOrganizersTab({ colors }: { colors: AdminPal }) {
   const [orgs, setOrgs] = useState<AdminOrganizer[]>([]);
@@ -4104,13 +4881,29 @@ function AdminGameOrganizersTab({ colors }: { colors: AdminPal }) {
 }
 
 // ─── Solo Connect moderation (verifications + reports) ──────────────────────
+interface AdminSoloGroup {
+  id: number; name: string; city: string; status: string; creatorName: string; creatorEmail: string;
+  pendingCount: number; totalMemberCount: number; daysSinceActivity: number | null; deletedAt: string | null;
+}
+interface AdminSoloDeletedGroup {
+  id: number; groupId: number; name: string; memberCount: number; reason: string; deletedAt: string; restorable: boolean;
+}
+interface AdminSoloModLogRow {
+  id: number; adminName: string; targetName: string; groupId: number | null; reportId: number | null; action: string; note: string; createdAt: string;
+}
 function AdminSoloModerationTab({ colors }: { colors: AdminPal }) {
-  const [view, setView] = useState<"verifications" | "reports">("verifications");
+  const [view, setView] = useState<"verifications" | "reports" | "groups" | "deleted" | "log">("verifications");
   const [verifs, setVerifs] = useState<AdminSoloVerification[]>([]);
   const [reports, setReports] = useState<AdminSoloReport[]>([]);
+  const [groups, setGroups] = useState<AdminSoloGroup[]>([]);
+  const [deletedGroups, setDeletedGroups] = useState<AdminSoloDeletedGroup[]>([]);
+  const [modLog, setModLog] = useState<AdminSoloModLogRow[]>([]);
   const load = useCallback(() => {
     customFetch("/api/admin/solo-connect/verifications?status=pending").then((r) => setVerifs(asArray<AdminSoloVerification>(r))).catch(() => {});
     customFetch("/api/admin/solo-connect/reports?status=pending").then((r) => setReports(asArray<AdminSoloReport>(r))).catch(() => {});
+    customFetch("/api/admin/solo-connect/groups").then((r) => setGroups(asArray<AdminSoloGroup>(r))).catch(() => {});
+    customFetch("/api/admin/solo-connect/deleted-groups").then((r) => setDeletedGroups(asArray<AdminSoloDeletedGroup>(r))).catch(() => {});
+    customFetch("/api/admin/solo-connect/moderation-actions").then((r) => setModLog(asArray<AdminSoloModLogRow>(r))).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
   async function review(id: number, decision: "approved" | "rejected") {
@@ -4121,16 +4914,37 @@ function AdminSoloModerationTab({ colors }: { colors: AdminPal }) {
     try { await customFetch(`/api/admin/solo-connect/reports/${id}/action`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }); load(); }
     catch (e) { Alert.alert("Failed", (e as Error).message); }
   }
+  async function closeGroup(id: number) {
+    try { await customFetch(`/api/admin/solo-connect/groups/${id}/close`, { method: "POST" }); load(); }
+    catch (e) { Alert.alert("Failed", (e as Error).message); }
+  }
+  function deleteGroup(id: number, name: string) {
+    Alert.alert("Delete group?", `"${name}" and its members/messages/reports will be permanently removed.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+        try { await customFetch(`/api/admin/solo-connect/groups/${id}`, { method: "DELETE" }); load(); }
+        catch (e) { Alert.alert("Failed", (e as Error).message); }
+      } },
+    ]);
+  }
+  async function restoreGroup(id: number) {
+    try { await customFetch(`/api/admin/solo-connect/groups/${id}/restore`, { method: "POST" }); load(); }
+    catch (e) { Alert.alert("Failed", (e as Error).message); }
+  }
   return (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
-      <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
-        {(["verifications", "reports"] as const).map((v) => (
-          <TouchableOpacity key={v} onPress={() => setView(v)} style={{ flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: view === v ? colors.primary : colors.border, backgroundColor: view === v ? colors.primary + "1f" : colors.muted, alignItems: "center" }}>
-            <Text style={{ color: view === v ? colors.primary : colors.mutedForeground, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{v}{v === "verifications" ? ` (${verifs.length})` : ` (${reports.length})`}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      {view === "verifications" ? (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {(["verifications", "reports", "groups", "deleted", "log"] as const).map((v) => (
+            <TouchableOpacity key={v} onPress={() => setView(v)} style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: view === v ? colors.primary : colors.border, backgroundColor: view === v ? colors.primary + "1f" : colors.muted, alignItems: "center" }}>
+              <Text style={{ color: view === v ? colors.primary : colors.mutedForeground, fontFamily: "Inter_600SemiBold", textTransform: "capitalize", fontSize: 12 }}>
+                {v === "log" ? "Mod log" : v}{v === "verifications" ? ` (${verifs.length})` : v === "reports" ? ` (${reports.length})` : v === "groups" ? ` (${groups.length})` : v === "deleted" ? ` (${deletedGroups.length})` : ""}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+      {view === "verifications" && (
         verifs.length === 0 ? <ModEmpty colors={colors} label="No pending verifications." /> : verifs.map((v) => (
           <ModCard key={v.id} colors={colors}>
             <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>{v.userName}</Text>
@@ -4141,7 +4955,8 @@ function AdminSoloModerationTab({ colors }: { colors: AdminPal }) {
             </View>
           </ModCard>
         ))
-      ) : (
+      )}
+      {view === "reports" && (
         reports.length === 0 ? <ModEmpty colors={colors} label="No pending reports." /> : reports.map((r) => (
           <ModCard key={r.id} colors={colors}>
             <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>{r.reportedName} <Text style={{ color: colors.redLight, fontSize: 11 }}>· {r.reportCountAgainstReported} reports</Text></Text>
@@ -4153,6 +4968,45 @@ function AdminSoloModerationTab({ colors }: { colors: AdminPal }) {
               <ModBtn colors={colors} label="Suspend" tone="danger" onPress={() => reportAction(r.id, "suspend")} />
               <ModBtn colors={colors} label="Ban" tone="danger" onPress={() => reportAction(r.id, "ban")} />
             </View>
+          </ModCard>
+        ))
+      )}
+      {view === "groups" && (
+        groups.length === 0 ? <ModEmpty colors={colors} label="No active groups." /> : groups.map((g) => (
+          <ModCard key={g.id} colors={colors}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", flex: 1 }} numberOfLines={1}>{g.name}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 11, textTransform: "capitalize" }}>{g.status}</Text>
+            </View>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{g.city} · {g.totalMemberCount} members{g.pendingCount ? ` · ${g.pendingCount} pending` : ""}</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>By {g.creatorName} ({g.creatorEmail}){g.daysSinceActivity !== null ? ` · ${g.daysSinceActivity}d inactive` : ""}</Text>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+              {g.status !== "closed" && <ModBtn colors={colors} label="Close" onPress={() => closeGroup(g.id)} />}
+              <ModBtn colors={colors} label="Delete" tone="danger" onPress={() => deleteGroup(g.id, g.name)} />
+            </View>
+          </ModCard>
+        ))
+      )}
+      {view === "deleted" && (
+        deletedGroups.length === 0 ? <ModEmpty colors={colors} label="No deleted groups." /> : deletedGroups.map((g) => (
+          <ModCard key={g.id} colors={colors}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>{g.name}</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{g.memberCount} members · {g.reason}</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Deleted {new Date(g.deletedAt).toLocaleDateString()}</Text>
+            {g.restorable && (
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+                <ModBtn colors={colors} label="Restore" tone="primary" onPress={() => restoreGroup(g.groupId)} />
+              </View>
+            )}
+          </ModCard>
+        ))
+      )}
+      {view === "log" && (
+        modLog.length === 0 ? <ModEmpty colors={colors} label="No moderation actions yet." /> : modLog.map((l) => (
+          <ModCard key={l.id} colors={colors}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", textTransform: "capitalize" }}>{l.action}{l.targetName ? ` · ${l.targetName}` : ""}</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>by {l.adminName || "system"} · {new Date(l.createdAt).toLocaleString()}</Text>
+            {!!l.note && <Text style={{ color: colors.mutedForeground, fontSize: 12 }} numberOfLines={2}>{l.note}</Text>}
           </ModCard>
         ))
       )}
@@ -4209,10 +5063,100 @@ interface AdminPartyRow {
   netEarnings: string;
 }
 
+interface PartyDetailPayload {
+  party: Record<string, unknown> & { id: number; name: string; description?: string; address?: string; organizerName: string; organizerEmail: string };
+  stats: { totalBookings: number; cancelledBookings: number; guestsGoing: number; checkedInCount: number; revenue: string; commission: string; netEarnings: string; capacity: number; seatsLeft: number | null };
+  bookings: { id: number; bookingCode: string; name: string; email: string; phone: string; quantity: number; totalPrice: string; status: string; checkedIn: boolean; createdAt: string }[];
+  attendees: { id: number; name: string; gender: string; quantity: number; status: string }[];
+  messages: { id: number; userName: string; isHost: boolean; body: string; createdAt: string }[];
+}
+function PartyDetailModal({ colors, partyId, onClose }: { colors: AdminPal; partyId: number | null; onClose: () => void }) {
+  const [data, setData] = useState<PartyDetailPayload | null>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (partyId === null) { setData(null); return; }
+    setLoading(true);
+    customFetch<PartyDetailPayload>(`/api/admin/create-your-party/${partyId}/detail`)
+      .then(setData).catch(() => setData(null)).finally(() => setLoading(false));
+  }, [partyId]);
+
+  return (
+    <Modal visible={partyId !== null} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" }}>
+        <View style={{ maxHeight: "88%", borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, padding: 16 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <Text style={{ color: colors.foreground, fontSize: 16, fontFamily: "Inter_700Bold", flex: 1 }} numberOfLines={1}>{data?.party.name ?? "Party detail"}</Text>
+            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={colors.mutedForeground} /></TouchableOpacity>
+          </View>
+          {loading || !data ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 30 }} /> : (
+            <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12, marginBottom: 10 }}>
+                Host: {data.party.organizerName}{data.party.organizerEmail ? ` (${data.party.organizerEmail})` : ""}
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+                {[
+                  { label: "Bookings", value: String(data.stats.totalBookings) },
+                  { label: "Cancelled", value: String(data.stats.cancelledBookings) },
+                  { label: "Going", value: String(data.stats.guestsGoing) },
+                  { label: "Checked in", value: String(data.stats.checkedInCount) },
+                  { label: "Revenue", value: `₹${Number(data.stats.revenue).toLocaleString("en-IN")}` },
+                  { label: "Net earnings", value: `₹${Number(data.stats.netEarnings).toLocaleString("en-IN")}` },
+                  { label: "Seats left", value: data.stats.seatsLeft === null ? "∞" : String(data.stats.seatsLeft) },
+                ].map((s) => (
+                  <View key={s.label} style={{ minWidth: "30%", borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 8 }}>
+                    <Text style={{ color: colors.foreground, fontSize: 14, fontFamily: "Inter_700Bold" }}>{s.value}</Text>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 9, fontFamily: "Inter_500Medium", textTransform: "uppercase" }}>{s.label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_700Bold", marginBottom: 6 }}>Bookings ({data.bookings.length})</Text>
+              {data.bookings.length === 0 ? <Text style={{ color: colors.mutedForeground, fontSize: 12, marginBottom: 12 }}>No bookings yet.</Text> : data.bookings.map((b) => (
+                <View key={b.id} style={{ borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 10, marginBottom: 6 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{b.name || "Guest"}</Text>
+                    <Text style={{ color: b.checkedIn ? "#4ade80" : colors.mutedForeground, fontSize: 10, fontFamily: "Inter_600SemiBold" }}>{b.checkedIn ? "Checked in" : b.status}</Text>
+                  </View>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{[b.phone, b.email].filter(Boolean).join(" · ")} · ×{b.quantity} · ₹{Number(b.totalPrice).toLocaleString("en-IN")}</Text>
+                </View>
+              ))}
+
+              {data.attendees.length > 0 && (
+                <>
+                  <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_700Bold", marginTop: 10, marginBottom: 6 }}>Attendees ({data.attendees.length})</Text>
+                  {data.attendees.map((a) => (
+                    <View key={a.id} style={{ flexDirection: "row", justifyContent: "space-between", borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 8, marginBottom: 6 }}>
+                      <Text style={{ color: colors.foreground, fontSize: 12 }}>{a.name}</Text>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{a.gender} · ×{a.quantity} · {a.status}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+
+              {data.messages.length > 0 && (
+                <>
+                  <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_700Bold", marginTop: 10, marginBottom: 6 }}>Chat ({data.messages.length})</Text>
+                  {data.messages.map((m) => (
+                    <View key={m.id} style={{ marginBottom: 6 }}>
+                      <Text style={{ color: m.isHost ? colors.primary : colors.foreground, fontSize: 11, fontFamily: "Inter_600SemiBold" }}>{m.userName}{m.isHost ? " (host)" : ""}</Text>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{m.body}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function AdminPrivatePartiesTab({ colors }: { colors: AdminPal }) {
   const [rows, setRows] = useState<AdminPartyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "published" | "cancelled">("all");
+  const [detailId, setDetailId] = useState<number | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -4261,7 +5205,8 @@ function AdminPrivatePartiesTab({ colors }: { colors: AdminPal }) {
       ) : filtered.length === 0 ? (
         <ModEmpty colors={colors} label="No parties match." />
       ) : filtered.map((p) => (
-        <ModCard key={p.id} colors={colors}>
+        <Pressable key={p.id} onPress={() => setDetailId(p.id)}>
+        <ModCard colors={colors}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", flex: 1 }} numberOfLines={1}>{p.name}</Text>
             <View style={{ backgroundColor: statusColor(p.status) + "22", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
@@ -4295,7 +5240,9 @@ function AdminPrivatePartiesTab({ colors }: { colors: AdminPal }) {
             </View>
           )}
         </ModCard>
+        </Pressable>
       ))}
+      <PartyDetailModal colors={colors} partyId={detailId} onClose={() => setDetailId(null)} />
     </ScrollView>
   );
 }

@@ -10,10 +10,12 @@ import type {
   OccupancyResponse as ApiOccupancyResponse,
 } from "@workspace/api-client-react";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useState, useRef, useEffect } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -166,6 +168,17 @@ export default function ScannerScreen() {
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
+  // Haptic cue on every scan/confirm outcome so a manager working in a loud
+  // venue can tell valid vs. invalid without staring at the screen.
+  const hapticForResult = (res: ScanResult) => {
+    if (Platform.OS === "web") return;
+    const bad = res.code === "ERROR" || res.status === "EVENT_ENDED" || (!res.ticket && res.code !== "OK" && res.code !== "READY" && res.code !== "ALREADY_FINALIZED");
+    const warn = res.code === "ALREADY_FINALIZED" || res.status === "ALREADY_CHECKED_IN" || res.status === "already_checked_out";
+    if (bad) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    else if (warn) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
   const handleScan = async (code: string) => {
     if (scanLock.current || loading) return;
     const trimmed = code.trim();
@@ -185,14 +198,17 @@ export default function ScannerScreen() {
         body: JSON.stringify({ code: trimmed }),
       });
       setResult(res);
+      hapticForResult(res);
     } catch (e: unknown) {
       const err = e as { message?: string; code?: string; checkedInAt?: string; booking?: BookingData };
-      setResult({
+      const errResult: ScanResult = {
         code: err.code ?? "ERROR",
         message: err.message ?? "Network error. Try again.",
         checkedInAt: err.checkedInAt,
         booking: err.booking,
-      });
+      };
+      setResult(errResult);
+      hapticForResult(errResult);
     } finally {
       setLoading(false);
       setTimeout(() => { scanLock.current = false; }, 2500);
@@ -216,9 +232,12 @@ export default function ScannerScreen() {
         body: JSON.stringify({ code: lastCodeRef.current, confirm: true }),
       });
       setResult(res);
+      hapticForResult(res);
     } catch (e: unknown) {
       const err = e as { message?: string };
-      setResult({ code: "ERROR", message: err.message ?? "Check-in failed. Try again." });
+      const errResult: ScanResult = { code: "ERROR", message: err.message ?? "Check-in failed. Try again." };
+      setResult(errResult);
+      hapticForResult(errResult);
     } finally {
       setLoading(false);
     }
@@ -227,7 +246,7 @@ export default function ScannerScreen() {
   // Check-out flow (Task #581): re-POST to /partner/checkout-ticket with
   // confirm:true to flip checkedOut → true and decrement live occupancy.
   const [checkingOut, setCheckingOut] = useState(false);
-  const checkout = async () => {
+  const runCheckout = async () => {
     const bookingId = result?.booking?.id ?? null;
     if (!bookingId || checkingOut) return;
     setCheckingOut(true);
@@ -237,17 +256,27 @@ export default function ScannerScreen() {
       // parsing on the server.
       const res = (await partnerCheckoutTicket({ bookingId, confirm: true })) as ScanResult;
       setResult(res);
+      hapticForResult(res);
     } catch (e: unknown) {
       const err = e as { message?: string; code?: string; checkedOutAt?: string; booking?: BookingData };
-      setResult({
+      const errResult: ScanResult = {
         code: err.code ?? "ERROR",
         message: err.message ?? "Check-out failed.",
         checkedOutAt: err.checkedOutAt ?? null,
         booking: err.booking,
-      });
+      };
+      setResult(errResult);
+      hapticForResult(errResult);
     } finally {
       setCheckingOut(false);
     }
+  };
+  const checkout = () => {
+    const guestName = result?.booking?.personName ?? result?.booking?.userName ?? "this guest";
+    Alert.alert("Check out guest?", `Confirm ${guestName} is leaving the venue now.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Check out", style: "destructive", onPress: runCheckout },
+    ]);
   };
 
   useEffect(() => {
@@ -633,6 +662,8 @@ export default function ScannerScreen() {
 
         <ScannerPanels externalRefetchKey={panelsTick} />
 
+        <ManualBookingCard />
+
         <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
       {result?.booking && result.code === "READY" && (
@@ -770,10 +801,12 @@ function ActualEntrySheet({
         body: JSON.stringify({ code, actualEntry }),
       });
       if (res.booking) {
+        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         onSaved(res.booking, res.checkedInAt ?? new Date().toISOString());
         onClose();
       }
     } catch {
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       // Network errors are surfaced via the broader scanner state; nothing more to do here.
     } finally {
       setSaving(false);
@@ -868,6 +901,102 @@ function ActualEntrySheet({
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+// ─── Manual Booking / Walk-in ────────────────────────────────────────────────
+// Record a walk-in guest directly into the booking report — no user account,
+// no commission (mirrors web's ManualBookingForm at ticket-scanner.tsx).
+function ManualBookingCard() {
+  const colors = useColors();
+  const [expanded, setExpanded] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+  const [name, setName] = useState("");
+  const [date, setDate] = useState(today);
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [persons, setPersons] = useState("1");
+  const [price, setPrice] = useState("");
+  const [arrivalTime, setArrivalTime] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function reset() {
+    setName(""); setDate(today); setPhone(""); setEmail("");
+    setPersons("1"); setPrice(""); setArrivalTime("");
+  }
+
+  async function submit() {
+    if (!name.trim()) { Alert.alert("Name is required"); return; }
+    if (!/^\d{10}$/.test(phone)) { Alert.alert("Phone must be 10 digits"); return; }
+    if (!arrivalTime.trim()) { Alert.alert("Arrival time is required"); return; }
+    setSaving(true);
+    try {
+      await customFetch("/api/partner/manual-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(), date, phone, email: email.trim(),
+          persons: Math.max(1, parseInt(persons) || 1),
+          price: price.trim() ? Number(price) : 0,
+          arrivalTime: arrivalTime.trim(),
+        }),
+      });
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Booking recorded", `Walk-in for ${name.trim()} saved to booking report.`);
+      reset();
+      setExpanded(false);
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Failed to save", err.message ?? "Network error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <View style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: "hidden" }}>
+      <TouchableOpacity onPress={() => setExpanded((v) => !v)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Ionicons name="clipboard-outline" size={18} color={colors.primary} />
+          <View>
+            <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.foreground }}>Walk-in / Manual Booking</Text>
+            <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Record a guest without a ticket code</Text>
+          </View>
+        </View>
+        <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color={colors.mutedForeground} />
+      </TouchableOpacity>
+      {expanded && (
+        <View style={{ padding: 14, paddingTop: 0, gap: 10 }}>
+          <ManualField colors={colors} label="Name *" value={name} onChangeText={setName} placeholder="Guest name" />
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <View style={{ flex: 1 }}><ManualField colors={colors} label="Date *" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" /></View>
+            <View style={{ flex: 1 }}><ManualField colors={colors} label="Arrival time *" value={arrivalTime} onChangeText={setArrivalTime} placeholder="HH:MM" /></View>
+          </View>
+          <ManualField colors={colors} label="Phone *" value={phone} onChangeText={(v) => setPhone(v.replace(/[^0-9]/g, ""))} placeholder="10-digit mobile" keyboardType="number-pad" maxLength={10} />
+          <ManualField colors={colors} label="Email (optional)" value={email} onChangeText={setEmail} placeholder="guest@example.com" keyboardType="email-address" autoCapitalize="none" />
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <View style={{ flex: 1 }}><ManualField colors={colors} label="No. of persons *" value={persons} onChangeText={(v) => setPersons(v.replace(/[^0-9]/g, ""))} placeholder="1" keyboardType="number-pad" /></View>
+            <View style={{ flex: 1 }}><ManualField colors={colors} label="Price (optional)" value={price} onChangeText={(v) => setPrice(v.replace(/[^0-9]/g, ""))} placeholder="₹ 0" keyboardType="number-pad" /></View>
+          </View>
+          <TouchableOpacity onPress={submit} disabled={saving} style={{ borderRadius: 12, paddingVertical: 13, alignItems: "center", backgroundColor: colors.primary, opacity: saving ? 0.6 : 1, marginTop: 4 }}>
+            {saving ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.primaryForeground }}>Save booking</Text>}
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+function ManualField({ colors, label, ...props }: { colors: ReturnType<typeof useColors>; label: string } & React.ComponentProps<typeof TextInput>) {
+  return (
+    <View>
+      <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 5 }}>{label}</Text>
+      <TextInput
+        {...props}
+        placeholderTextColor={colors.mutedForeground}
+        style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.foreground, fontSize: 13, backgroundColor: colors.muted }}
+      />
+    </View>
   );
 }
 

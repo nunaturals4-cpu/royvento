@@ -11,12 +11,13 @@ export default function PaymentResultScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
-  const { payment, status, eventTitle, bookingId, id } = useLocalSearchParams<{
+  const { payment, status, eventTitle, bookingId, id, code } = useLocalSearchParams<{
     payment?: string;
     status?: string;
     eventTitle?: string;
     bookingId?: string;
     id?: string;
+    code?: string;
   }>();
 
   const isSuccess = payment === "success" || status === "success";
@@ -90,9 +91,16 @@ export default function PaymentResultScreen() {
             We could not determine your payment result. Please check My Bookings or contact support.
           </Text>
         ) : (
-          <Text style={[styles.message, { color: colors.mutedForeground }]}>
-            Something went wrong with your payment. Please try again or contact support.
-          </Text>
+          <>
+            <Text style={[styles.message, { color: colors.mutedForeground }]}>
+              {code
+                ? `The payment could not be completed (${code}). No amount has been charged.`
+                : "The payment could not be completed. No amount has been charged."}
+            </Text>
+            <Text style={[styles.refundNote, { color: colors.mutedForeground }]}>
+              If your account was debited, it will be automatically refunded within 5-7 business days.
+            </Text>
+          </>
         )}
 
         <View style={styles.actions}>
@@ -127,6 +135,7 @@ const styles = StyleSheet.create({
   status: { fontSize: 26, fontFamily: "Inter_700Bold", textAlign: "center" },
   eventTitle: { fontSize: 16, fontFamily: "Inter_500Medium", textAlign: "center" },
   message: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22, maxWidth: 300 },
+  refundNote: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 18, maxWidth: 280, marginTop: -4 },
   actions: { width: "100%", gap: 12, marginTop: 8 },
   primaryBtn: { borderRadius: 14, paddingVertical: 15, alignItems: "center" },
   primaryBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
