@@ -10,11 +10,14 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { CityPickerSheet } from "@/components/CityPickerSheet";
+import { FilterSelect } from "@/components/FilterSelect";
 import { MobileFooter } from "@/components/MobileFooter";
 import { PubCard } from "@/components/PubCard";
 import { useColors } from "@/hooks/useColors";
@@ -43,8 +46,6 @@ type PubEvent = ApiEvent & {
   country?: string;
 };
 
-const CITIES = ["All Cities", "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Pune", "Chennai", "Kolkata", "Goa"];
-
 const PRICE_PRESETS = [
   { label: "Under ₹500", min: 0, max: 500 },
   { label: "₹500 – ₹1.5K", min: 500, max: 1500 },
@@ -59,24 +60,26 @@ const DRINK_DEAL_OPTIONS = [
 ] as const;
 type DrinkPlanType = (typeof DRINK_DEAL_OPTIONS)[number]["value"] | "";
 
-const CROWD_OPTIONS = [
-  { value: "low", label: "Low", icon: "leaf-outline" as const, color: "#16a34a" },
-  { value: "moderate", label: "Moderate", icon: "flame-outline" as const, color: "#d97706" },
-  { value: "party", label: "High Crowd", icon: "flame" as const, color: "#dc2626" },
-] as const;
-type CrowdFilter = "" | (typeof CROWD_OPTIONS)[number]["value"];
+// Crowd + Day are rendered as web-style dropdowns (see FilterSelect). "" = any.
+const CROWD_SELECT_OPTIONS = [
+  { value: "", label: "Any crowd" },
+  { value: "low", label: "Low" },
+  { value: "moderate", label: "Moderate" },
+  { value: "party", label: "High Crowd" },
+];
+type CrowdFilter = "" | "low" | "moderate" | "party";
 
-const DAY_OPTIONS = [
-  { value: "Sun", label: "Sun" },
-  { value: "Mon", label: "Mon" },
-  { value: "Tue", label: "Tue" },
-  { value: "Wed", label: "Wed" },
-  { value: "Thu", label: "Thu" },
-  { value: "Fri", label: "Fri" },
-  { value: "Sat", label: "Sat" },
-] as const;
-type DayFilter = "" | (typeof DAY_OPTIONS)[number]["value"];
-const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_SELECT_OPTIONS = [
+  { value: "", label: "Any day" },
+  { value: "Sun", label: "Sunday" },
+  { value: "Mon", label: "Monday" },
+  { value: "Tue", label: "Tuesday" },
+  { value: "Wed", label: "Wednesday" },
+  { value: "Thu", label: "Thursday" },
+  { value: "Fri", label: "Friday" },
+  { value: "Sat", label: "Saturday" },
+];
+type DayFilter = "" | "Sun" | "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat";
 
 // Keep in sync with PUB_CATEGORY_SECTIONS in artifacts/royvento/src/pages/pubs.tsx.
 const PUB_CATEGORY_SECTIONS = [
@@ -106,7 +109,8 @@ export default function PubsScreen() {
   const params = useLocalSearchParams<{ category?: string }>();
 
   const [search, setSearch] = useState("");
-  const [city, setCity] = useState("All Cities");
+  const [city, setCity] = useState("");
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
   const [pricePreset, setPricePreset] = useState<number | null>(null);
   const [drinkPlanType, setDrinkPlanType] = useState<DrinkPlanType>("");
   const [hasDrinkDeal, setHasDrinkDeal] = useState(false);
@@ -137,7 +141,7 @@ export default function PubsScreen() {
   const baseParams = useMemo(() => {
     const p: Record<string, string> = { type: "pub", limit: String(PAGE_SIZE) };
     if (search.trim()) p["search"] = search.trim();
-    if (city !== "All Cities") p["city"] = city;
+    if (city) p["city"] = city;
     if (pricePreset !== null) {
       const preset = PRICE_PRESETS[pricePreset];
       if (preset) {
@@ -215,7 +219,7 @@ export default function PubsScreen() {
 
   const hasFilters =
     !!search ||
-    city !== "All Cities" ||
+    !!city ||
     pricePreset !== null ||
     !!drinkPlanType ||
     hasDrinkDeal ||
@@ -228,7 +232,7 @@ export default function PubsScreen() {
 
   function clearAll() {
     setSearch("");
-    setCity("All Cities");
+    setCity("");
     setPricePreset(null);
     setDrinkPlanType("");
     setHasDrinkDeal(false);
@@ -251,7 +255,7 @@ export default function PubsScreen() {
       <Text style={[styles.h1, { color: colors.foreground }]}>All Pubs &amp; Bars</Text>
       <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{t("pubs.subtitle")}</Text>
 
-      {/* Search */}
+      {/* Search + filter bar — mirrors web's flex-wrap row (Search · Location · Crowd · Filters) */}
       <View style={[styles.searchBar, { backgroundColor: colors.muted, borderColor: colors.border }]}>
         <Ionicons name="search-outline" size={16} color={colors.mutedForeground} />
         <TextInput
@@ -268,46 +272,29 @@ export default function PubsScreen() {
         )}
       </View>
 
-      {/* City */}
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={CITIES}
-        keyExtractor={(c) => c}
-        contentContainerStyle={styles.chipRow}
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => setCity(item)}
-            style={[styles.pill, { backgroundColor: city === item ? colors.primary : colors.muted, borderColor: city === item ? colors.primary : colors.border }]}
-          >
-            <Text style={[styles.pillText, { color: city === item ? colors.primaryForeground : colors.mutedForeground }]}>{item}</Text>
-          </Pressable>
-        )}
-      />
+      <View style={styles.barRow}>
+        {/* Location — opens the shared city picker (web's LocationSelect equivalent) */}
+        <Pressable
+          onPress={() => setCityPickerOpen(true)}
+          style={[styles.selectTrigger, { backgroundColor: colors.muted, borderColor: colors.border }]}
+        >
+          <Ionicons name="location-outline" size={14} color={colors.mutedForeground} />
+          <Text style={[styles.selectTriggerText, { color: city ? colors.foreground : colors.mutedForeground }]} numberOfLines={1}>
+            {city || "All cities"}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color={colors.mutedForeground} />
+        </Pressable>
 
-      {/* Crowd */}
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={[{ value: "" as const, label: "Any crowd", icon: "people-outline" as const, color: colors.mutedForeground }, ...CROWD_OPTIONS]}
-        keyExtractor={(o) => o.value || "any"}
-        contentContainerStyle={styles.chipRow}
-        renderItem={({ item }) => {
-          const active = crowdLevel === item.value;
-          return (
-            <Pressable
-              onPress={() => setCrowdLevel(item.value)}
-              style={[styles.pill, { backgroundColor: active ? item.color : colors.muted, borderColor: active ? item.color : colors.border }]}
-            >
-              <Ionicons name={item.icon} size={12} color={active ? "#fff" : colors.mutedForeground} />
-              <Text style={[styles.pillText, { color: active ? "#fff" : colors.mutedForeground }]}>{item.label}</Text>
-            </Pressable>
-          );
-        }}
-      />
+        {/* Crowd — web-style dropdown */}
+        <FilterSelect
+          value={crowdLevel}
+          options={CROWD_SELECT_OPTIONS}
+          placeholder="Crowd"
+          onChange={(v) => setCrowdLevel(v as CrowdFilter)}
+          minWidth={124}
+        />
 
-      {/* Filters toggle + clear all */}
-      <View style={styles.controlsRow}>
+        {/* Filters toggle */}
         <Pressable
           onPress={() => setFiltersOpen((v) => !v)}
           style={[
@@ -335,59 +322,43 @@ export default function PubsScreen() {
       {/* Expanded filters panel */}
       {filtersOpen && (
         <View style={[styles.filterPanel, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-          {/* Day of week */}
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={[{ value: "" as const, label: "Any day" }, ...DAY_OPTIONS]}
-            keyExtractor={(o) => o.value || "any"}
-            contentContainerStyle={styles.chipRow}
-            renderItem={({ item }) => {
-              const active = dayFilter === item.value;
-              return (
-                <Pressable
-                  onPress={() => setDayFilter(item.value)}
-                  style={[styles.pill, { backgroundColor: active ? colors.primary : colors.card, borderColor: active ? colors.primary : colors.border }]}
-                >
-                  <Text style={[styles.pillText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>{item.label}</Text>
-                </Pressable>
-              );
-            }}
-          />
-
-          {/* Toggle pills: Free Entry / Drink Deal / VIP Table / Dance Floor */}
-          <View style={styles.toggleWrap}>
-            <Pressable
-              onPress={() => setFreeEntry((v) => !v)}
-              style={[styles.togglePill, { backgroundColor: freeEntry ? "#22c55e20" : colors.card, borderColor: freeEntry ? "#22c55e" : colors.border }]}
-            >
-              <View style={[styles.toggleDot, { backgroundColor: "#22c55e" }]} />
-              <Text style={[styles.toggleText, { color: freeEntry ? "#22c55e" : colors.mutedForeground }]}>Free Entry</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => toggleHasDrinkDeal(!hasDrinkDeal)}
-              style={[styles.togglePill, { backgroundColor: hasDrinkDeal ? "#f59e0b20" : colors.card, borderColor: hasDrinkDeal ? "#f59e0b" : colors.border }]}
-            >
-              <View style={[styles.toggleDot, { backgroundColor: "#f59e0b" }]} />
-              <Text style={[styles.toggleText, { color: hasDrinkDeal ? "#f59e0b" : colors.mutedForeground }]}>Drink Deals</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => toggleVipTable(!vipTable)}
-              style={[styles.togglePill, { backgroundColor: vipTable ? "#a78bfa20" : colors.card, borderColor: vipTable ? "#a78bfa" : colors.border }]}
-            >
-              <View style={[styles.toggleDot, { backgroundColor: "#a78bfa" }]} />
-              <Text style={[styles.toggleText, { color: vipTable ? "#a78bfa" : colors.mutedForeground }]}>VIP Table</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setDanceFloor((v) => !v)}
-              style={[styles.togglePill, { backgroundColor: danceFloor ? "#f472b620" : colors.card, borderColor: danceFloor ? "#f472b6" : colors.border }]}
-            >
-              <Ionicons name="musical-notes-outline" size={12} color={danceFloor ? "#f472b6" : colors.mutedForeground} />
-              <Text style={[styles.toggleText, { color: danceFloor ? "#f472b6" : colors.mutedForeground }]}>Dance Floor</Text>
-            </Pressable>
+          {/* Day of week — web-style dropdown */}
+          <View style={styles.filterRow}>
+            <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Day:</Text>
+            <FilterSelect
+              value={dayFilter}
+              options={DAY_SELECT_OPTIONS}
+              placeholder="Any day"
+              onChange={(v) => setDayFilter(v as DayFilter)}
+              minWidth={140}
+            />
           </View>
 
-          {/* Drink deal type chips */}
+          {/* Switches: Free Entry / Drink Deals / VIP Table / Dance Floor (mirror web) */}
+          <View style={styles.switchWrap}>
+            <View style={styles.switchRow}>
+              <Switch value={freeEntry} onValueChange={setFreeEntry} trackColor={{ true: "#22c55e", false: colors.border }} thumbColor="#fff" />
+              <View style={[styles.switchDot, { backgroundColor: "#22c55e" }]} />
+              <Text style={[styles.switchLabel, { color: colors.foreground }]}>{t("events.free_entry_label")}</Text>
+            </View>
+            <View style={styles.switchRow}>
+              <Switch value={hasDrinkDeal} onValueChange={toggleHasDrinkDeal} trackColor={{ true: "#f59e0b", false: colors.border }} thumbColor="#fff" />
+              <View style={[styles.switchDot, { backgroundColor: "#f59e0b" }]} />
+              <Text style={[styles.switchLabel, { color: colors.foreground }]}>{t("events.drink_deals")}</Text>
+            </View>
+            <View style={styles.switchRow}>
+              <Switch value={vipTable} onValueChange={toggleVipTable} trackColor={{ true: "#a78bfa", false: colors.border }} thumbColor="#fff" />
+              <View style={[styles.switchDot, { backgroundColor: "#a78bfa" }]} />
+              <Text style={[styles.switchLabel, { color: colors.foreground }]}>{t("events.vip_table_label")}</Text>
+            </View>
+            <View style={styles.switchRow}>
+              <Switch value={danceFloor} onValueChange={setDanceFloor} trackColor={{ true: "#f472b6", false: colors.border }} thumbColor="#fff" />
+              <Ionicons name="musical-notes-outline" size={13} color="#f472b6" />
+              <Text style={[styles.switchLabel, { color: colors.foreground }]}>Dance Floor</Text>
+            </View>
+          </View>
+
+          {/* Drink deal type chips — shown when Drink Deals is on (mirrors web) */}
           {hasDrinkDeal && (
             <FlatList
               horizontal
@@ -409,25 +380,28 @@ export default function PubsScreen() {
             />
           )}
 
-          {/* Price presets */}
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={[{ label: "Any Price", idx: null as number | null }, ...PRICE_PRESETS.map((p, idx) => ({ label: p.label, idx }))]}
-            keyExtractor={(o) => String(o.idx)}
-            contentContainerStyle={styles.chipRow}
-            renderItem={({ item }) => {
-              const active = pricePreset === item.idx;
-              return (
-                <Pressable
-                  onPress={() => setPricePreset(item.idx)}
-                  style={[styles.pill, { backgroundColor: active ? colors.primary : colors.card, borderColor: active ? colors.primary : colors.border }]}
-                >
-                  <Text style={[styles.pillText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>{item.label}</Text>
-                </Pressable>
-              );
-            }}
-          />
+          {/* Price presets — web-style chips */}
+          <View style={styles.filterRow}>
+            <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Price:</Text>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={[{ label: "Any", idx: null as number | null }, ...PRICE_PRESETS.map((p, idx) => ({ label: p.label, idx }))]}
+              keyExtractor={(o) => String(o.idx)}
+              contentContainerStyle={styles.chipRow}
+              renderItem={({ item }) => {
+                const active = pricePreset === item.idx;
+                return (
+                  <Pressable
+                    onPress={() => setPricePreset(item.idx)}
+                    style={[styles.pill, { backgroundColor: active ? colors.primary : colors.card, borderColor: active ? colors.primary : colors.border }]}
+                  >
+                    <Text style={[styles.pillText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>{item.label}</Text>
+                  </Pressable>
+                );
+              }}
+            />
+          </View>
         </View>
       )}
 
@@ -526,6 +500,13 @@ export default function PubsScreen() {
           }
         />
       )}
+
+      <CityPickerSheet
+        visible={cityPickerOpen}
+        onClose={() => setCityPickerOpen(false)}
+        selectedCity={city}
+        onSelect={setCity}
+      />
     </View>
   );
 }
@@ -555,7 +536,18 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   pillText: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  controlsRow: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: 2 },
+  barRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 2 },
+  selectTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 42,
+    minWidth: 130,
+  },
+  selectTriggerText: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium" },
   filtersBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -563,25 +555,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 9,
+    height: 42,
   },
   filtersBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   filtersDot: { width: 6, height: 6, borderRadius: 3 },
   clearAllBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
   clearAllText: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  filterPanel: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 },
-  toggleWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  togglePill: {
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  toggleDot: { width: 7, height: 7, borderRadius: 3.5 },
-  toggleText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  filterPanel: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 12 },
+  filterRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  filterLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  switchWrap: { flexDirection: "row", flexWrap: "wrap", gap: 14, rowGap: 10 },
+  switchRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  switchDot: { width: 7, height: 7, borderRadius: 3.5 },
+  switchLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
   resultsRow: { marginTop: 4 },
   resultsText: { fontSize: 13, fontFamily: "Inter_400Regular" },
   tabPill: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 10 },

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
-    "dev:local": "pnpm run build && node --enable-source-maps --env-file=.env.local ./dist/index.mjs",
+    "dev:local": "node ./free-port.mjs && pnpm run build && node --enable-source-maps --env-file=.env.local ./dist/index.mjs",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
